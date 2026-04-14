@@ -1,0 +1,17 @@
+﻿<UserControl x:Class="NetworkMapViewerV2.Views.MapCanvasView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Focusable="True" 
+             PreviewKeyDown="UserControl_PreviewKeyDown">
+    <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden">
+        <Canvas x:Name="DrawingCanvas" 
+                Background="Transparent" 
+                ClipToBounds="True"
+                UseLayoutRounding="True"
+                SnapsToDevicePixels="True"
+                RenderOptions.BitmapScalingMode="NearestNeighbor"
+                            
+                ContextMenuOpening="DrawingCanvas_ContextMenuOpening">
+        </Canvas>
+    </ScrollViewer>
+</UserControl>
