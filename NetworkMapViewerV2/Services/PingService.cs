@@ -73,15 +73,24 @@ namespace NetworkMapViewerV2.Services
 
         private async Task<bool> PingHostAsync(string ipAddress)
         {
+            // 1. THE GUARD CLAUSE: Reject empty strings or "0.0.0.0" immediately!
+            if (string.IsNullOrWhiteSpace(ipAddress) || ipAddress == "0.0.0.0")
+            {
+                return false;
+            }
+
             try
             {
-                using var pinger = new Ping();
-                // 1500ms timeout. If it takes longer than 1.5s to reply, consider it down.
-                var reply = await pinger.SendPingAsync(ipAddress, 1500);
-                return reply.Status == IPStatus.Success;
+                using (var ping = new Ping())
+                {
+                    // 2. The ping is now safe to execute
+                    var reply = await ping.SendPingAsync(ipAddress, 2000); // 2000ms timeout
+                    return reply.Status == IPStatus.Success;
+                }
             }
-            catch
+            catch (PingException)
             {
+                // This catches legitimate network failures (like unresolvable DNS)
                 return false;
             }
         }

@@ -68,7 +68,7 @@
                     <ComboBox x:Name="cmbType" Grid.Row="0" Grid.Column="1" Margin="0,0,0,15" VerticalAlignment="Center" Padding="4" SelectionChanged="CmbType_SelectionChanged"/>
 
                     <TextBlock x:Name="lblAddress" Grid.Row="1" Grid.Column="0" Text="Address" VerticalAlignment="Center" Margin="0,0,10,15"/>
-                    <TextBox x:Name="txtAddress" Grid.Row="1" Grid.Column="1" Margin="0,0,0,15" VerticalAlignment="Center" Padding="4"/>
+                    <TextBox x:Name="txtAddress" Grid.Row="1" Grid.Column="1" Margin="0,0,0,15" VerticalAlignment="Center" Padding="4" IsVisibleChanged="txtAddress_IsVisibleChanged"/>
 
                     <TextBlock x:Name="lblTargetMap" Text="Map file" Grid.Row="2" Grid.Column="0" Margin="0,0,0,2" VerticalAlignment="Center"/>
                     <ComboBox x:Name="cmbTargetMap" Grid.Row="2" Grid.Column="1"  VerticalAlignment="Center" Padding="4"/>

@@ -1,6 +1,7 @@
 ﻿using NetworkMapViewerV2.Helpers;
 using NetworkMapViewerV2.Models;
 using NetworkMapViewerV2.ViewModels;
+using System.ComponentModel;
 using System.IO;
 using System.Text.RegularExpressions;
 using System.Windows;
@@ -34,7 +35,7 @@ namespace NetworkMapViewerV2.Views
         private int _originalZIndex;
         private Dictionary<FrameworkElement, Point> _dragStartPositions = new();
         private Point _lastRightClickPosition;
-
+   
         // --- NEW: Marquee Selection & Clipboard State ---
         private Point _selectionStartPoint;
         private Rectangle? _selectionBox;
@@ -72,41 +73,33 @@ namespace NetworkMapViewerV2.Views
 
         private void MapCanvasView_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
-            // Unsubscribe from the OLD tab's property changes to prevent memory leaks
             if (e.OldValue is MapTabState oldState)
                 oldState.PropertyChanged -= CurrentState_PropertyChanged;
 
             if (e.NewValue is MapTabState state)
             {
                 _currentState = state;
-
-                // Subscribe to per-tab property changes (e.g. IsEditingEnabled toggled from another tab)
-                state.PropertyChanged += CurrentState_PropertyChanged;
-
-                // Redraw the map elements
                 DrawMap(state);
                 UpdateBackground();
-
-                // --- NEW: As soon as a newly opened tab finishes drawing, check if we need to animate! ---
                 CheckForPendingHighlight();
 
-                // FIX: Grab keyboard focus when the tab is activated so Ctrl+C / Ctrl+V work immediately
+                // ← ADD THIS: grab keyboard focus when the tab is switched
                 Dispatcher.InvokeAsync(
                     () => { this.Focus(); Keyboard.Focus(this); },
                     System.Windows.Threading.DispatcherPriority.Input);
             }
 
-            // Listen for Global ViewModel changes (like Grid Mode toggling!)
+            // Listen for Global ViewModel changes (like Edit Mode or Grid Mode toggling!)
             if (GlobalViewModel != null)
             {
                 // Remove old handler to prevent memory leaks, then attach the new one
                 GlobalViewModel.PropertyChanged -= GlobalViewModel_PropertyChanged;
                 GlobalViewModel.PropertyChanged += GlobalViewModel_PropertyChanged;
             }
+
         }
 
-        // Redraws the canvas when a per-tab property changes (e.g. IsEditingEnabled)
-        private void CurrentState_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        private void CurrentState_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             if (e.PropertyName == nameof(MapTabState.IsEditingEnabled))
                 DrawMap(_currentState);
@@ -194,7 +187,11 @@ namespace NetworkMapViewerV2.Views
             {
                 UpdateBackground();
             }
-            // --- CATCH THE ANIMATION SIGNAL! ---
+            else if (e.PropertyName == nameof(GlobalViewModel.IsEditingEnabled))
+            {
+                DrawMap(_currentState);
+            }
+            // --- NEW: CATCH THE ANIMATION SIGNAL! ---
             else if (e.PropertyName == nameof(GlobalViewModel.HighlightedDeviceId))
             {
                 CheckForPendingHighlight();
@@ -775,7 +772,7 @@ namespace NetworkMapViewerV2.Views
                     miAutoFill.Items.Add(miDomain);
                     miAutoFill.Items.Add(miNonDomain);
                     miAutoFill.Items.Add(miDefaultPC);
-                    miAutoFill.Items.Add(miLinux);
+                    miAutoFill.Items.Add(miLinux);                   
                     miAutoFill.Items.Add(new Separator());
                     miAutoFill.Items.Add(miPrinter);
                     miAutoFill.Items.Add(miPhone);
@@ -1165,7 +1162,7 @@ namespace NetworkMapViewerV2.Views
             }
         }
 
-
+                
         private async Task RunPrinterAutoFill(NetworkDevice device)
         {
             if (string.IsNullOrWhiteSpace(device.Address) || device.Address == "0.0.0.0") return;
@@ -1380,6 +1377,7 @@ namespace NetworkMapViewerV2.Views
         {
             if (e.OriginalSource != DrawingCanvas) return;
             if (_currentState == null || !_currentState.IsEditingEnabled)
+
             {
                 e.Handled = true;
                 return;
@@ -1390,7 +1388,7 @@ namespace NetworkMapViewerV2.Views
             // Dynamically build the menu!
             var menu = new ContextMenu();
 
-            var miAddDevice = new MenuItem { Icon = "🖥️", Header = "Add Device Here...", FontWeight = FontWeights.Bold };
+            var miAddDevice = new MenuItem { Header = "🖥️ Add Device Here...", FontWeight = FontWeights.Bold };
 
             // Fetch groups from DB so you can select the type BEFORE adding!
             var repo = new Data.MapRepository();
@@ -1402,16 +1400,16 @@ namespace NetworkMapViewerV2.Views
                 miAddDevice.Items.Add(subItem);
             }
 
-            var miBatchAdd = new MenuItem { Icon = "📦", Header = "Batch Add Devices..." };
+            var miBatchAdd = new MenuItem { Header = "📦 Batch Add Devices..." };
             miBatchAdd.Click += BatchAdd_Click;
 
-            var miAddLabel = new MenuItem { Icon = "📝", Header = "Add Label Here...", FontWeight = FontWeights.Bold };
+            var miAddLabel = new MenuItem { Header = "📝 Add Label Here...", FontWeight = FontWeights.Bold };
             miAddLabel.Click += AddLabel_Click;
 
-            var miBatchLabels = new MenuItem { Icon = "📦", Header = "Batch Add Labels..." };
+            var miBatchLabels = new MenuItem { Header = "📦 Batch Add Labels..." };
             miBatchLabels.Click += BatchAddLabels_Click;
 
-            var miAdvancedGrid = new MenuItem { Icon = "⚙️", Header = "Advanced Grid Generator..." };
+            var miAdvancedGrid = new MenuItem { Header = "⚙️ Advanced Grid Generator..." };
             miAdvancedGrid.Click += (s, ev) =>
             {
                 if (_currentState == null) return;
@@ -1466,13 +1464,6 @@ namespace NetworkMapViewerV2.Views
                 miAlign.Items.Add(miAlignBottom);
 
                 menu.Items.Add(miAlign);
-            }
-
-            if (_selectedElements.Any(e => e.Tag is NetworkDevice) && _selectedElements.Any(e => e.Tag is NetworkLabel))
-            {
-                var miAutoAlign = new MenuItem { Icon = "✨", Header = "Auto-Align Devices (Alt+A)" };
-                miAutoAlign.Click += (sender, args) => AutoAlignSelectedPairs();
-                menu.Items.Add(miAutoAlign);
             }
 
             menu.Items.Add(miAddDevice);
@@ -1739,10 +1730,10 @@ namespace NetworkMapViewerV2.Views
 
             // Ceiling constraint (Bottom/Right)
             if (DrawingCanvas.ActualWidth > 0 && newLeft > DrawingCanvas.ActualWidth - element.ActualWidth)
-                newLeft = DrawingCanvas.ActualWidth;
+                newLeft = DrawingCanvas.ActualWidth - element.ActualWidth;
 
             if (DrawingCanvas.ActualHeight > 0 && newTop > DrawingCanvas.ActualHeight - element.ActualHeight)
-                newTop = DrawingCanvas.ActualHeight;
+                newTop = DrawingCanvas.ActualHeight - element.ActualHeight;
         }
 
 
@@ -1823,20 +1814,13 @@ namespace NetworkMapViewerV2.Views
                 return;
             }
 
-            // --- PASTE LOGIC (Ctrl + V / Ctrl + Shift + V) ---
+            // --- PASTE LOGIC (Ctrl + V) ---
             if (isCtrlDown && e.Key == Key.V && _currentState != null)
             {
-                // 1. Detect if Shift is held down for "Paste in Place"
-                bool isShiftDown = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
-
-                // 2. If Shift is down, offset is 0. Otherwise, calculate normal offset.
-                double offset = isShiftDown ? 0 : 30 * _pasteOffsetMultiplier;
-
+                double offset = 30 * _pasteOffsetMultiplier;
                 SelectElement(null, false); // Clear current selection
-
                 if (_copiedDevices.Count == 0 && _copiedLabels.Count == 0)
                     return;
-
                 // Paste Devices
                 foreach (var d in _copiedDevices)
                 {
@@ -1881,12 +1865,7 @@ namespace NetworkMapViewerV2.Views
                     _currentState.Labels.Add(newLab);
                 }
 
-                // 3. Only increment the offset multiplier if it was a normal paste!
-                if (!isShiftDown)
-                {
-                    _pasteOffsetMultiplier++;
-                }
-
+                _pasteOffsetMultiplier++; // If they paste again, it steps down further!
                 if (_currentState != null) _currentState.HasUnsavedChanges = true;
                 DrawMap(_currentState);
 
@@ -1937,97 +1916,8 @@ namespace NetworkMapViewerV2.Views
                     case Key.Right: AlignSelectedElements(AlignMode.Right); e.Handled = true; return;
                     case Key.S: AlignSelectedElements(AlignMode.Middle); e.Handled = true; return;
                     case Key.C: AlignSelectedElements(AlignMode.Center); e.Handled = true; return;
-                    case Key.A: AutoAlignSelectedPairs(); e.Handled = true; return;
                 }
             }
-        }
-
-
-        private void AutoAlignSelectedPairs()
-        {
-            if (_currentState == null || !_currentState.IsEditingEnabled) return;
-
-            var deviceElements = _selectedElements.Where(e => e.Tag is NetworkDevice).ToList();
-            var labelElements = _selectedElements.Where(e => e.Tag is NetworkLabel).ToList();
-
-            if (deviceElements.Count == 0 || labelElements.Count == 0) return;
-
-            // 1. Force layout update so sizes are accurate
-            foreach (var el in _selectedElements) el.UpdateLayout();
-
-            // 2. Backup the original selection so we can restore it at the end
-            var originalSelection = _selectedElements.ToList();
-
-            // 3. Match devices and labels 1-to-1 using Center Distance
-            var unassignedLabels = labelElements.ToList();
-            var unassignedDevices = deviceElements.ToList();
-            var pairings = new List<(FrameworkElement device, FrameworkElement label)>();
-
-            while (unassignedLabels.Count > 0 && unassignedDevices.Count > 0)
-            {
-                double minDistance = double.MaxValue;
-                FrameworkElement? bestDevice = null;
-                FrameworkElement? bestLabel = null;
-
-                foreach (var lbl in unassignedLabels)
-                {
-                    double lblCX = Canvas.GetLeft(lbl) + (lbl.ActualWidth / 2);
-                    double lblCY = Canvas.GetTop(lbl) + (lbl.ActualHeight / 2);
-
-                    foreach (var dev in unassignedDevices)
-                    {
-                        double devCX = Canvas.GetLeft(dev) + (dev.ActualWidth / 2);
-                        double devCY = Canvas.GetTop(dev) + (dev.ActualHeight / 2);
-
-                        // Strict vertical penalty so it prefers the label directly above/below it
-                        double dist = Math.Pow((lblCX - devCX) * 10, 2) + Math.Pow(lblCY - devCY, 2);
-                        if (dist < minDistance)
-                        {
-                            minDistance = dist;
-                            bestDevice = dev;
-                            bestLabel = lbl;
-                        }
-                    }
-                }
-
-                if (bestDevice != null && bestLabel != null)
-                {
-                    pairings.Add((bestDevice, bestLabel));
-                    unassignedLabels.Remove(bestLabel);
-                    unassignedDevices.Remove(bestDevice);
-                }
-            }
-
-            // =======================================================
-            // 4. USE YOUR EXISTING ALIGNMENT LOGIC!
-            // =======================================================
-            foreach (var pair in pairings)
-            {
-                // Temporarily isolate the selection to JUST this one pair
-                _selectedElements.Clear();
-                _selectedElements.Add(pair.device);
-                _selectedElements.Add(pair.label);
-
-                var devData = (NetworkDevice)pair.device.Tag;
-
-                if (devData.GroupId == 9) // Phones
-                {
-                    AlignSelectedElements(AlignMode.Top);
-                    AlignSelectedElements(AlignMode.Right);
-                }
-                else // Computers, Printers, etc.
-                {
-                    AlignSelectedElements(AlignMode.Middle);
-                    AlignSelectedElements(AlignMode.Center);
-                }
-            }
-
-            // 5. Restore the user's original massive selection
-            _selectedElements.Clear();
-            _selectedElements.AddRange(originalSelection);
-
-            _currentState.HasUnsavedChanges = true;
-            DrawMap(_currentState);
         }
     }
 }

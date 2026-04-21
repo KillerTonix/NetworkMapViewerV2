@@ -88,7 +88,7 @@
                                 <Setter TargetName="TabBorder" Property="Background" Value="#D9534F"/>
                                 <Setter TargetName="TabBorder" Property="BorderBrush" Value="#C9302C"/>
                                 <Setter Property="Foreground" Value="White"/>
-                                <Setter Property="FontWeight" Value="Bold"/>
+                                <Setter Property="FontWeight" Value="SemiBold"/>
                             </MultiDataTrigger>
 
                         </ControlTemplate.Triggers>

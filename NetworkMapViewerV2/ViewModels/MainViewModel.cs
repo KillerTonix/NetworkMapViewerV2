@@ -124,26 +124,6 @@ namespace NetworkMapViewerV2.ViewModels
         }
 
 
-       /* [RelayCommand]
-        public void ImportLegacyMap()
-        {
-            var openFileDialog = new OpenFileDialog { Filter = "Map Files (*.map)|*.map", Title = "Import Legacy Network Map File" };
-            if (openFileDialog.ShowDialog() == true)
-            {
-                try
-                {
-                    var importedMapState = MapParserService.ParseMapFile(openFileDialog.FileName);
-                    var repository = new Data.MapRepository();
-
-                    // Assuming SaveMap returns the new Database ID, or sets it on the object
-                    repository.SaveMap(importedMapState);
-
-                    OpenTabs.Add(importedMapState);
-                    SelectedTab = importedMapState;
-                }
-                catch (Exception ex) { MessageBox.Show($"Error importing:\n{ex.Message}"); }
-            }
-        }*/
 
 
         // ─── PURE SQLITE RELOAD ──────────────────────────────
@@ -182,30 +162,7 @@ namespace NetworkMapViewerV2.ViewModels
             }
         }
 
-        // ─── SAVE AS... (Ctrl + Shift + S) ───────────────────
-        /*[RelayCommand]
-        private void ExportMap()
-        {
-            if (SelectedTab == null) return;
-
-            var saveFileDialog = new Microsoft.Win32.SaveFileDialog
-            {
-                Filter = "Map Files (*.map)|*.map",
-                Title = "Export Legacy Network Map",
-                FileName = SelectedTab.MapName
-            };
-
-            if (saveFileDialog.ShowDialog() == true)
-            {
-                try
-                {
-                    MapParserService.ExportToMapFile(SelectedTab, saveFileDialog.FileName);
-                    MessageBox.Show($"Map successfully exported to:\n{saveFileDialog.FileName}", "Export Successful", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-                catch (Exception ex) { MessageBox.Show($"Failed to export map:\n{ex.Message}", "Export Error", MessageBoxButton.OK, MessageBoxImage.Error); }
-            }
-        }
-*/
+        
         [RelayCommand]
         private void Options()
         {
@@ -223,30 +180,23 @@ namespace NetworkMapViewerV2.ViewModels
         [RelayCommand]
         private void ToggleEditMode()
         {
+            if (SelectedTab == null) return;
+
             // If we are turning it OFF, and there are changes...
-            if (IsEditingEnabled && HasUnsavedChanges)
+            if (SelectedTab.IsEditingEnabled && SelectedTab.HasUnsavedChanges)
             {
                 var result = MessageBox.Show(
                     "You have unsaved edits. Do you want to save them to the database?",
                     "Save Changes?", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
 
-                if (result == MessageBoxResult.Yes)
-                {
-                    SaveMap(); // Save to DB!
-                }
-                else if (result == MessageBoxResult.Cancel)
-                {
-                    return; // Abort turning off edit mode
-                }
-                else if (result == MessageBoxResult.No)
-                {
-                    // Discard changes by reloading the map from the database!
-                    HasUnsavedChanges = false;
-                    ReloadMap();
-                }
+                if (result == MessageBoxResult.Yes) SaveMap();
+                else if (result == MessageBoxResult.Cancel) return;
+                else if (result == MessageBoxResult.No) { SelectedTab.HasUnsavedChanges = false; ReloadMap(); }
             }
 
-            IsEditingEnabled = !IsEditingEnabled;
+            SelectedTab.IsEditingEnabled = !SelectedTab.IsEditingEnabled;
+            IsEditingEnabled = SelectedTab.IsEditingEnabled;
+
         }
 
         [RelayCommand]
@@ -340,36 +290,7 @@ namespace NetworkMapViewerV2.ViewModels
         {
             OpenOptionsWindow(3); //options 2 page
         }
-        
-        /*public void OpenSpecificMap(string mapFilePath)
-        {
-            if (string.IsNullOrWhiteSpace(mapFilePath)) return;
-
-            // Check if already open
-            foreach (var tab in OpenTabs)
-            {
-                if (tab.FilePath?.Equals(mapFilePath, StringComparison.OrdinalIgnoreCase) == true)
-                {
-                    SelectedTab = tab;
-                    return;
-                }
-            }
-
-            // Import, Save to SQLite, and Add Tab!
-            try
-            {
-                var importedMapState = MapParserService.ParseMapFile(mapFilePath);
-                var repository = new Data.MapRepository();
-                repository.SaveMap(importedMapState);
-
-                OpenTabs.Add(importedMapState);
-                SelectedTab = importedMapState;
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Could not open linked map:\n{ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }*/
+                
 
         // Add the service to the top of your ViewModel
         private readonly PingService _pingService = new();
@@ -404,6 +325,8 @@ namespace NetworkMapViewerV2.ViewModels
         // --- Detect when the user switches tabs ---
         partial void OnSelectedTabChanged(MapTabState value)
         {
+            IsEditingEnabled = value?.IsEditingEnabled ?? false;
+
             if (value != null)
             {
                 if (PingService.IsRunning) PingService.StopPinging();

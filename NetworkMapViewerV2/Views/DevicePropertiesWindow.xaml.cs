@@ -144,6 +144,14 @@ namespace NetworkMapViewerV2.Views
             {
                 EditingDevice.GroupId = (int)cmbType.SelectedValue;
             }
+            if (cmbTargetMap.SelectedValue != null)
+            {
+                EditingDevice.TargetMapId = (int)cmbTargetMap.SelectedValue;
+            }
+            else
+            {
+                EditingDevice.TargetMapId = null;
+            }
 
             this.DialogResult = true;
             this.Close();
@@ -194,19 +202,32 @@ namespace NetworkMapViewerV2.Views
             }
         }
 
-        private void Window_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        private void Window_KeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Key == System.Windows.Input.Key.Escape)
+            if (e.Key == Key.Escape)
                 this.Close();
         }
-               
 
-        private void txtHint_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+
+        private void txtHint_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.B)
             {
                 BtnBold_Click(sender, e);
                 e.Handled = true;
+            }
+        }
+
+        private void txtAddress_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            if ((bool)e.NewValue == true)
+            {
+                // Tell WPF to wait until the UI is idle and completely drawn before focusing
+                Application.Current.Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    txtAddress.Focus();
+                    txtAddress.SelectAll();
+                }), System.Windows.Threading.DispatcherPriority.ContextIdle);
             }
         }
     }
