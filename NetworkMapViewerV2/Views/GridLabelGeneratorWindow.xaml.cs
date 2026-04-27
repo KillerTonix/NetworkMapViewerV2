@@ -1,6 +1,4 @@
 ﻿using NetworkMapViewerV2.Models;
-using System;
-using System.Collections.Generic;
 using System.Windows;
 
 namespace NetworkMapViewerV2.Views
@@ -13,11 +11,7 @@ namespace NetworkMapViewerV2.Views
         public GridLabelGeneratorWindow(int targetMapId, Point startLocation)
         {
             InitializeComponent();
-            _targetMapId = targetMapId;
-
-            // Auto-fill starting coordinates based on where the user right-clicked!
-            txtStartX.Text = startLocation.X.ToString();
-            txtStartY.Text = startLocation.Y.ToString();
+            _targetMapId = targetMapId;           
         }
 
         private void BtnGenerate_Click(object sender, RoutedEventArgs e)

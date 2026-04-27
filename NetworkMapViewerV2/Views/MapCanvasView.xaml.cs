@@ -1054,7 +1054,6 @@ namespace NetworkMapViewerV2.Views
 
             try
             {
-                // Provide visual feedback while WMI is scanning
                 device.Hints.Clear();
                 device.Hints.Add("<b>STATUS:</b> Scanning WMI via PowerShell...");
                 DrawMap(_currentState);
@@ -1072,29 +1071,163 @@ namespace NetworkMapViewerV2.Views
                 using var process = System.Diagnostics.Process.Start(psi);
                 if (process == null) return;
 
-                // Read the output asynchronously so the UI doesn't freeze!
                 string output = await process.StandardOutput.ReadToEndAsync();
                 await process.WaitForExitAsync();
 
+                // ==========================================
+                // --- THE FIX: RPC FAILURE DETECTION ---
+                // ==========================================
+                if (string.IsNullOrWhiteSpace(output) || output.Contains("ERROR="))
+                {
+                    device.Hints.Clear();
+                    device.Hints.Add("<b>STATUS:</b> WMI Blocked. Tunneling via PsExec...");
+                    DrawMap(_currentState);
+
+                    // Trigger the fallback!
+                    output = await RunPsExecFallbackAsync(device.Address);
+
+                    var lines = output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).ToList();
+                    for (int i = 0; i < lines.Count; i++)
+                    {
+                        if (lines[i].StartsWith("USERNAME="))
+                        {
+                            string rawUser = lines[i].Substring(9).Trim();
+                            if (!string.IsNullOrWhiteSpace(rawUser))
+                            {
+                                // Show a loading message so you know it's querying AD
+                                device.Hints.Clear();
+                                device.Hints.Add($"<b>STATUS:</b> Resolving AD User: {rawUser}...");
+                                DrawMap(_currentState);
+
+                                // Replace the raw username with the real AD Name!
+                                string adName = await ResolveADNameAsync(rawUser);
+                                lines[i] = $"USERNAME={adName}";
+                            }
+                        }
+                    }
+
+                    // Re-assemble the text and hand it safely to the parser
+                    output = string.Join("\n", lines);
+                }
+
                 if (string.IsNullOrWhiteSpace(output))
                 {
-                    string errors = await process.StandardError.ReadToEndAsync();
-                    MessageBox.Show($"Script returned no data. Error:\n{errors}", "WMI Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show("Both WMI and PsExec failed to return data.", "Scan Failed", MessageBoxButton.OK, MessageBoxImage.Error);
                     device.Hints.Clear();
                     device.Hints.Add("<b>STATUS:</b> Scan Failed");
                 }
                 else
-                {
+                {             
+                    
                     ParseScriptOutputToHints(device, output);
                 }
 
-                GlobalViewModel?.HasUnsavedChanges = true;
+                if (GlobalViewModel != null) GlobalViewModel.HasUnsavedChanges = true;
                 DrawMap(_currentState);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to execute PowerShell:\n{ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"Failed to execute scripts:\n{ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+
+
+        private async Task<string> RunPsExecFallbackAsync(string ipAddress)
+        {
+            string localScriptPath = System.IO.Path.Combine(ScriptsPath, "SystemInfo Local.ps1");
+            string psExecPath = System.IO.Path.Combine(ScriptsPath, "psexec.exe");
+
+            if (!File.Exists(localScriptPath) || !File.Exists(psExecPath))
+            {
+                return "ERROR=PsExec.exe or 'SystemInfo Local.ps1' not found in Scripts folder.";
+            }
+
+            try
+            {
+                // 1. Read the script and encode it to Base64 (UTF-16LE is strictly required by PowerShell)
+                string scriptContent = await File.ReadAllTextAsync(localScriptPath);
+                byte[] scriptBytes = System.Text.Encoding.Unicode.GetBytes(scriptContent);
+                string encodedCommand = Convert.ToBase64String(scriptBytes);
+
+                // 2. Build the PsExec command
+                // -s runs it as the powerful SYSTEM account. 
+                // -n 15 forces it to give up after 15 seconds if the PC is truly dead.
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = psExecPath,
+                    Arguments = $"\\\\{ipAddress} -s -accepteula -n 15 powershell.exe -NoProfile -ExecutionPolicy Bypass -EncodedCommand {encodedCommand}",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using var process = System.Diagnostics.Process.Start(psi);
+                if (process == null) return "ERROR=Failed to start PsExec process.";
+
+                string output = await process.StandardOutput.ReadToEndAsync();
+                await process.WaitForExitAsync();
+
+
+
+                // PsExec spits out a lot of junk connection text. We just want our variables!
+                if (string.IsNullOrWhiteSpace(output) || output.Contains("ERROR="))
+                    return "ERROR=PsExec connected but returned no data.";
+                return output;
+            }
+            catch (Exception ex)
+            {
+                return $"ERROR=PsExec Failure: {ex.Message}";
+            }
+        }
+
+        private async Task<string> ResolveADNameAsync(string rawUsername)
+        {
+            // 1. Clean the username (Strips "DOMAIN\" so it's just "jdoe")
+            string cleanUsername = rawUsername;
+            if (cleanUsername.Contains('\\'))
+            {
+                cleanUsername = cleanUsername.Split('\\').Last();
+            }
+
+            string scriptPath = System.IO.Path.Combine(ScriptsPath, "GetADUser.ps1");
+
+            // If the script is missing, just return the raw username so the map doesn't break
+            if (!File.Exists(scriptPath)) return rawUsername;
+
+            try
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "powershell.exe",
+                    Arguments = $"-NoProfile -ExecutionPolicy Bypass -File \"{scriptPath}\" -Username \"{cleanUsername}\"",
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using var process = System.Diagnostics.Process.Start(psi);
+                if (process == null) return rawUsername;
+
+                string output = await process.StandardOutput.ReadToEndAsync();
+                await process.WaitForExitAsync();
+
+                // Extract the clean name from your script's output
+                foreach (var line in output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+                {
+                    if (line.StartsWith("USERNAME="))
+                    {
+                        string adName = line.Substring(9).Trim();
+                        if (!string.IsNullOrWhiteSpace(adName)) return adName;
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                MessageBox.Show(e.Message);
+            }
+
+            return rawUsername; // Fallback on failure
         }
 
         private void ParseScriptOutputToHints(NetworkDevice device, string scriptOutput)
@@ -1211,52 +1344,53 @@ namespace NetworkMapViewerV2.Views
         {
             if (string.IsNullOrWhiteSpace(device.Address) || device.Address == "0.0.0.0") return;
 
-            string model = string.Empty, mac = string.Empty, firmware = string.Empty;
             device.Hints.Clear();
             device.Hints.Add("<b>STATUS:</b> Scraping Grandstream Web Interface...");
             DrawMap(_currentState);
 
-            // Run Selenium on a background thread so the UI doesn't freeze!
-            var results = await Task.Run(() =>
+            var fetcher = new Helpers.WebFetcher.GrandstreamsWebFetcher();
+            var results = await fetcher.FetchGrandstreamsAsync(device.Address);
+
+            if (results.TryGetValue("ERROR", out string? errorMessage))
             {
-                var fetcher = new Helpers.WebFetcher.GrandstreamsWebFetcher();
-                return fetcher.FetchGrandstreams(device.Address);
-            });
+                // Explicitly clear the scraping status if it failed
+                device.Hints.Clear();
+                device.Hints.Add("<b>STATUS:</b> Scan Failed");
+                DrawMap(_currentState);
 
-            if (!results.TryGetValue("ERROR", out string? value))
-            {
-                if (results.Count > 0)
-                {
-                    model = results.GetValueOrDefault("Model", "Grandstream Device");
-                    mac = results.GetValueOrDefault("MAC", "Unknown");
-                    firmware = results.GetValueOrDefault("Firmware", "Unknown");
-
-                    device.Hints.Clear();
-                    device.Hints.Add($"<b>MODEL:</b> {model}");
-                    device.Hints.Add($"<b>MAC:</b> {mac}");
-                    device.Hints.Add($"<b>IP:</b> {device.Address}");
-                    device.Hints.Add($"<b>FIRMWARE:</b> {firmware}");
-
-                    device.Titles.Clear();
-                    device.Titles.Add(results.GetValueOrDefault("Number", "unknown").Trim());
-
-                    if (model.Contains("GXP2170"))
-                        device.HintImagePath = HintImagesPath + "\\GXP2170.png";
-                    else if (model.Contains("DP750"))
-                        device.HintImagePath = HintImagesPath + "\\DP750.png";
-                    else if (model.Contains("GXP1628"))
-                        device.HintImagePath = HintImagesPath + "\\GXP1628.png";
-
-                    GlobalViewModel?.HasUnsavedChanges = true;
-                    DrawMap(_currentState);
-                }
-            }
-            else
-            {
-                MessageBox.Show($"Web Scraper failed:\n{value}", "Scan Failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show($"Web Scraper failed:\n{errorMessage}", "Scan Failed", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-        }
+
+
+            if (results.Count > 0)
+            {
+                string model = results.GetValueOrDefault("Model", "Grandstream Device");
+                string mac = results.GetValueOrDefault("MAC", "Unknown");
+                string firmware = results.GetValueOrDefault("Firmware", "Unknown");
+                string sipNumber = results.GetValueOrDefault("Number", "unknown").Trim();
+
+                device.Hints.Clear();
+                device.Hints.Add($"<b>MODEL:</b> {model}");
+                device.Hints.Add($"<b>MAC:</b> {mac}");
+                device.Hints.Add($"<b>IP:</b> {device.Address}");
+                device.Hints.Add($"<b>FIRMWARE:</b> {firmware}");
+
+                device.Titles.Clear();
+                device.Titles.Add(sipNumber);
+
+                if (model.Contains("GXP2170"))
+                    device.HintImagePath = HintImagesPath + "\\GXP2170.png";
+                else if (model.Contains("DP750"))
+                    device.HintImagePath = HintImagesPath + "\\DP750.png";
+                else if (model.Contains("GXP1628"))
+                    device.HintImagePath = HintImagesPath + "\\GXP1628.png";
+
+                GlobalViewModel?.HasUnsavedChanges = true;
+
+                DrawMap(_currentState);
+            }            
+        } 
 
 
         // --- HELPER: Finds a specific control inside a container ---
@@ -1691,7 +1825,7 @@ namespace NetworkMapViewerV2.Views
                 for (int i = 0; i < count; i++)
                 {
                     // 2. Calculate offsets. (Horizontal uses Width + 10 gap, Vertical uses 40 as requested)
-                    double leftOffset = txtHorizontal.IsChecked == true ? (i * 80) : 0;
+                    double leftOffset = txtHorizontal.IsChecked == true ? (i * 125) : 0;
                     double topOffset = txtVertical.IsChecked == true ? (i * 50) : 0;
 
                     var newDevice = new NetworkDevice
@@ -1806,6 +1940,15 @@ namespace NetworkMapViewerV2.Views
                 return;
             }
             bool isCtrlDown = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
+
+            // --- FIND AND REPLACE LOGIC (Ctrl + H) ---
+            if (isCtrlDown && e.Key == Key.H)
+            {
+                ExecuteFindAndReplace();
+                e.Handled = true;
+                return;
+            }
+
 
             // --- COPY LOGIC (Ctrl + C) ---
             if (isCtrlDown && e.Key == Key.C)
@@ -2028,6 +2171,68 @@ namespace NetworkMapViewerV2.Views
 
             _currentState.HasUnsavedChanges = true;
             DrawMap(_currentState);
+        }
+
+
+
+        private void ExecuteFindAndReplace()
+        {
+            if (_currentState == null || !_currentState.IsEditingEnabled) return;
+
+            var dlg = new FindReplaceWindow { Owner = Window.GetWindow(this) };
+            if (dlg.ShowDialog() == true)
+            {
+                string find = dlg.FindText;
+                string replace = dlg.ReplaceText;
+                int affectedDevices = 0;
+
+                // Loop through EVERY device on the current map
+                foreach (var device in _currentState.Devices)
+                {
+                    bool wasModified = false;
+
+                    // 1. Check and Replace IP Address
+                    if (!string.IsNullOrEmpty(device.Address) && device.Address.Contains(find))
+                    {
+                        device.Address = device.Address.Replace(find, replace);
+                        wasModified = true;
+                    }
+
+                    // 2. Check and Replace Titles (The visible text on the map)
+                    for (int i = 0; i < device.Titles.Count; i++)
+                    {
+                        if (device.Titles[i].Contains(find))
+                        {
+                            device.Titles[i] = device.Titles[i].Replace(find, replace);
+                            wasModified = true;
+                        }
+                    }
+
+                    // 3. Check and Replace Hints (The tooltip hover text)
+                    for (int i = 0; i < device.Hints.Count; i++)
+                    {
+                        if (device.Hints[i].Contains(find))
+                        {
+                            device.Hints[i] = device.Hints[i].Replace(find, replace);
+                            wasModified = true;
+                        }
+                    }
+
+                    if (wasModified) affectedDevices++;
+                }
+
+                // If we changed anything, tell the system there are unsaved changes and redraw!
+                if (affectedDevices > 0)
+                {
+                    _currentState.HasUnsavedChanges = true;
+                    DrawMap(_currentState);
+                    MessageBox.Show($"Successfully replaced '{find}' with '{replace}' in {affectedDevices} devices.", "Replace Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                else
+                {
+                    MessageBox.Show($"No matches found for '{find}' on this map.", "No Results", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
         }
     }
 }
