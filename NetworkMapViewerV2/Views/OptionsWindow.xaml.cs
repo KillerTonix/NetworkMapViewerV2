@@ -1,4 +1,4 @@
-﻿using Microsoft.Win32;
+﻿using NetworkMapViewerV2.Helpers.Passwords;
 using NetworkMapViewerV2.Models;
 using NetworkMapViewerV2.Services;
 using System.Collections.ObjectModel;
@@ -11,10 +11,12 @@ namespace NetworkMapViewerV2.Views
     {
         private readonly AppSettings _settings;
         public ObservableCollection<ExternalCommand> Commands { get; set; }
-        public ObservableCollection<DeviceGroup> DeviceGroups { get; set; } 
+        public ObservableCollection<DeviceGroup> DeviceGroups { get; set; }
         /// <summary>True if user pressed OK (settings should be re-read by caller).</summary>
         public bool Saved { get; private set; }
+        private static AppSettings settings = SettingsService.Load();
 
+        private static string DbPath = settings.DatabasePath ?? "";
         public OptionsWindow(int tabIndex = 0)
         {
             InitializeComponent();
@@ -36,6 +38,24 @@ namespace NetworkMapViewerV2.Views
 
             // --- LOAD SEARCH SETTINGS ---
             DeeperSearchRB.IsChecked = _settings.DeepperSearchMode;
+
+            // --- LOAD PATH SETTINGS ---
+            DatabasePathTextBox.Text = _settings.DatabasePath;
+            DeviceIconsPathTextBox.Text = _settings.DeviceIconsPath;
+            HintImagesPathTextBox.Text = _settings.HintImagesPath;
+            ScriptsPathTextBox.Text = _settings.ScriptsPath;
+
+            // --- LOAD PASSWORD SETTINGS ---
+            if (!(DbPath == null || DbPath == ""))
+            {
+                PrinterPasswordTextBox.Text = "******";
+                GrandstreamPasswordTextBox.Text = "******";
+                VncPasswordTextBox.Text = "******";
+                SshPasswordTextBox.Text = "******";
+                ManagersPcPasswordTextBox.Text = "******";
+                QmsPasswordTextBox.Text = "******";
+            }
+
 
             SettingsTC.SelectedIndex = tabIndex;
             var repo = new Data.MapRepository();
@@ -282,6 +302,27 @@ namespace NetworkMapViewerV2.Views
             // Save Search settings
             _settings.DeepperSearchMode = DeeperSearchRB.IsChecked == true;
 
+            // Save Path settings
+            _settings.DatabasePath = DatabasePathTextBox.Text.Trim();
+            _settings.DeviceIconsPath = DeviceIconsPathTextBox.Text.Trim();
+            _settings.HintImagesPath = HintImagesPathTextBox.Text.Trim();
+            _settings.ScriptsPath = ScriptsPathTextBox.Text.Trim();
+
+
+            if (PrinterPasswordTextBox.Text != "******")
+                _settings.PrinterPassword = SecureSettingsHelper.ProtectPassword(PrinterPasswordTextBox.Text.Trim());
+            if (GrandstreamPasswordTextBox.Text != "******")
+                _settings.GrandstreamPassword = SecureSettingsHelper.ProtectPassword(GrandstreamPasswordTextBox.Text.Trim());
+            if (VncPasswordTextBox.Text != "******")
+                _settings.VNCPassword = SecureSettingsHelper.ProtectPassword(VncPasswordTextBox.Text.Trim());
+            if (SshPasswordTextBox.Text != "******")
+                _settings.SSHPassword = SecureSettingsHelper.ProtectPassword(SshPasswordTextBox.Text.Trim());
+            if (ManagersPcPasswordTextBox.Text != "******")
+                _settings.ManagersPCPassword = SecureSettingsHelper.ProtectPassword(ManagersPcPasswordTextBox.Text.Trim()); 
+            if (QmsPasswordTextBox.Text != "******")
+                _settings.QMSPassword = SecureSettingsHelper.ProtectPassword(QmsPasswordTextBox.Text.Trim());
+
+
             // Write to disk
             SettingsService.Save(_settings);
             Saved = true;
@@ -293,6 +334,6 @@ namespace NetworkMapViewerV2.Views
             this.Close();
         }
 
-       
+
     }
 }

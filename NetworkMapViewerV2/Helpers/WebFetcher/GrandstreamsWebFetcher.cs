@@ -1,15 +1,18 @@
-﻿using OpenQA.Selenium;
+﻿using NetworkMapViewerV2.Helpers.Passwords;
+using NetworkMapViewerV2.Models;
+using NetworkMapViewerV2.Services;
+using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Support.UI;
 using SeleniumExtras.WaitHelpers;
-using System.Runtime;
 
 namespace NetworkMapViewerV2.Helpers.WebFetcher
 {
     public class GrandstreamsWebFetcher
     {
         private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(10);
-
+        private static AppSettings settings = SettingsService.Load();
+        private static string decryptedPassword = SecureSettingsHelper.UnprotectPassword(settings.GrandstreamPassword) ?? "";
         public async Task<Dictionary<string, string>> FetchGrandstreamsAsync(string deviceIP)
         {
             return await Task.Run(() =>
@@ -78,7 +81,7 @@ namespace NetworkMapViewerV2.Helpers.WebFetcher
 
                         // Login process
                         SafeWrite(driver, By.XPath("//input[contains(@class,'gwt-TextBox')]"), "admin");
-                        SafeWrite(driver, By.XPath("//input[contains(@class, 'gwt-PasswordTextBox')]"), "789Test");
+                        SafeWrite(driver, By.XPath("//input[contains(@class, 'gwt-PasswordTextBox')]"), decryptedPassword);
                         WaitUntilClickable(driver, By.XPath("//button[contains(text(),'Login')]")).Click();
 
                         // Wait for the dashboard to successfully load

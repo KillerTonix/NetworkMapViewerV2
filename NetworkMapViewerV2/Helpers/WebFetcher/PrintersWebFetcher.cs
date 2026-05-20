@@ -1,4 +1,7 @@
-﻿using OpenQA.Selenium;
+﻿using NetworkMapViewerV2.Helpers.Passwords;
+using NetworkMapViewerV2.Models;
+using NetworkMapViewerV2.Services;
+using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Support.UI;
 using SeleniumExtras.WaitHelpers;
@@ -8,10 +11,11 @@ namespace NetworkMapViewerV2.Helpers.WebFetcher
     internal class PrintersWebFetcher
     {
         private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(10);
-
+        private static AppSettings settings = SettingsService.Load();
+        private static string decryptedPassword = SecureSettingsHelper.UnprotectPassword(settings.PrinterPassword) ?? "";
         public Dictionary<string, string> FetchPrinters(string deviceIP)
         {
-            Dictionary<string, string> HintInfo = new();
+            Dictionary<string, string> HintInfo = [];
             string url = $"https://{deviceIP}/"; // Note: Many newer HPs force HTTPS!
             string httpUrl = $"http://{deviceIP}/"; // Fallback
             string networkUrl = $"{url}#hId-pgNetworkSummary";
@@ -74,7 +78,7 @@ namespace NetworkMapViewerV2.Helpers.WebFetcher
 
                         var passBox = driver.FindElement(By.XPath("//input[@type='password']"));
                         passBox.Clear();
-                        passBox.SendKeys("EvocaPrint!@");
+                        passBox.SendKeys(decryptedPassword);
 
                         var submitBtn = driver.FindElement(By.XPath("//button[contains(text(),'Submit')]"));
                         ClickJS(driver, submitBtn);

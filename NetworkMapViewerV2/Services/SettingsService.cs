@@ -1,6 +1,4 @@
 ﻿using NetworkMapViewerV2.Models;
-using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 
@@ -44,8 +42,11 @@ namespace NetworkMapViewerV2.Services
                 Commands =
                 [
                     new() { Name = "Ping",          Icon = "⚡", Path = @"C:\Windows\System32\PING.EXE",                               Arguments = "{Address} -t" },
-                    new() { Name = "VNC View",      Icon = "🖥️", Path = @"C:\Program Files\uvnc bvba\UltraVNC\vncviewer.exe",          Arguments = "-fullscreen -scale 95/100 -shared -normalcursor -emulate3 -password prombank {Address}" },
-                    new() { Name = "Google Chrome", Icon = "🌐", Path = "chrome.exe",                                                  Arguments = "http://{Address}"}
+                    new() { Name = "VNC View",      Icon = "🖥️", Path = @"C:\Program Files\uvnc bvba\UltraVNC\vncviewer.exe",          Arguments = "-fullscreen -scale 95/100 -shared -normalcursor -emulate3 -password {VNCPassword} {Address}" },
+                    new() { Name = "SSH",           Icon = "🐧", Path = @"C:\Program Files\PuTTY\putty.exe",                           Arguments = "-ssh administrator@{Address} -pw {SSHPassword}" },
+                    new() { Name = "Google Chrome", Icon = "🌐", Path = "chrome.exe",                                                  Arguments = "http://{Address}"},
+                    new() { Name = @"Explorer C:\", Icon = "📁", Path = "explorer.exe",                                                Arguments = @"\\{Address}\C$"},
+                    new() { Name = @"Explorer D:\", Icon = "📁", Path = "explorer.exe",                                                Arguments = @"\\{Address}\D$"}
                 ],
 
                 // --- NEW: Define the default double-click actions here! ---

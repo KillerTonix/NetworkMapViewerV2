@@ -10,10 +10,10 @@
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
         mc:Ignorable="d"
-        Title="OptionsWindow" Height="480" Width="600">
+        Title="OptionsWindow" Height="580" Width="600">
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="380"/>
+            <RowDefinition Height="480"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
@@ -196,7 +196,92 @@
                     </StackPanel>
                 </Border>
             </TabItem>
-            
+            <TabItem Header="Paths">
+                <Border Margin="10" >
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <GroupBox Grid.Row="0" Header="Database" Margin="10,10,10,10" >
+                            <Grid>
+                                <Label Content="Set database file path:" HorizontalAlignment="Left" />
+                                <TextBox x:Name="DatabasePathTextBox" Text="C:\Path\To\Database.db" Margin="125,0,10,0" FontSize="12" VerticalContentAlignment="Center"/>
+                            </Grid>
+                        </GroupBox>
+                        <GroupBox Grid.Row="1" Header="Device Icons" Margin="10,10,10,10" >
+                            <Grid>
+                                <Label Content="Set device icons path:" HorizontalAlignment="Left" />
+                                <TextBox x:Name="DeviceIconsPathTextBox" Text="C:\Path\To\DeviceIcons" Margin="125,0,10,0" FontSize="12" VerticalContentAlignment="Center"/>
+                            </Grid>
+                        </GroupBox>
+                        <GroupBox Grid.Row="2" Header="Hint Images" Margin="10,10,10,10" >
+                            <Grid>
+                                <Label Content="Set hint images path:" HorizontalAlignment="Left" />
+                                <TextBox x:Name="HintImagesPathTextBox" Text="C:\Path\To\HintImages" Margin="125,0,10,0" FontSize="12" VerticalContentAlignment="Center"/>
+                            </Grid>
+                        </GroupBox>
+                        <GroupBox Grid.Row="3" Header="Scripts" Margin="10,10,10,10" >
+                            <Grid>
+                                <Label Content="Set scripts path:" HorizontalAlignment="Left" />
+                                <TextBox x:Name="ScriptsPathTextBox" Text="C:\Path\To\Scripts" Margin="125,0,10,0" FontSize="12" VerticalContentAlignment="Center"/>
+                            </Grid>
+                        </GroupBox>
+                    </Grid>
+                </Border>
+            </TabItem>
+            <TabItem Header="Passwords">
+                <Border Margin="10" >
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <GroupBox Grid.Row="0" Header="Printer" Margin="10,10,10,0" >
+                            <Grid>
+                                <Label Content="Set printer password:" HorizontalAlignment="Left" />
+                                <TextBox x:Name="PrinterPasswordTextBox" Text="" Margin="155,0,10,0" FontSize="12" VerticalContentAlignment="Center"/>
+                            </Grid>
+                        </GroupBox>
+                        <GroupBox Grid.Row="1" Header="Grandstream" Margin="10,10,10,0" >
+                            <Grid>
+                                <Label Content="Set grandstream password:" HorizontalAlignment="Left" />
+                                <TextBox x:Name="GrandstreamPasswordTextBox" Text="" Margin="155,0,10,0" FontSize="12" VerticalContentAlignment="Center"/>
+                            </Grid>
+                        </GroupBox>
+                        <GroupBox Grid.Row="2" Header="VNC" Margin="10,10,10,0" >
+                            <Grid>
+                                <Label Content="Set VNC password:" HorizontalAlignment="Left" />
+                                <TextBox x:Name="VncPasswordTextBox" Text="" Margin="155,0,10,0" FontSize="12" VerticalContentAlignment="Center"/>
+                            </Grid>
+                        </GroupBox>
+                        <GroupBox Grid.Row="3" Header="SSH" Margin="10,10,10,0" >
+                            <Grid>
+                                <Label Content="Set SSH password:" HorizontalAlignment="Left" />
+                                <TextBox x:Name="SshPasswordTextBox" Text="" Margin="155,0,10,0" FontSize="12" VerticalContentAlignment="Center"/>
+                            </Grid>
+                        </GroupBox>
+                        <GroupBox Grid.Row="4" Header="Managers" Margin="10,10,10,0" >
+                            <Grid>
+                                <Label Content="Set Managers PC password:" HorizontalAlignment="Left" />
+                                <TextBox x:Name="ManagersPcPasswordTextBox" Text="" Margin="155,0,10,0" FontSize="12" VerticalContentAlignment="Center"/>
+                            </Grid>
+                        </GroupBox>
+                        <GroupBox Grid.Row="5" Header="QMS" Margin="10,10,10,0" >
+                            <Grid>
+                                <Label Content="Set QMS password:" HorizontalAlignment="Left" />
+                                <TextBox x:Name="QmsPasswordTextBox" Text="" Margin="155,0,10,0" FontSize="12" VerticalContentAlignment="Center"/>
+                            </Grid>
+                        </GroupBox>
+                    </Grid>
+                </Border>
+            </TabItem>
         </TabControl>
 
         <Grid Grid.Column="0" Grid.Row="1" Grid.ColumnSpan="2">

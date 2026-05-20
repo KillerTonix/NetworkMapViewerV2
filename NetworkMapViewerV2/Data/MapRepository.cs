@@ -1,5 +1,6 @@
 ﻿using Microsoft.Data.Sqlite;
 using NetworkMapViewerV2.Models;
+using NetworkMapViewerV2.Services;
 using System.Collections.ObjectModel;
 using System.Text.Json;
 
@@ -7,6 +8,9 @@ namespace NetworkMapViewerV2.Data
 {
     public class MapRepository
     {
+        private static AppSettings settings = SettingsService.Load();
+
+        private static string DbPath = settings.DatabasePath ?? "";
         public Dictionary<int, string> GetAvailableMaps()
         {
             var maps = new Dictionary<int, string>();
@@ -344,6 +348,9 @@ namespace NetworkMapViewerV2.Data
 
         public List<DeviceGroup> GetAllDeviceGroups()
         {
+            if (DbPath == null || DbPath == "")
+                return new List<DeviceGroup>();
+
             var groups = new List<DeviceGroup>();
             using var connection = GetOpenConnection();
             using var cmd = new SqliteCommand("SELECT GroupId, GroupName, IconPath, DefaultCommand, IsMapLink FROM Groups ORDER BY GroupName", connection);

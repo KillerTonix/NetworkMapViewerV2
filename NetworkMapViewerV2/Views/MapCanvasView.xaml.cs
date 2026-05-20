@@ -1,5 +1,9 @@
 ﻿using NetworkMapViewerV2.Helpers;
+using NetworkMapViewerV2.Helpers.Alignment;
+using NetworkMapViewerV2.Helpers.LocalFetcher;
+using NetworkMapViewerV2.Helpers.Passwords;
 using NetworkMapViewerV2.Models;
+using NetworkMapViewerV2.Services;
 using NetworkMapViewerV2.ViewModels;
 using System.IO;
 using System.Text.RegularExpressions;
@@ -12,17 +16,16 @@ using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
+using static NetworkMapViewerV2.Helpers.Alignment.Align;
 
 namespace NetworkMapViewerV2.Views
 {
     public partial class MapCanvasView : UserControl
     {
-        public static string ScriptsPath => "\\\\evoca.am\\evoca\\pinger\\Network Map Viewer\\Scripts";
-        public static string HintImagesPath => "\\\\evoca.am\\evoca\\pinger\\Network Map Viewer\\Hint Images";
-
+        
         // --- NEW: Interactivity State ---
         private List<FrameworkElement>? _selectedElements = [];
-        private MapTabState? _currentState; // Keep track of the current map
+        public MapTabState _currentState; // Keep track of the current map
         private DropShadowEffect? _selectionGlow = new() { Color = Colors.Cyan, BlurRadius = 20, ShadowDepth = 0 };
         private Brush _gridBrush;
         private readonly Brush _standardBrush = new SolidColorBrush(Color.FromRgb(105, 105, 105));
@@ -46,6 +49,7 @@ namespace NetworkMapViewerV2.Views
 
         // Helper to get global state from our ViewModel
         private MainViewModel? GlobalViewModel => Application.Current.MainWindow.DataContext as MainViewModel;
+         
 
         public MapCanvasView()
         {
@@ -228,10 +232,10 @@ namespace NetworkMapViewerV2.Views
             }
         }
 
-        private void DrawMap(MapTabState state)
+        public void DrawMap(MapTabState? state)
         {
             DrawingCanvas.Children.Clear();
-            _selectedElements.Clear();
+            _selectedElements?.Clear();
 
             DrawLabels(state);
             DrawDevices(state);
@@ -239,8 +243,10 @@ namespace NetworkMapViewerV2.Views
 
         // ─── DRAW LABELS ─────────────────────────────────────────
 
-        private void DrawLabels(MapTabState state)
+        private void DrawLabels(MapTabState? state)
         {
+            if (state == null) return;
+
             foreach (var label in state.Labels)
             {
                 var border = new Border
@@ -260,7 +266,7 @@ namespace NetworkMapViewerV2.Views
 
                 if (label.TextLines.Count != 0)
                 {
-                    var (hAlign, vAlign, tAlign) = ResolveLabelAlignment(label);
+                    var (hAlign, vAlign, tAlign) = Align.ResolveLabelAlignment(label);
 
                     var textBlock = new TextBlock
                     {
@@ -294,8 +300,10 @@ namespace NetworkMapViewerV2.Views
 
         // ─── DRAW DEVICES ────────────────────────────────────────
 
-        private void DrawDevices(MapTabState state)
+        private void DrawDevices(MapTabState? state)
         {
+            if (state == null) return;
+
             // 1. Fetch all groups ONCE before the loop so we don't spam the database
             var repo = new Data.MapRepository();
             var allGroups = repo.GetAllDeviceGroups().ToDictionary(g => g.GroupId);
@@ -538,21 +546,24 @@ namespace NetworkMapViewerV2.Views
                 }
 
                 // --- BATCH MOVEMENT: Apply the movement delta to ALL selected items! ---
-                foreach (var el in _selectedElements)
+                if (_selectedElements != null)
                 {
-                    if (el is FrameworkElement fw && _dragStartPositions.TryGetValue(fw, out Point startPos))
+                    foreach (var el in _selectedElements)
                     {
-                        // Apply the distance to their ORIGINAL starting positions
-                        double newLeft = startPos.X + totalDeltaX;
-                        double newTop = startPos.Y + totalDeltaY;
+                        if (el is FrameworkElement fw && _dragStartPositions.TryGetValue(fw, out Point startPos))
+                        {
+                            // Apply the distance to their ORIGINAL starting positions
+                            double newLeft = startPos.X + totalDeltaX;
+                            double newTop = startPos.Y + totalDeltaY;
 
-                        EnforceBounds(fw, ref newLeft, ref newTop); // Keep them on screen
+                            EnforceBounds(fw, ref newLeft, ref newTop); // Keep them on screen
 
-                        Canvas.SetLeft(fw, newLeft);
-                        Canvas.SetTop(fw, newTop);
+                            Canvas.SetLeft(fw, newLeft);
+                            Canvas.SetTop(fw, newTop);
 
-                        // Update the SQLite memory model
-                        UpdateModelPosition(fw, newLeft, newTop);
+                            // Update the SQLite memory model
+                            UpdateModelPosition(fw, newLeft, newTop);
+                        }
                     }
                 }
             }
@@ -580,12 +591,12 @@ namespace NetworkMapViewerV2.Views
                 {
                     if (!Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
                     {
-                        if (_wasAlreadySelected && _selectedElements.Count == 1)
+                        if (_wasAlreadySelected && _selectedElements?.Count == 1)
                         {
                             // It was the ONLY item selected. Unselect it!
                             SelectElement(null, false);
                         }
-                        else if (_wasAlreadySelected && _selectedElements.Count > 1)
+                        else if (_wasAlreadySelected && _selectedElements?.Count > 1)
                         {
                             // Multiple items were selected. Clear the group and select ONLY this one!
                             SelectElement(null, false);
@@ -601,7 +612,7 @@ namespace NetworkMapViewerV2.Views
             }
         }
 
-        private static void UpdateModelPosition(FrameworkElement el, double? left, double? top)
+        public static void UpdateModelPosition(FrameworkElement el, double? left, double? top)
         {
             if (el.Tag is NetworkDevice device) { if (left.HasValue) device.Left = left.Value; if (top.HasValue) device.Top = top.Value; }
             else if (el.Tag is NetworkLabel label) { if (left.HasValue) label.Left = left.Value; if (top.HasValue) label.Top = top.Value; }
@@ -655,21 +666,24 @@ namespace NetworkMapViewerV2.Views
 
 
 
-        private void SelectElement(FrameworkElement element, bool multiSelect)
+        private void SelectElement(FrameworkElement? element, bool multiSelect)
         {
             // Clear old selection if we aren't holding CTRL
             if (!multiSelect)
             {
-                foreach (var el in _selectedElements)
+                if (_selectedElements != null)
                 {
-                    el.Effect = null; // Remove glow
+                    foreach (var el in _selectedElements)
+                    {
+                        el.Effect = null; // Remove glow
+                    }
+                    _selectedElements.Clear();
                 }
-                _selectedElements.Clear();
             }
 
-            if (element != null && !_selectedElements.Contains(element))
+            if (element != null && !_selectedElements?.Contains(element) == true)
             {
-                _selectedElements.Add(element);
+                _selectedElements?.Add(element);
                 this.Loaded += (s, e) =>
                 {
                     this.Focus();
@@ -682,6 +696,7 @@ namespace NetworkMapViewerV2.Views
 
         private void AttachDeviceContextMenu(Border container, NetworkDevice device)
         {
+
             // 1. Give it a blank menu immediately so WPF knows it can be right-clicked!
             container.ContextMenu = new ContextMenu();
 
@@ -690,7 +705,7 @@ namespace NetworkMapViewerV2.Views
                 // ==========================================
                 // --- AUTO-SELECT ON RIGHT CLICK ---
                 // ==========================================
-                if (!_selectedElements.Contains(container))
+                if (!_selectedElements?.Contains(container) == true)
                 {
                     SelectElement(null, false);      // Clear old group
                     SelectElement(container, false); // Select this specific item
@@ -711,7 +726,7 @@ namespace NetworkMapViewerV2.Views
                     var miCmd = new MenuItem { Icon = cmd.Icon, Header = cmd.Name };
                     miCmd.Click += (sender, args) =>
                     {
-                        Helpers.CommandHelper.ExecuteExternalCommand(cmd, device.Address);
+                        CommandHelper.ExecuteExternalCommand(cmd, device.Address);
                     };
                     menu.Items.Add(miCmd);
                 }
@@ -755,22 +770,22 @@ namespace NetworkMapViewerV2.Views
                     var miAutoFill = new MenuItem { Icon = "🔍", Header = "Auto-Fill PC Specs" };
 
                     var miDomain = new MenuItem { Icon = "💻", Header = "Domain Joined PC" };
-                    miDomain.Click += async (sender, args) => await RunAutoFillScript(device, "SystemInfo.ps1");
+                    miDomain.Click += async (sender, args) => await AutoFill.RunAutoFillScript(this, device, "SystemInfo.ps1");
 
                     var miNonDomain = new MenuItem { Icon = "🖥️", Header = "Non-Domain PC" };
-                    miNonDomain.Click += async (sender, args) => await RunAutoFillScript(device, "SystemInfo Non Domain.ps1");
+                    miNonDomain.Click += async (sender, args) => await AutoFill.RunAutoFillScript(this, device, $"SystemInfo Non Domain.ps1");
 
                     var miDefaultPC = new MenuItem { Icon = "🖥️", Header = "Default PC" };
-                    miDefaultPC.Click += async (sender, args) => await RunAutoFillScript(device, "SystemInfo Default.ps1");
+                    miDefaultPC.Click += async (sender, args) => await AutoFill.RunAutoFillScript(this, device, $"SystemInfo Default.ps1");
 
                     var miLinux = new MenuItem { Icon = "🐧", Header = "Linux PC (SSH)" };
-                    miLinux.Click += async (sender, args) => await RunAutoFillScript(device, "SystemInfo Linux.ps1");
+                    miLinux.Click += async (sender, args) => await AutoFill.RunAutoFillScript(this, device, $"SystemInfo Linux.ps1");
 
                     var miPrinter = new MenuItem { Icon = "🖨️", Header = "Printer" };
-                    miPrinter.Click += async (sender, args) => await RunPrinterAutoFill(device);
+                    miPrinter.Click += async (sender, args) => await AutoFill.RunPrinterAutoFill(GlobalViewModel, this, device);
 
                     var miPhone = new MenuItem { Icon = "☎️", Header = "Grandstream" };
-                    miPhone.Click += async (sender, args) => await RunGrandstreamAutoFill(device);
+                    miPhone.Click += async (sender, args) => await AutoFill.RunGrandstreamAutoFill(GlobalViewModel, this, device);
 
                     miAutoFill.Items.Add(miDomain);
                     miAutoFill.Items.Add(miNonDomain);
@@ -788,7 +803,7 @@ namespace NetworkMapViewerV2.Views
                         if (_currentState != null)
                         {
                             _currentState.Devices.Remove(device);
-                            if (_currentState != null) _currentState.HasUnsavedChanges = true;
+                            _currentState?.HasUnsavedChanges = true;
                             DrawMap(_currentState);
                         }
                     };
@@ -919,513 +934,23 @@ namespace NetworkMapViewerV2.Views
         }
 
 
-        private enum AlignMode { Left, Center, Right, Top, Middle, Bottom }
 
-        private void AlignSelectedElements(AlignMode mode)
-        {
-            if (_selectedElements == null || _selectedElements.Count < 2) return;
 
-            double outerMinX = double.MaxValue, outerMinY = double.MaxValue;
-            double outerMaxX = double.MinValue, outerMaxY = double.MinValue;
 
-            double innerMinX = double.MaxValue, innerMinY = double.MaxValue;
-            double innerMaxX = double.MinValue, innerMaxY = double.MinValue;
 
-            var outerBounds = new Dictionary<FrameworkElement, Rect>();
-            var innerBounds = new Dictionary<FrameworkElement, Rect>();
 
-            // 1. Calculate TWO sets of boundaries (Outer = Whole Container + Text, Inner = Just the Icon)
-            foreach (var el in _selectedElements)
-            {
-                if (el is FrameworkElement fw)
-                {
-                    // --- OUTER BOUNDS (Accounts for wide text and negative margins) ---
-                    double currentLeft = double.IsNaN(Canvas.GetLeft(fw)) ? 0 : Canvas.GetLeft(fw);
-                    double currentTop = double.IsNaN(Canvas.GetTop(fw)) ? 0 : Canvas.GetTop(fw);
 
-                    double visualLeft = currentLeft + fw.Margin.Left;
-                    double visualTop = currentTop + fw.Margin.Top;
 
-                    Rect outer = new Rect(visualLeft, visualTop, fw.ActualWidth, fw.ActualHeight);
-                    outerBounds[fw] = outer;
 
-                    if (outer.Left < outerMinX) outerMinX = outer.Left;
-                    if (outer.Top < outerMinY) outerMinY = outer.Top;
-                    if (outer.Right > outerMaxX) outerMaxX = outer.Right;
-                    if (outer.Bottom > outerMaxY) outerMaxY = outer.Bottom;
 
-                    // --- INNER BOUNDS (Finds just the Image Icon) ---
-                    Image? img = FindVisualChild<Image>(fw);
-                    FrameworkElement targetVisual = img != null ? (FrameworkElement)img : fw;
 
-                    try
-                    {
-                        var transform = targetVisual.TransformToAncestor(DrawingCanvas);
-                        Point topLeft = transform.Transform(new Point(0, 0));
 
-                        // 3-pixel inset ONLY for the icons to ignore the cyan glow
-                        double inset = (img != null) ? 3 : 0;
-                        Rect inner = new Rect(
-                            topLeft.X + inset,
-                            topLeft.Y + inset,
-                            Math.Max(0, targetVisual.ActualWidth - (inset * 2)),
-                            Math.Max(0, targetVisual.ActualHeight - (inset * 2))
-                        );
 
-                        innerBounds[fw] = inner;
 
-                        if (inner.Left < innerMinX) innerMinX = inner.Left;
-                        if (inner.Top < innerMinY) innerMinY = inner.Top;
-                        if (inner.Right > innerMaxX) innerMaxX = inner.Right;
-                        if (inner.Bottom > innerMaxY) innerMaxY = inner.Bottom;
-                    }
-                    catch
-                    {
-                        innerBounds[fw] = outer; // Fallback just in case
-                    }
-                }
-            }
 
-            double innerCenterX = innerMinX + (innerMaxX - innerMinX) / 2;
-            double innerCenterY = innerMinY + (innerMaxY - innerMinY) / 2;
-
-            // 2. Apply movement depending on the Mode chosen!
-            foreach (var el in _selectedElements)
-            {
-                if (el is FrameworkElement fw && outerBounds.ContainsKey(fw) && innerBounds.ContainsKey(fw))
-                {
-                    Rect outer = outerBounds[fw];
-                    Rect inner = innerBounds[fw];
-
-                    double deltaX = 0;
-                    double deltaY = 0;
-
-                    switch (mode)
-                    {
-                        // Edges use OUTER BOUNDS so the long text labels act as the hard boundary
-                        case AlignMode.Left: deltaX = outerMinX - outer.Left; break;
-                        case AlignMode.Right: deltaX = outerMaxX - outer.Right; break;
-                        case AlignMode.Top: deltaY = outerMinY - outer.Top; break;
-                        case AlignMode.Bottom: deltaY = outerMaxY - outer.Bottom; break;
-
-                        // Center uses INNER BOUNDS so the physical computer icons line up!
-                        case AlignMode.Center:
-                            double currentInnerCenterX = inner.Left + (inner.Width / 2);
-                            deltaX = innerCenterX - currentInnerCenterX;
-                            break;
-                        case AlignMode.Middle:
-                            double currentInnerCenterY = inner.Top + (inner.Height / 2);
-                            deltaY = innerCenterY - currentInnerCenterY;
-                            break;
-                    }
-
-                    // Apply the final calculated movement shift
-                    double currentLeft = double.IsNaN(Canvas.GetLeft(fw)) ? 0 : Canvas.GetLeft(fw);
-                    double currentTop = double.IsNaN(Canvas.GetTop(fw)) ? 0 : Canvas.GetTop(fw);
-
-                    double newLeft = currentLeft + deltaX;
-                    double newTop = currentTop + deltaY;
-
-                    Canvas.SetLeft(fw, newLeft);
-                    Canvas.SetTop(fw, newTop);
-                    UpdateModelPosition(fw, newLeft, newTop);
-                }
-            }
-
-            if (GlobalViewModel != null) if (_currentState != null) _currentState.HasUnsavedChanges = true;
-        }
-
-
-
-        private async Task RunAutoFillScript(NetworkDevice device, string scriptName)
-        {
-            if (string.IsNullOrWhiteSpace(device.Address) || device.Address == "0.0.0.0")
-            {
-                MessageBox.Show("Please set a valid IP Address for this device first!", "Missing IP", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            string scriptPath = System.IO.Path.Combine(ScriptsPath, scriptName);
-            if (!File.Exists(scriptPath))
-            {
-                MessageBox.Show($"Could not find script at:\n{scriptPath}", "Missing Script", MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
-            }
-
-            try
-            {
-                device.Hints.Clear();
-                device.Hints.Add("<b>STATUS:</b> Scanning WMI via PowerShell...");
-                DrawMap(_currentState);
-
-                var psi = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = "powershell.exe",
-                    Arguments = $"-NoProfile -ExecutionPolicy Bypass -File \"{scriptPath}\" -IP \"{device.Address}\"",
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-
-                using var process = System.Diagnostics.Process.Start(psi);
-                if (process == null) return;
-
-                string output = await process.StandardOutput.ReadToEndAsync();
-                await process.WaitForExitAsync();
-
-                // ==========================================
-                // --- THE FIX: RPC FAILURE DETECTION ---
-                // ==========================================
-                if (string.IsNullOrWhiteSpace(output) || output.Contains("ERROR="))
-                {
-                    device.Hints.Clear();
-                    device.Hints.Add("<b>STATUS:</b> WMI Blocked. Tunneling via PsExec...");
-                    DrawMap(_currentState);
-
-                    // Trigger the fallback!
-                    output = await RunPsExecFallbackAsync(device.Address);
-
-                    var lines = output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).ToList();
-                    for (int i = 0; i < lines.Count; i++)
-                    {
-                        if (lines[i].StartsWith("USERNAME="))
-                        {
-                            string rawUser = lines[i].Substring(9).Trim();
-                            if (!string.IsNullOrWhiteSpace(rawUser))
-                            {
-                                // Show a loading message so you know it's querying AD
-                                device.Hints.Clear();
-                                device.Hints.Add($"<b>STATUS:</b> Resolving AD User: {rawUser}...");
-                                DrawMap(_currentState);
-
-                                // Replace the raw username with the real AD Name!
-                                string adName = await ResolveADNameAsync(rawUser);
-                                lines[i] = $"USERNAME={adName}";
-                            }
-                        }
-                    }
-
-                    // Re-assemble the text and hand it safely to the parser
-                    output = string.Join("\n", lines);
-                }
-
-                if (string.IsNullOrWhiteSpace(output))
-                {
-                    MessageBox.Show("Both WMI and PsExec failed to return data.", "Scan Failed", MessageBoxButton.OK, MessageBoxImage.Error);
-                    device.Hints.Clear();
-                    device.Hints.Add("<b>STATUS:</b> Scan Failed");
-                }
-                else
-                {             
-                    
-                    ParseScriptOutputToHints(device, output);
-                }
-
-                if (GlobalViewModel != null) GlobalViewModel.HasUnsavedChanges = true;
-                DrawMap(_currentState);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Failed to execute scripts:\n{ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-
-        private async Task<string> RunPsExecFallbackAsync(string ipAddress)
-        {
-            string localScriptPath = System.IO.Path.Combine(ScriptsPath, "SystemInfo Local.ps1");
-            string psExecPath = System.IO.Path.Combine(ScriptsPath, "psexec.exe");
-
-            if (!File.Exists(localScriptPath) || !File.Exists(psExecPath))
-            {
-                return "ERROR=PsExec.exe or 'SystemInfo Local.ps1' not found in Scripts folder.";
-            }
-
-            try
-            {
-                // 1. Read the script and encode it to Base64 (UTF-16LE is strictly required by PowerShell)
-                string scriptContent = await File.ReadAllTextAsync(localScriptPath);
-                byte[] scriptBytes = System.Text.Encoding.Unicode.GetBytes(scriptContent);
-                string encodedCommand = Convert.ToBase64String(scriptBytes);
-
-                // 2. Build the PsExec command
-                // -s runs it as the powerful SYSTEM account. 
-                // -n 15 forces it to give up after 15 seconds if the PC is truly dead.
-                var psi = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = psExecPath,
-                    Arguments = $"\\\\{ipAddress} -s -accepteula -n 15 powershell.exe -NoProfile -ExecutionPolicy Bypass -EncodedCommand {encodedCommand}",
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-
-                using var process = System.Diagnostics.Process.Start(psi);
-                if (process == null) return "ERROR=Failed to start PsExec process.";
-
-                string output = await process.StandardOutput.ReadToEndAsync();
-                await process.WaitForExitAsync();
-
-
-
-                // PsExec spits out a lot of junk connection text. We just want our variables!
-                if (string.IsNullOrWhiteSpace(output) || output.Contains("ERROR="))
-                    return "ERROR=PsExec connected but returned no data.";
-                return output;
-            }
-            catch (Exception ex)
-            {
-                return $"ERROR=PsExec Failure: {ex.Message}";
-            }
-        }
-
-        private async Task<string> ResolveADNameAsync(string rawUsername)
-        {
-            // 1. Clean the username (Strips "DOMAIN\" so it's just "jdoe")
-            string cleanUsername = rawUsername;
-            if (cleanUsername.Contains('\\'))
-            {
-                cleanUsername = cleanUsername.Split('\\').Last();
-            }
-
-            string scriptPath = System.IO.Path.Combine(ScriptsPath, "GetADUser.ps1");
-
-            // If the script is missing, just return the raw username so the map doesn't break
-            if (!File.Exists(scriptPath)) return rawUsername;
-
-            try
-            {
-                var psi = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = "powershell.exe",
-                    Arguments = $"-NoProfile -ExecutionPolicy Bypass -File \"{scriptPath}\" -Username \"{cleanUsername}\"",
-                    RedirectStandardOutput = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-
-                using var process = System.Diagnostics.Process.Start(psi);
-                if (process == null) return rawUsername;
-
-                string output = await process.StandardOutput.ReadToEndAsync();
-                await process.WaitForExitAsync();
-
-                // Extract the clean name from your script's output
-                foreach (var line in output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
-                {
-                    if (line.StartsWith("USERNAME="))
-                    {
-                        string adName = line.Substring(9).Trim();
-                        if (!string.IsNullOrWhiteSpace(adName)) return adName;
-                    }
-                }
-            }
-            catch (Exception e)
-            {
-                MessageBox.Show(e.Message);
-            }
-
-            return rawUsername; // Fallback on failure
-        }
-
-        private void ParseScriptOutputToHints(NetworkDevice device, string scriptOutput)
-        {
-            var lines = scriptOutput.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
-
-            // 1. PARSE INTO TEMPORARY VARIABLES FIRST
-            string name = "", mac = "", cpu = "", ram = "", ssd = "", gpu = "", os = "", username = "";
-            bool hasError = false;
-            string errorMessage = "";
-
-            foreach (var line in lines)
-            {
-                if (line.StartsWith("ERROR="))
-                {
-                    hasError = true;
-                    errorMessage = line[6..].Trim();
-                    break; // Stop parsing, we hit a wall!
-                }
-
-                if (line.StartsWith("NAME=")) name = line[5..].Trim();
-                else if (line.StartsWith("MAC=")) mac = line[4..].Trim();
-                else if (line.StartsWith("CPU=")) cpu = line[4..].Trim();
-                else if (line.StartsWith("RAM=")) ram = line[4..].Trim();
-                else if (line.StartsWith("SSD=")) ssd = line[4..].Trim();
-                else if (line.StartsWith("GRAPHIC=")) gpu = line[8..].Trim();
-                else if (line.StartsWith("OS=")) os = line[3..].Trim();
-                else if (line.StartsWith("USERNAME=")) username = line[9..].Trim();
-            }
-
-            // 2. VALIDATE: Did it fail, or return completely blank data?
-            // (If 'name' and 'mac' are both empty, the script likely failed silently)
-            if (hasError || (string.IsNullOrEmpty(name) && string.IsNullOrEmpty(mac)))
-            {
-                // Alert the user, but DO NOT touch the device properties!
-                string failReason = hasError ? errorMessage : "The script returned no usable data.";
-                MessageBox.Show($"Auto-Fill failed. Your previous data has been preserved.\n\nReason: {failReason}", "Scan Failed", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return; // Abort! The old data survives!
-            }
-
-            // 3. COMMIT: We have good data! Now it is safe to overwrite.
-            device.Hints.Clear();
-            device.HintImagePath = "";
-            device.Titles.Clear();
-
-            // Build the titles
-            device.Titles.Add("%Address");
-            if (!string.IsNullOrEmpty(name)) device.Titles.Add(name);
-            if (!string.IsNullOrEmpty(username)) device.Titles.Add(username);
-
-            // Build the hints
-            device.Hints.Add($"<b>NAME:</b> {name}");
-            device.Hints.Add($"<b>MAC:</b> {mac}");
-            device.Hints.Add($"<b>IP:</b> {device.Address}");
-            device.Hints.Add($"<b>CPU:</b> {cpu}");
-            device.Hints.Add($"<b>RAM:</b> {ram}");
-            device.Hints.Add($"<b>SSD:</b> {ssd}");
-            device.Hints.Add($"<b>GRAPHIC:</b> {gpu}");
-            device.Hints.Add($"<b>OS:</b> {os}");
-
-            // Build the tooltip image path safely
-            if (!string.IsNullOrEmpty(os))
-            {
-                if (os.Contains("Ubuntu"))
-                    device.HintImagePath = HintImagesPath + "\\Ubuntu.png";
-                else
-                    device.HintImagePath = HintImagesPath + (os.Contains("11") ? "\\Win11.png" : "\\Win10.png");
-            }
-        }
-
-
-        private async Task RunPrinterAutoFill(NetworkDevice device)
-        {
-            if (string.IsNullOrWhiteSpace(device.Address) || device.Address == "0.0.0.0") return;
-
-            device.Hints.Clear();
-            device.Hints.Add("<b>STATUS:</b> Scraping HP Web Interface...");
-            DrawMap(_currentState);
-
-            // Run Selenium on a background thread so the UI doesn't freeze!
-            var results = await Task.Run(() =>
-            {
-                var fetcher = new Helpers.WebFetcher.PrintersWebFetcher();
-                return fetcher.FetchPrinters(device.Address);
-            });
-
-            if (results.ContainsKey("ERROR"))
-            {
-                MessageBox.Show($"Web Scraper failed:\n{results["ERROR"]}", "Scan Failed", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            if (results.Count > 0)
-            {
-                device.Hints.Clear();
-                device.Hints.Add($"<b>NAME:</b> {results.GetValueOrDefault("Model", "HP Printer")}");
-                device.Hints.Add($"<b>MAC:</b> {results.GetValueOrDefault("MAC", "Unknown")}");
-                device.Hints.Add($"<b>IP:</b> {device.Address}");
-                device.Hints.Add($"<b>Host Name:</b> {results.GetValueOrDefault("HostName", "Unknown")}");
-
-                device.Titles.Clear();
-                device.Titles.Add("%Address");
-                device.Titles.Add(results.GetValueOrDefault("Model", "HP Printer").Replace("HP LaserJet", "").Trim());
-                device.Titles.Add(results.GetValueOrDefault("HostName", "Unknown"));
-
-                device.HintImagePath = HintImagesPath + "\\HP LaserJet.png";
-
-                if (GlobalViewModel != null) if (_currentState != null) _currentState.HasUnsavedChanges = true;
-                DrawMap(_currentState);
-            }
-        }
-
-        private async Task RunGrandstreamAutoFill(NetworkDevice device)
-        {
-            if (string.IsNullOrWhiteSpace(device.Address) || device.Address == "0.0.0.0") return;
-
-            device.Hints.Clear();
-            device.Hints.Add("<b>STATUS:</b> Scraping Grandstream Web Interface...");
-            DrawMap(_currentState);
-
-            var fetcher = new Helpers.WebFetcher.GrandstreamsWebFetcher();
-            var results = await fetcher.FetchGrandstreamsAsync(device.Address);
-
-            if (results.TryGetValue("ERROR", out string? errorMessage))
-            {
-                // Explicitly clear the scraping status if it failed
-                device.Hints.Clear();
-                device.Hints.Add("<b>STATUS:</b> Scan Failed");
-                DrawMap(_currentState);
-
-                MessageBox.Show($"Web Scraper failed:\n{errorMessage}", "Scan Failed", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-
-            if (results.Count > 0)
-            {
-                string model = results.GetValueOrDefault("Model", "Grandstream Device");
-                string mac = results.GetValueOrDefault("MAC", "Unknown");
-                string firmware = results.GetValueOrDefault("Firmware", "Unknown");
-                string sipNumber = results.GetValueOrDefault("Number", "unknown").Trim();
-
-                device.Hints.Clear();
-                device.Hints.Add($"<b>MODEL:</b> {model}");
-                device.Hints.Add($"<b>MAC:</b> {mac}");
-                device.Hints.Add($"<b>IP:</b> {device.Address}");
-                device.Hints.Add($"<b>FIRMWARE:</b> {firmware}");
-
-                device.Titles.Clear();
-                device.Titles.Add(sipNumber);
-
-                if (model.Contains("GXP2170"))
-                    device.HintImagePath = HintImagesPath + "\\GXP2170.png";
-                else if (model.Contains("DP750"))
-                    device.HintImagePath = HintImagesPath + "\\DP750.png";
-                else if (model.Contains("GXP1628"))
-                    device.HintImagePath = HintImagesPath + "\\GXP1628.png";
-
-                GlobalViewModel?.HasUnsavedChanges = true;
-
-                DrawMap(_currentState);
-            }            
-        } 
 
 
         // --- HELPER: Finds a specific control inside a container ---
-        private T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
-        {
-            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
-            {
-                var child = VisualTreeHelper.GetChild(parent, i);
-                if (child != null && child is T t)
-                    return t;
-                else
-                {
-                    var childOfChild = FindVisualChild<T>(child);
-                    if (childOfChild != null)
-                        return childOfChild;
-                }
-            }
-            return null;
-        }
-
-        private static (HorizontalAlignment hAlign, VerticalAlignment vAlign, TextAlignment tAlign) ResolveLabelAlignment(NetworkLabel label)
-        {
-            HorizontalAlignment hAlign = HorizontalAlignment.Center;
-            TextAlignment tAlign = TextAlignment.Center;
-
-            if (label.HorizontalAlignment == "Left") { hAlign = HorizontalAlignment.Left; tAlign = TextAlignment.Left; }
-            else if (label.HorizontalAlignment == "Right") { hAlign = HorizontalAlignment.Right; tAlign = TextAlignment.Right; }
-
-            VerticalAlignment vAlign = VerticalAlignment.Center;
-
-            if (label.VerticalAlignment == "Top") vAlign = VerticalAlignment.Top;
-            else if (label.VerticalAlignment == "Bottom") vAlign = VerticalAlignment.Bottom;
-
-            return (hAlign, vAlign, tAlign);
-        }
 
 
 
@@ -1574,22 +1099,22 @@ namespace NetworkMapViewerV2.Views
                 var miAlign = new MenuItem { Icon = "📐", Header = "Align Selected...", FontWeight = FontWeights.Bold };
 
                 var miAlignLeft = new MenuItem { Header = "Align Left" };
-                miAlignLeft.Click += (s, ev) => AlignSelectedElements(AlignMode.Left);
+                miAlignLeft.Click += (s, ev) => Align.AlignSelectedElements(_selectedElements, GlobalViewModel, this, AlignMode.Left);
 
                 var miAlignCenter = new MenuItem { Header = "Align Center (Horizontal)" };
-                miAlignCenter.Click += (s, ev) => AlignSelectedElements(AlignMode.Center);
+                miAlignCenter.Click += (s, ev) => Align.AlignSelectedElements(_selectedElements, GlobalViewModel, this, AlignMode.Center);
 
                 var miAlignRight = new MenuItem { Header = "Align Right" };
-                miAlignRight.Click += (s, ev) => AlignSelectedElements(AlignMode.Right);
+                miAlignRight.Click += (s, ev) => Align.AlignSelectedElements(_selectedElements, GlobalViewModel, this, AlignMode.Right);
 
                 var miAlignTop = new MenuItem { Header = "Align Top" };
-                miAlignTop.Click += (s, ev) => AlignSelectedElements(AlignMode.Top);
+                miAlignTop.Click += (s, ev) => Align.AlignSelectedElements(_selectedElements, GlobalViewModel, this, AlignMode.Top);
 
                 var miAlignMiddle = new MenuItem { Header = "Align Middle (Vertical)" };
-                miAlignMiddle.Click += (s, ev) => AlignSelectedElements(AlignMode.Middle);
+                miAlignMiddle.Click += (s, ev) => Align.AlignSelectedElements(_selectedElements, GlobalViewModel, this, AlignMode.Middle);
 
                 var miAlignBottom = new MenuItem { Header = "Align Bottom" };
-                miAlignBottom.Click += (s, ev) => AlignSelectedElements(AlignMode.Bottom);
+                miAlignBottom.Click += (s, ev) => Align.AlignSelectedElements(_selectedElements, GlobalViewModel, this, AlignMode.Bottom);
 
                 miAlign.Items.Add(miAlignLeft);
                 miAlign.Items.Add(miAlignCenter);
@@ -2074,12 +1599,12 @@ namespace NetworkMapViewerV2.Views
 
                 switch (actualKey)
                 {
-                    case Key.Up: AlignSelectedElements(AlignMode.Top); e.Handled = true; return;
-                    case Key.Down: AlignSelectedElements(AlignMode.Bottom); e.Handled = true; return;
-                    case Key.Left: AlignSelectedElements(AlignMode.Left); e.Handled = true; return;
-                    case Key.Right: AlignSelectedElements(AlignMode.Right); e.Handled = true; return;
-                    case Key.S: AlignSelectedElements(AlignMode.Middle); e.Handled = true; return;
-                    case Key.C: AlignSelectedElements(AlignMode.Center); e.Handled = true; return;
+                    case Key.Up: Align.AlignSelectedElements(_selectedElements, GlobalViewModel, this, AlignMode.Top); e.Handled = true; return;
+                    case Key.Down: Align.AlignSelectedElements(_selectedElements, GlobalViewModel, this, AlignMode.Bottom); e.Handled = true; return;
+                    case Key.Left: Align.AlignSelectedElements(_selectedElements, GlobalViewModel, this, AlignMode.Left); e.Handled = true; return;
+                    case Key.Right: Align.AlignSelectedElements(_selectedElements, GlobalViewModel, this, AlignMode.Right); e.Handled = true; return;
+                    case Key.S: Align.AlignSelectedElements(_selectedElements, GlobalViewModel, this, AlignMode.Middle); e.Handled = true; return;
+                    case Key.C: Align.AlignSelectedElements(_selectedElements, GlobalViewModel, this, AlignMode.Center); e.Handled = true; return;
                     case Key.A: AutoAlignSelectedPairs(); e.Handled = true; return;
                 }
             }
@@ -2155,13 +1680,13 @@ namespace NetworkMapViewerV2.Views
 
                 if (devData.GroupId == 9) // Phones
                 {
-                    AlignSelectedElements(AlignMode.Top);
-                    AlignSelectedElements(AlignMode.Right);
+                    Align.AlignSelectedElements(_selectedElements, GlobalViewModel, this, AlignMode.Top);
+                    Align.AlignSelectedElements(_selectedElements, GlobalViewModel, this, AlignMode.Right);
                 }
                 else // Computers, Printers, etc.
                 {
-                    AlignSelectedElements(AlignMode.Middle);
-                    AlignSelectedElements(AlignMode.Center);
+                    Align.AlignSelectedElements(_selectedElements, GlobalViewModel, this, AlignMode.Middle);
+                    Align.AlignSelectedElements(_selectedElements, GlobalViewModel, this, AlignMode.Center);
                 }
             }
 

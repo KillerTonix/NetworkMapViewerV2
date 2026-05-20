@@ -1,18 +1,24 @@
 ﻿using Microsoft.Data.Sqlite;
-using System;
+using NetworkMapViewerV2.Models;
+using NetworkMapViewerV2.Services;
 using System.IO;
 
 namespace NetworkMapViewerV2.Data
 {
     public static class DatabaseService
     {
-        // Puts the database right next to your .exe file
-        public static string DbPath => "\\\\evoca.am\\evoca\\pinger\\Network Map Viewer\\Database\\Database.db";
-        public static string IconsPath => "\\\\evoca.am\\evoca\\pinger\\Network Map Viewer\\Device Icons\\ON";
+        private static AppSettings settings = SettingsService.Load();
+
+        private static string DbPath = settings.DatabasePath ?? "";
+        private static string IconsPath = Path.Combine(settings.DeviceIconsPath ?? "", "ON");
+
         public static string ConnectionString => $"Data Source={DbPath};";
 
         public static void InitializeDatabase()
         {
+            if (DbPath == null || DbPath == "")
+                return;
+
             using var connection = new SqliteConnection(ConnectionString);
             connection.Open();
 
