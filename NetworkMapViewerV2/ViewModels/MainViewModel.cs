@@ -6,6 +6,7 @@ using NetworkMapViewerV2.Services;
 using NetworkMapViewerV2.Views;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Reflection.Metadata.Ecma335;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -290,7 +291,15 @@ namespace NetworkMapViewerV2.ViewModels
         {
             OpenOptionsWindow(3); //options 2 page
         }
-                
+
+
+        [RelayCommand]
+        private void ActionLogs()
+        {
+            ActionLogsWindow actionLogs = new();
+            actionLogs.ShowDialog();
+        }
+
 
         // Add the service to the top of your ViewModel
         private readonly PingService _pingService = new();
@@ -423,6 +432,15 @@ namespace NetworkMapViewerV2.ViewModels
             }
         }
 
+        [RelayCommand]
+        public void OutOfBoundsDevices()
+        {
+            if (SelectedTab != null)
+            {
+                // Tell the currently selected tab to broadcast the gather request
+                SelectedTab.RequestGatherDevices?.Invoke();
+            }
+        }
 
         public void OpenMapFromDatabase(int mapId)
         {
@@ -575,6 +593,8 @@ namespace NetworkMapViewerV2.ViewModels
                 HighlightedDeviceId = target.DeviceId;
             }
         }
+
+
 
     }
 }

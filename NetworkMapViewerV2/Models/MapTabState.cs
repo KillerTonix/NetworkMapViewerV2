@@ -11,7 +11,7 @@ namespace NetworkMapViewerV2.Models
         public List<NetworkDevice> Devices { get; set; } = [];
         public List<NetworkLabel> Labels { get; set; } = [];
 
-
+        public Action? RequestGatherDevices;
         // ==========================================
         // --- NEW: UI STATE PROPERTIES ---
         // ==========================================

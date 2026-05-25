@@ -183,20 +183,25 @@ namespace NetworkMapViewerV2.Helpers.WebFetcher
         private static string WaitForSipUserId(ChromeDriver driver)
         {
             var wait = new WebDriverWait(driver, DefaultTimeout);
+
+            // 1. Only wait for the element to exist on the page
             var element = wait.Until(d =>
             {
                 try
                 {
-                    var el = d.FindElement(By.Name("P35"));
-                    var value = el.GetAttribute("value");
-                    return string.IsNullOrWhiteSpace(value) ? null : el;
+                    return d.FindElement(By.Name("P35"));
                 }
                 catch (NoSuchElementException)
                 {
-                    return null;
+                    return null; // Keep waiting if the page hasn't loaded the element yet
                 }
             });
-            return element.GetAttribute("value").Trim();
+
+            // 2. Once found, extract the value
+            var value = element.GetAttribute("value");
+
+            // 3. Return "unknown" if it is empty, otherwise return the trimmed value
+            return string.IsNullOrWhiteSpace(value) ? "unknown" : value.Trim();
         }
 
         // Extracted firmware wait into its own safe method

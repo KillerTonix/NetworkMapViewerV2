@@ -15,6 +15,7 @@
 
         <KeyBinding Key="E" Modifiers="Ctrl" Command="{Binding ToggleEditModeCommand}" />
         <KeyBinding Key="G" Modifiers="Ctrl" Command="{Binding ToggleGridModeCommand}" />
+        <KeyBinding Key="F1" Modifiers="Ctrl" Command="{Binding OutOfBoundsDevices}" />
 
         <KeyBinding Key="F5" Command="{Binding StartPingCommand}" />
         <KeyBinding Key="F4" Command="{Binding StopPingCommand}" />
@@ -28,6 +29,8 @@
         <KeyBinding Key="W" Modifiers="Ctrl" Command="{Binding CloseCurrentTabCommand}" />
         <KeyBinding Key="F" Modifiers="Ctrl" Command="{Binding ToggleSearchCommand}" />
         <KeyBinding Key="F" Modifiers="Ctrl+Shift" Command="{Binding SearchOptionsCommand}" />
+        
+        <KeyBinding Key="L" Modifiers="Ctrl" Command="{Binding ActionLogsCommand}" />
 
     </Window.InputBindings>
     
@@ -140,7 +143,13 @@
                     </MenuItem.Icon>
                 </MenuItem>
             </MenuItem>
-            <MenuItem Header="" InputGestureText="Ctrl+F" Command="{Binding }" />
+            <MenuItem Header="_Logs">
+                <MenuItem Header="Action Logs" InputGestureText="Ctrl+L" Command="{Binding ActionLogsCommand}" >
+                    <MenuItem.Icon>
+                        <TextBlock Text="📜" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                    </MenuItem.Icon>
+                </MenuItem>
+            </MenuItem>
         </Menu>
 
         <TabControl Grid.Row="1" Style="{StaticResource MapTabControlStyle}" ItemsSource="{Binding OpenTabs}" 

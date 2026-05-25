@@ -66,6 +66,7 @@ namespace NetworkMapViewerV2.Views
                     SelectElement(null, false);
                 }
             };
+            this.DataContextChanged += MapCanvasView_DataContextChanged;
             // --- NEW: Marquee Selection Events ---
             DrawingCanvas.MouseLeftButtonDown += DrawingCanvas_MouseLeftButtonDown;
             DrawingCanvas.MouseMove += DrawingCanvas_MouseMove;
@@ -78,12 +79,16 @@ namespace NetworkMapViewerV2.Views
         {
             // Unsubscribe from the OLD tab's property changes to prevent memory leaks
             if (e.OldValue is MapTabState oldState)
+            {
                 oldState.PropertyChanged -= CurrentState_PropertyChanged;
-
+                oldState.RequestGatherDevices -= GatherOutOfBoundsDevices;
+            }
             if (e.NewValue is MapTabState state)
             {
                 _currentState = state;
-
+                state.RequestGatherDevices += GatherOutOfBoundsDevices;
+            
+        
                 // Subscribe to per-tab property changes (e.g. IsEditingEnabled toggled from another tab)
                 state.PropertyChanged += CurrentState_PropertyChanged;
 
@@ -1757,6 +1762,49 @@ namespace NetworkMapViewerV2.Views
                 {
                     MessageBox.Show($"No matches found for '{find}' on this map.", "No Results", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
+            }
+        }
+
+
+
+        public void GatherOutOfBoundsDevices()
+        {
+            // Define the safe boundaries (assuming MapCanvas is the name of your WPF Canvas)
+            // We subtract 100 to account for the width/height of the device icon itself
+            double maxWidth = DrawingCanvas.ActualWidth > 0 ? DrawingCanvas.ActualWidth - 100 : 1200;
+            double maxHeight = DrawingCanvas.ActualHeight > 0 ? DrawingCanvas.ActualHeight - 100 : 800;
+
+            bool mapRequiresRedraw = false;
+            double cascadeOffset = 20.0; // Start at X:20, Y:20
+
+            // Adjust '_currentState.Devices' to match whatever collection holds your network items
+            foreach (var device in _currentState.Devices)
+            {
+                // Check if the device is outside the visible screen
+                if (device.Left < 0 || device.Left > maxWidth || device.Top < 0 || device.Top > maxHeight)
+                {
+                    // Snap it back to a safe location
+                    device.Left = cascadeOffset;
+                    device.Top = cascadeOffset;
+
+                    // Increment the offset so the next lost device doesn't perfectly hide under this one
+                    cascadeOffset += 30.0;
+
+                    // Prevent the offset from going off-screen again
+                    if (cascadeOffset > 300) cascadeOffset = 20.0;
+
+                    mapRequiresRedraw = true;
+                }
+            }
+
+            if (mapRequiresRedraw)
+            {
+                if (GlobalViewModel != null)
+                {
+                    GlobalViewModel.HasUnsavedChanges = true;
+                }
+
+                DrawMap(_currentState);
             }
         }
     }

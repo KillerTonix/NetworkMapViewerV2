@@ -66,7 +66,11 @@ namespace NetworkMapViewerV2.Helpers.LocalFetcher
                 if (process == null) return;
 
                 string output = await process.StandardOutput.ReadToEndAsync();
+                string err = await process.StandardError.ReadToEndAsync();
+
                 await process.WaitForExitAsync();
+                               
+
 
                 // ==========================================
                 // --- THE FIX: RPC FAILURE DETECTION ---
@@ -176,7 +180,7 @@ namespace NetworkMapViewerV2.Helpers.LocalFetcher
             device.Hints.Add("<b>STATUS:</b> Scraping Grandstream Web Interface...");
             if (mapCanvas._currentState != null) mapCanvas.DrawMap(mapCanvas._currentState);
 
-            var fetcher = new Helpers.WebFetcher.GrandstreamsWebFetcher();
+            var fetcher = new WebFetcher.GrandstreamsWebFetcher();
             var results = await fetcher.FetchGrandstreamsAsync(device.Address);
 
             if (results.TryGetValue("ERROR", out string? errorMessage))

@@ -1,6 +1,5 @@
 ﻿using NetworkMapViewerV2.ViewModels;
 using System.Windows;
-using System.Windows.Controls;
 
 namespace NetworkMapViewerV2.Views
 {

@@ -5,7 +5,7 @@ namespace NetworkMapViewerV2.Models
     public class AuditLog
     {
         public int LogId { get; set; }
-        public DateTime Timestamp { get; set; } = DateTime.Now;
+        public string Timestamp { get; set; } = string.Empty; // ISO 8601 format
         public string Username { get; set; } = string.Empty;
         public string ActionType { get; set; } = string.Empty; // e.g., "INSERT", "UPDATE", "DELETE"
         public string TableName { get; set; } = string.Empty;  // e.g., "Devices", "Maps"

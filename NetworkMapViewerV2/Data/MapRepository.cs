@@ -17,7 +17,7 @@ namespace NetworkMapViewerV2.Data
             using var connection = GetOpenConnection();
             using var cmd = new SqliteCommand("SELECT MapId, MapName FROM Maps ORDER BY MapName", connection);
             using var reader = cmd.ExecuteReader();
-
+            
             while (reader.Read())
             {
                 maps.Add(reader.GetInt32(0), reader.GetString(1));
@@ -32,7 +32,13 @@ namespace NetworkMapViewerV2.Data
             using var cmd = new SqliteCommand(sql, connection);
 
             cmd.Parameters.AddWithValue("@MapName", mapName);
+
+            // Log this critical update action for accountability!
+            InsertAuditLog("INSERT", "Maps", 0, $"Created new map: {mapName}");
+
             return Convert.ToInt32(cmd.ExecuteScalar());
+
+
         }
 
         public MapTabState LoadMap(int mapId)
@@ -145,10 +151,56 @@ namespace NetworkMapViewerV2.Data
             }
             else // Existing Device (UPDATE)
             {
+                // ==========================================
+                // 1. CHANGE DETECTION (Avoid unnecessary saves)
+                // ==========================================
+                bool hasChanges = false;
+                List<string> changedFields = new();
+
+                string checkSql = "SELECT GroupId, Left, Top, Address, TitleJson, HintsJson, HintImagePath, TargetMapId FROM Devices WHERE DeviceId = @DeviceId";
+                using (var checkCmd = new SqliteCommand(checkSql, connection))
+                {
+                    checkCmd.Parameters.AddWithValue("@DeviceId", device.DeviceId);
+                    using var reader = checkCmd.ExecuteReader();
+
+                    if (reader.Read())
+                    {
+                        // Read current DB values safely
+                        int dbGroupId = reader.GetInt32(0);
+                        double dbLeft = reader.GetDouble(1);
+                        double dbTop = reader.GetDouble(2);
+                        string dbAddress = reader.IsDBNull(3) ? "" : reader.GetString(3);
+                        string dbTitleJson = reader.IsDBNull(4) ? "" : reader.GetString(4);
+                        string dbHintsJson = reader.IsDBNull(5) ? "" : reader.GetString(5);
+                        string dbImagePath = reader.IsDBNull(6) ? "" : reader.GetString(6);
+                        int? dbTargetMapId = reader.IsDBNull(7) ? null : reader.GetInt32(7);
+
+                        // Compare them against the object trying to be saved
+                        if (dbGroupId != (device.GroupId <= 0 ? 1 : device.GroupId)) { hasChanges = true; changedFields.Add("Type"); }
+                        if (Math.Abs(dbLeft - device.Left) > 0.01 || Math.Abs(dbTop - device.Top) > 0.01) { hasChanges = true; changedFields.Add("Position"); }
+                        if (dbAddress != (device.Address ?? "")) { hasChanges = true; changedFields.Add("IP"); }
+                        if (dbTitleJson != titlesJson) { hasChanges = true; changedFields.Add("Titles"); }
+                        if (dbHintsJson != hintsJson) { hasChanges = true; changedFields.Add("Hints"); }
+                        if (dbImagePath != (device.HintImagePath ?? "")) { hasChanges = true; changedFields.Add("Image"); }
+                        if (dbTargetMapId != device.TargetMapId) { hasChanges = true; changedFields.Add("Map Link"); }
+                    }
+                    else
+                    {
+                        hasChanges = true; // If it somehow wasn't in the DB, force the update
+                        changedFields.Add("Forced Update");
+                    }
+                }
+
+                // IF NOTHING CHANGED, ABORT THE UPDATE AND DO NOT LOG!
+                if (!hasChanges) return;
+
+                // ==========================================
+                // 2. EXECUTE THE UPDATE
+                // ==========================================
                 string sql = @"
-                    UPDATE Devices SET GroupId=@GroupId, Left=@Left, Top=@Top, Address=@Address, 
-                    TitleJson=@TitleJson, HintsJson=@HintsJson, HintImagePath=@HintImagePath, TargetMapId=@TargetMapId 
-                    WHERE DeviceId=@DeviceId;";
+            UPDATE Devices SET GroupId=@GroupId, Left=@Left, Top=@Top, Address=@Address, 
+            TitleJson=@TitleJson, HintsJson=@HintsJson, HintImagePath=@HintImagePath, TargetMapId=@TargetMapId 
+            WHERE DeviceId=@DeviceId;";
 
                 using var cmd = new SqliteCommand(sql, connection);
                 cmd.Parameters.AddWithValue("@DeviceId", device.DeviceId);
@@ -162,6 +214,9 @@ namespace NetworkMapViewerV2.Data
                 cmd.Parameters.AddWithValue("@TargetMapId", device.TargetMapId.HasValue ? (object)device.TargetMapId.Value : DBNull.Value);
 
                 cmd.ExecuteNonQuery();
+
+                // The audit log now dynamically tells you exactly what they changed!
+                InsertAuditLog("UPDATE", "Devices", device.DeviceId, $"Device IP: {device.Address ?? ""}; Changed: {string.Join(", ", changedFields)}");
             }
         }
 
@@ -183,19 +238,58 @@ namespace NetworkMapViewerV2.Data
             }
             else // Existing Label (UPDATE)
             {
+                // ==========================================
+                // 1. CHANGE DETECTION (Avoid unnecessary saves)
+                // ==========================================
+                bool hasChanges = false;
+                List<string> changedFields = new();
+
+                string checkSql = "SELECT Left, Top, Width, Height, TextJson FROM Labels WHERE LabelId = @LabelId";
+                using (var checkCmd = new SqliteCommand(checkSql, connection))
+                {
+                    checkCmd.Parameters.AddWithValue("@LabelId", label.LabelId);
+                    using var reader = checkCmd.ExecuteReader();
+
+                    if (reader.Read())
+                    {
+                        double dbLeft = reader.GetDouble(0);
+                        double dbTop = reader.GetDouble(1);
+                        double dbWidth = reader.GetDouble(2);
+                        double dbHeight = reader.GetDouble(3);
+                        string dbTextJson = reader.IsDBNull(4) ? "" : reader.GetString(4);
+
+                        if (Math.Abs(dbLeft - label.Left) > 0.01 || Math.Abs(dbTop - label.Top) > 0.01) { hasChanges = true; changedFields.Add("Position"); }
+                        if (Math.Abs(dbWidth - label.Width) > 0.01 || Math.Abs(dbHeight - label.Height) > 0.01) { hasChanges = true; changedFields.Add("Size"); }
+                        if (dbTextJson != textJson) { hasChanges = true; changedFields.Add("Text"); }
+                    }
+                    else
+                    {
+                        hasChanges = true;
+                        changedFields.Add("Format");
+                    }
+                }
+
+                // IF NOTHING CHANGED, ABORT THE UPDATE AND DO NOT LOG!
+                if (!hasChanges) return;
+
+                // ==========================================
+                // 2. EXECUTE THE UPDATE
+                // ==========================================
                 string sql = @"
-                    UPDATE Labels SET 
-                        Left = @Left, Top = @Top, Width = @Width, Height = @Height, 
-                        Background = @Background, BorderBrush = @BorderBrush, BorderThickness = @BorderThickness, 
-                        HorizontalAlignment = @HorizontalAlignment, VerticalAlignment = @VerticalAlignment, 
-                        FontFamily = @FontFamily, FontSize = @FontSize, FontStyle = @FontStyle, FontWeight = @FontWeight,
-                        Foreground = @Foreground, TextJson = @TextJson
-                    WHERE LabelId = @LabelId";
+            UPDATE Labels SET 
+                Left = @Left, Top = @Top, Width = @Width, Height = @Height, 
+                Background = @Background, BorderBrush = @BorderBrush, BorderThickness = @BorderThickness, 
+                HorizontalAlignment = @HorizontalAlignment, VerticalAlignment = @VerticalAlignment, 
+                FontFamily = @FontFamily, FontSize = @FontSize, FontStyle = @FontStyle, FontWeight = @FontWeight,
+                Foreground = @Foreground, TextJson = @TextJson
+            WHERE LabelId = @LabelId";
 
                 using var cmd = new SqliteCommand(sql, connection);
                 cmd.Parameters.AddWithValue("@LabelId", label.LabelId);
-                AddLabelParameters(cmd, label, textJson);
+                AddLabelParameters(cmd, label, textJson); // Uses your existing parameter helper
                 cmd.ExecuteNonQuery();
+
+                InsertAuditLog("UPDATE", "Labels", label.LabelId, $"Changed: {string.Join(", ", changedFields)}");
             }
         }
 
@@ -228,6 +322,9 @@ namespace NetworkMapViewerV2.Data
             using var cmd = new SqliteCommand("DELETE FROM Devices WHERE DeviceId = @DeviceId", connection);
             cmd.Parameters.AddWithValue("@DeviceId", deviceId);
             cmd.ExecuteNonQuery();
+
+            // Log this critical action for accountability!
+            InsertAuditLog("DELETE", "Devices", deviceId, "Device removed from map.");
         }
 
         public void DeleteLabel(int labelId)
@@ -237,6 +334,9 @@ namespace NetworkMapViewerV2.Data
             using var cmd = new SqliteCommand("DELETE FROM Labels WHERE LabelId = @LabelId", connection);
             cmd.Parameters.AddWithValue("@LabelId", labelId);
             cmd.ExecuteNonQuery();
+
+            // Log this critical action for accountability!
+            InsertAuditLog("DELETE", "Labels", labelId, "Label removed from map.");
         }
 
         // ─── SEARCH OPERATIONS ──────────────────────────────────────────
@@ -335,6 +435,9 @@ namespace NetworkMapViewerV2.Data
                 cmd.Parameters.AddWithValue("@GroupId", group.GroupId);
                 AddGroupParameters(cmd, group);
                 cmd.ExecuteNonQuery();
+
+                // Log this critical update action for accountability!
+                InsertAuditLog("UPDATE", "Groups", group.GroupId, $"Updated group name: {group.GroupName}");
             }
         }
 
@@ -376,6 +479,60 @@ namespace NetworkMapViewerV2.Data
             using var cmd = new SqliteCommand("DELETE FROM Groups WHERE GroupId = @GroupId", connection);
             cmd.Parameters.AddWithValue("@GroupId", groupId);
             cmd.ExecuteNonQuery();
+
+            // Log this critical action for accountability!
+            InsertAuditLog("DELETE", "Groups", groupId, "Device group removed.");
+        }
+
+
+
+        // --- 1. WRITE TO LOG ---
+        public void InsertAuditLog(string actionType, string tableName, int recordId, string details = "")
+        {
+            using var connection = GetOpenConnection();
+            connection.Open();
+            string sql = @"
+                INSERT INTO AuditLogs (Timestamp, Username, ActionType, TableName, RecordId, Details) 
+                VALUES (@Timestamp, @Username, @ActionType, @TableName, @RecordId, @Details)";
+
+            using var cmd = new SqliteCommand(sql, connection);
+            // Save the exact moment it happened in a sortable format
+            cmd.Parameters.AddWithValue("@Timestamp", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+            cmd.Parameters.AddWithValue("@Username", Environment.UserName);
+            cmd.Parameters.AddWithValue("@ActionType", actionType);
+            cmd.Parameters.AddWithValue("@TableName", tableName);
+            cmd.Parameters.AddWithValue("@RecordId", recordId);
+            cmd.Parameters.AddWithValue("@Details", details);
+
+            cmd.ExecuteNonQuery();
+        }
+
+        // --- 2. READ THE LOGS ---
+        public List<AuditLog> GetAuditLogs()
+        {
+            var logs = new List<AuditLog>();
+            using var connection = GetOpenConnection();
+            connection.Open();
+            // Order by descending so the newest actions are always at the top!
+            string sql = "SELECT * FROM AuditLogs ORDER BY LogId DESC";
+
+            using var cmd = new SqliteCommand(sql, connection);
+            using var reader = cmd.ExecuteReader();
+
+            while (reader.Read())
+            {
+                logs.Add(new AuditLog
+                {
+                    LogId = reader.GetInt32(0),
+                    Timestamp = reader.GetString(1),
+                    Username = reader.GetString(2),
+                    ActionType = reader.GetString(3),
+                    TableName = reader.GetString(4),
+                    RecordId = reader.GetInt32(5),
+                    Details = reader.IsDBNull(6) ? "" : reader.GetString(6)
+                });
+            }
+            return logs;
         }
     }
 }
