@@ -119,7 +119,22 @@ namespace NetworkMapViewerV2.Helpers.WebFetcher
         private static IWebElement WaitUntilClickable(ChromeDriver driver, By by)
         {
             var wait = new WebDriverWait(driver, DefaultTimeout);
-            return wait.Until(ExpectedConditions.ElementToBeClickable(by));
+            return wait.Until(drv =>
+            {
+                try
+                {
+                    var element = drv.FindElement(by);
+                    return (element != null && element.Displayed && element.Enabled) ? element : null;
+                }
+                catch (NoSuchElementException)
+                {
+                    return null;
+                }
+                catch (StaleElementReferenceException)
+                {
+                    return null;
+                }
+            });
         }
 
         private static void ClickJS(IWebDriver driver, IWebElement el)

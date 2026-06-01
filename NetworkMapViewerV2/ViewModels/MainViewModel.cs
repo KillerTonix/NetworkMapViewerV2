@@ -1,12 +1,10 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Microsoft.Win32;
 using NetworkMapViewerV2.Models;
 using NetworkMapViewerV2.Services;
 using NetworkMapViewerV2.Views;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
-using System.Reflection.Metadata.Ecma335;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -137,7 +135,7 @@ namespace NetworkMapViewerV2.ViewModels
                 int mapId = state.MapId;
                 CloseTab(state);
                 OpenMapFromDatabase(mapId); // Re-fetches the clean state from SQLite
-                HasUnsavedChanges = false;
+                SelectedTab.HasUnsavedChanges = false;
             }
         }
 
@@ -155,7 +153,7 @@ namespace NetworkMapViewerV2.ViewModels
                 foreach (var device in SelectedTab.Devices) repo.UpdateDevice(device);
                 foreach (var label in SelectedTab.Labels) repo.UpdateLabel(label);
 
-                HasUnsavedChanges = false;
+                SelectedTab.HasUnsavedChanges = false;
             }
             catch (Exception ex)
             {
@@ -163,7 +161,7 @@ namespace NetworkMapViewerV2.ViewModels
             }
         }
 
-        
+
         [RelayCommand]
         private void Options()
         {
@@ -212,7 +210,7 @@ namespace NetworkMapViewerV2.ViewModels
         {
             PingService.StartPinging(SelectedTab.Devices);
             IsPinging = true;
-            
+
         }
 
 
@@ -348,7 +346,7 @@ namespace NetworkMapViewerV2.ViewModels
                 // Save the SQLite MapId to settings
                 if (value.MapId > 0 && _appSettings?.LastOpenedMapId != value.MapId)
                 {
-                    _appSettings.LastOpenedMapId = value.MapId;
+                    _appSettings?.LastOpenedMapId = value.MapId;
                     SettingsService.Save(_appSettings);
                 }
             }
@@ -435,11 +433,8 @@ namespace NetworkMapViewerV2.ViewModels
         [RelayCommand]
         public void OutOfBoundsDevices()
         {
-            if (SelectedTab != null)
-            {
-                // Tell the currently selected tab to broadcast the gather request
-                SelectedTab.RequestGatherDevices?.Invoke();
-            }
+            // Tell the currently selected tab to broadcast the gather request
+            SelectedTab?.RequestGatherDevices?.Invoke();
         }
 
         public void OpenMapFromDatabase(int mapId)

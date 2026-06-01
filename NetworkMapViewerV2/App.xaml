@@ -64,32 +64,30 @@
                         <ControlTemplate.Triggers>
 
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="TabBorder" Property="Background" Value="#505050"/>
+                                <Setter TargetName="TabBorder" Property="Background" Value="#696969"/>
                                 <Setter Property="Foreground" Value="White"/>
                             </Trigger>
 
-                            <MultiDataTrigger>
-                                <MultiDataTrigger.Conditions>
-                                    <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource Self}}" Value="True"/>
-                                    <Condition Binding="{Binding DataContext.IsEditingEnabled, RelativeSource={RelativeSource AncestorType=Window}}" Value="True"/>
-                                </MultiDataTrigger.Conditions>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="TabBorder" Property="Background" Value="#3B3B3B"/>
+                                <Setter TargetName="TabBorder" Property="BorderBrush" Value="#242424"/>
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="FontWeight" Value="SemiBold"/>
+                            </Trigger>
+
+                            <DataTrigger Binding="{Binding IsEditingEnabled}" Value="True">
                                 <Setter TargetName="TabBorder" Property="Background" Value="#DAA520"/>
                                 <Setter TargetName="TabBorder" Property="BorderBrush" Value="#FFD700"/>
                                 <Setter Property="Foreground" Value="White"/>
                                 <Setter Property="FontWeight" Value="SemiBold"/>
-                            </MultiDataTrigger>
+                            </DataTrigger>
 
-                            <MultiDataTrigger>
-                                <MultiDataTrigger.Conditions>
-                                    <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource Self}}" Value="True"/>
-                                    <Condition Binding="{Binding DataContext.IsEditingEnabled, RelativeSource={RelativeSource AncestorType=Window}}" Value="True"/>
-                                    <Condition Binding="{Binding DataContext.HasUnsavedChanges, RelativeSource={RelativeSource AncestorType=Window}}" Value="True"/>
-                                </MultiDataTrigger.Conditions>
+                            <DataTrigger Binding="{Binding HasUnsavedChanges}" Value="True">
                                 <Setter TargetName="TabBorder" Property="Background" Value="#D9534F"/>
                                 <Setter TargetName="TabBorder" Property="BorderBrush" Value="#C9302C"/>
                                 <Setter Property="Foreground" Value="White"/>
-                                <Setter Property="FontWeight" Value="SemiBold"/>
-                            </MultiDataTrigger>
+                                <Setter Property="FontWeight" Value="Bold"/>
+                            </DataTrigger>
 
                         </ControlTemplate.Triggers>
                     </ControlTemplate>

@@ -15,7 +15,7 @@
 
         <KeyBinding Key="E" Modifiers="Ctrl" Command="{Binding ToggleEditModeCommand}" />
         <KeyBinding Key="G" Modifiers="Ctrl" Command="{Binding ToggleGridModeCommand}" />
-        <KeyBinding Key="F1" Modifiers="Ctrl" Command="{Binding OutOfBoundsDevices}" />
+        <KeyBinding Key="F1" Modifiers="Ctrl" Command="{Binding OutOfBoundsDevicesCommand}" />
 
         <KeyBinding Key="F5" Command="{Binding StartPingCommand}" />
         <KeyBinding Key="F4" Command="{Binding StopPingCommand}" />

@@ -123,13 +123,43 @@ namespace NetworkMapViewerV2.Helpers.WebFetcher
         private static IWebElement WaitUntilClickable(ChromeDriver driver, By by)
         {
             var wait = new WebDriverWait(driver, DefaultTimeout);
-            return wait.Until(ExpectedConditions.ElementToBeClickable(by));
+            return wait.Until(d =>
+            {
+                try
+                {
+                    var element = d.FindElement(by);
+                    return (element != null && element.Displayed && element.Enabled) ? element : null;
+                }
+                catch (NoSuchElementException)
+                {
+                    return null;
+                }
+                catch (StaleElementReferenceException)
+                {
+                    return null;
+                }
+            });
         }
 
         private static IWebElement WaitUntilVisible(ChromeDriver driver, By by)
         {
             var wait = new WebDriverWait(driver, DefaultTimeout);
-            return wait.Until(ExpectedConditions.ElementIsVisible(by));
+            return wait.Until(d =>
+            {
+                try
+                {
+                    var element = d.FindElement(by);
+                    return (element != null && element.Displayed) ? element : null;
+                }
+                catch (NoSuchElementException)
+                {
+                    return null;
+                }
+                catch (StaleElementReferenceException)
+                {
+                    return null;
+                }
+            });
         }
 
         private static void SafeWrite(ChromeDriver driver, By by, string text)

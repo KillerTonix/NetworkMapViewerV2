@@ -22,12 +22,12 @@ namespace NetworkMapViewerV2.Views
 {
     public partial class MapCanvasView : UserControl
     {
-        
+
         // --- NEW: Interactivity State ---
         private List<FrameworkElement>? _selectedElements = [];
-        public MapTabState _currentState; // Keep track of the current map
+        public MapTabState? _currentState; // Keep track of the current map
         private DropShadowEffect? _selectionGlow = new() { Color = Colors.Cyan, BlurRadius = 20, ShadowDepth = 0 };
-        private Brush _gridBrush;
+        private Brush? _gridBrush;
         private readonly Brush _standardBrush = new SolidColorBrush(Color.FromRgb(105, 105, 105));
 
         private bool _isDragging = false;
@@ -49,7 +49,7 @@ namespace NetworkMapViewerV2.Views
 
         // Helper to get global state from our ViewModel
         private MainViewModel? GlobalViewModel => Application.Current.MainWindow.DataContext as MainViewModel;
-         
+
 
         public MapCanvasView()
         {
@@ -87,8 +87,8 @@ namespace NetworkMapViewerV2.Views
             {
                 _currentState = state;
                 state.RequestGatherDevices += GatherOutOfBoundsDevices;
-            
-        
+
+
                 // Subscribe to per-tab property changes (e.g. IsEditingEnabled toggled from another tab)
                 state.PropertyChanged += CurrentState_PropertyChanged;
 
@@ -451,12 +451,12 @@ namespace NetworkMapViewerV2.Views
                         if (element.Tag is NetworkDevice dev)
                         {
                             var dlg = new DevicePropertiesWindow(dev, true) { Owner = Window.GetWindow(this) };
-                            if (dlg.ShowDialog() == true) { if (_currentState != null) _currentState.HasUnsavedChanges = true; DrawMap(_currentState); }
+                            if (dlg.ShowDialog() == true) { _currentState?.HasUnsavedChanges = true; DrawMap(_currentState); }
                         }
                         else if (element.Tag is NetworkLabel lbl)
                         {
                             var dlg = new LabelPropertiesWindow(lbl, true) { Owner = Window.GetWindow(this) };
-                            if (dlg.ShowDialog() == true) { if (_currentState != null) _currentState.HasUnsavedChanges = true; DrawMap(_currentState); }
+                            if (dlg.ShowDialog() == true) { _currentState?.HasUnsavedChanges = true; DrawMap(_currentState); }
                         }
                     }
                     else
@@ -464,6 +464,7 @@ namespace NetworkMapViewerV2.Views
                         // VIEW MODE: Run the Ping command or Open the Map Link
                         if (element.Tag is NetworkDevice dev)
                         {
+                            var dlg = new DevicePropertiesWindow(dev, true) { Owner = Window.GetWindow(this) };
                             HandleDeviceDoubleClick(dev);
                         }
                     }
@@ -736,6 +737,24 @@ namespace NetworkMapViewerV2.Views
                     menu.Items.Add(miCmd);
                 }
 
+                menu.Items.Add(new Separator());
+
+                var miEdit = new MenuItem { Icon = "⚙️", Header = "Properties (F2)" };
+                miEdit.Click += (sender, args) =>
+                {
+                    bool isEditeMode = true;
+                    if (_currentState == null || !_currentState.IsEditingEnabled) isEditeMode = false;
+
+                    var dlg = new DevicePropertiesWindow(device, isEditeMode) { Owner = Window.GetWindow(this) };
+                    if (dlg.ShowDialog() == true)
+                    {
+                        _currentState?.HasUnsavedChanges = true;
+                        DrawMap(_currentState);
+                    }
+                };
+                menu.Items.Add(miEdit);
+
+
                 // If it's a Map Link, add the option to jump to the other map!
                 var repo = new Data.MapRepository();
                 var groups = repo.GetAllDeviceGroups();
@@ -757,19 +776,6 @@ namespace NetworkMapViewerV2.Views
                 // ==========================================
                 if (_currentState != null && _currentState.IsEditingEnabled)
                 {
-                    menu.Items.Add(new Separator());
-
-                    var miEdit = new MenuItem { Icon = "⚙️", Header = "Properties (F2)" };
-                    miEdit.Click += (sender, args) =>
-                    {
-                        var dlg = new DevicePropertiesWindow(device, true) { Owner = Window.GetWindow(this) };
-                        if (dlg.ShowDialog() == true)
-                        {
-                            if (_currentState != null) _currentState.HasUnsavedChanges = true;
-                            DrawMap(_currentState);
-                        }
-                    };
-                    menu.Items.Add(miEdit);
 
                     // --- AUTO-FILL SCRIPTS ---
                     var miAutoFill = new MenuItem { Icon = "🔍", Header = "Auto-Fill PC Specs" };
@@ -1412,7 +1418,7 @@ namespace NetworkMapViewerV2.Views
 
         private void UserControl_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            if (_currentState == null || !_currentState.IsEditingEnabled) return;
+            if (_currentState == null) return;
 
             // --- EDIT LOGIC (F2) ---
             if (e.Key == Key.F2 && _selectedElements.Count == 1)
@@ -1421,10 +1427,12 @@ namespace NetworkMapViewerV2.Views
 
                 if (el.Tag is NetworkDevice d)
                 {
-                    var dlg = new DevicePropertiesWindow(d, true) { Owner = Window.GetWindow(this) };
+                    bool isEditeMode = true;
+                    if (!_currentState.IsEditingEnabled) isEditeMode = false;
+                    var dlg = new DevicePropertiesWindow(d, isEditeMode) { Owner = Window.GetWindow(this) };
                     if (dlg.ShowDialog() == true)
                     {
-                        if (_currentState != null) _currentState.HasUnsavedChanges = true;
+                        _currentState?.HasUnsavedChanges = true;
                         DrawMap(_currentState);
                     }
                 }
@@ -1433,7 +1441,7 @@ namespace NetworkMapViewerV2.Views
                     var dlg = new LabelPropertiesWindow(l, true) { Owner = Window.GetWindow(this) };
                     if (dlg.ShowDialog() == true)
                     {
-                        if (_currentState != null) _currentState.HasUnsavedChanges = true;
+                        _currentState?.HasUnsavedChanges = true;
                         DrawMap(_currentState);
                     }
                 }
@@ -1771,8 +1779,8 @@ namespace NetworkMapViewerV2.Views
         {
             // Define the safe boundaries (assuming MapCanvas is the name of your WPF Canvas)
             // We subtract 100 to account for the width/height of the device icon itself
-            double maxWidth = DrawingCanvas.ActualWidth > 0 ? DrawingCanvas.ActualWidth - 100 : 1200;
-            double maxHeight = DrawingCanvas.ActualHeight > 0 ? DrawingCanvas.ActualHeight - 100 : 800;
+            double maxWidth = DrawingCanvas.ActualWidth > 0 ? DrawingCanvas.ActualWidth : 1200;
+            double maxHeight = DrawingCanvas.ActualHeight > 0 ? DrawingCanvas.ActualHeight : 800;
 
             bool mapRequiresRedraw = false;
             double cascadeOffset = 20.0; // Start at X:20, Y:20

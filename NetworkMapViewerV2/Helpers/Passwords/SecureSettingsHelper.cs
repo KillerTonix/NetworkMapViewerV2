@@ -1,53 +1,64 @@
-﻿using System.Security.Cryptography;
-using System.Text;
+﻿using System.IO;
+using System.Security.Cryptography;
 
 namespace NetworkMapViewerV2.Helpers.Passwords
 {
     public static class SecureSettingsHelper
     {
+        // A 32-byte key and 16-byte IV hidden in the compiled code.
+        // (You can change these random bytes to anything you want, just keep the lengths 32 and 16!)
+        private static readonly byte[] Key = [12, 45, 88, 221, 5, 99, 14, 76, 201, 10, 44, 7, 88, 120, 50, 4, 18, 9, 33, 44, 55, 66, 77, 88, 99, 11, 22, 33, 44, 55, 66, 77];
+        private static readonly byte[] IV = [88, 11, 22, 33, 44, 55, 66, 77, 88, 99, 11, 22, 33, 44, 55, 66];
+
         /// <summary>
-        /// Encrypts a plain text password and returns a safe Base64 string to store in settings.json.
+        /// Encrypts a plain text password using AES-256 for safe network-share storage.
         /// </summary>
         public static string? ProtectPassword(string? plainTextPassword)
         {
-            if (string.IsNullOrEmpty(plainTextPassword))
-                return null;
+            if (string.IsNullOrEmpty(plainTextPassword)) return null;
 
-            // Convert the string to a byte array
-            byte[] plainBytes = Encoding.UTF8.GetBytes(plainTextPassword);
+            using Aes aes = Aes.Create();
+            aes.Key = Key;
+            aes.IV = IV;
 
-            // Encrypt the data. DataProtectionScope.CurrentUser ensures only the 
-            // logged-in Windows user can decrypt it.
-            byte[] encryptedBytes = ProtectedData.Protect(plainBytes, null, DataProtectionScope.CurrentUser);
+            ICryptoTransform encryptor = aes.CreateEncryptor(aes.Key, aes.IV);
 
-            // Return as a clean Base64 string for your JSON file
-            return Convert.ToBase64String(encryptedBytes);
+            using MemoryStream ms = new();
+            using CryptoStream cs = new(ms, encryptor, CryptoStreamMode.Write);
+            using (StreamWriter sw = new(cs))
+            {
+                sw.Write(plainTextPassword);
+            }
+
+            return Convert.ToBase64String(ms.ToArray());
         }
 
         /// <summary>
-        /// Reads the Base64 string from settings.json and decrypts it back to plain text.
+        /// Decrypts the Base64 string back to plain text. Works across all computers.
         /// </summary>
         public static string? UnprotectPassword(string? encryptedBase64)
         {
-            if (string.IsNullOrEmpty(encryptedBase64))
-                return null;
+            if (string.IsNullOrEmpty(encryptedBase64)) return null;
 
             try
             {
-                // Convert the Base64 string back to encrypted bytes
-                byte[] encryptedBytes = Convert.FromBase64String(encryptedBase64);
+                byte[] cipherBytes = Convert.FromBase64String(encryptedBase64);
 
-                // Decrypt the bytes
-                byte[] plainBytes = ProtectedData.Unprotect(encryptedBytes, null, DataProtectionScope.CurrentUser);
+                using Aes aes = Aes.Create();
+                aes.Key = Key;
+                aes.IV = IV;
 
-                // Convert back to a readable string
-                return Encoding.UTF8.GetString(plainBytes);
+                ICryptoTransform decryptor = aes.CreateDecryptor(aes.Key, aes.IV);
+
+                using MemoryStream ms = new(cipherBytes);
+                using CryptoStream cs = new(ms, decryptor, CryptoStreamMode.Read);
+                using StreamReader sr = new(cs);
+
+                return sr.ReadToEnd();
             }
-            catch (CryptographicException)
+            catch (Exception)
             {
-                // This triggers if someone copies settings.json to another computer
-                // or tries to open it under a different Windows user account.
-                Console.WriteLine("Decryption failed. The file was moved or user context changed.");
+                // Triggers if the string is completely malformed or manually edited
                 return null;
             }
         }

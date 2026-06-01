@@ -6,7 +6,7 @@ namespace NetworkMapViewerV2.Services
 {
     public class PingService
     {
-        private CancellationTokenSource _cts;
+        private CancellationTokenSource? _cts;
 
         public bool IsRunning => _cts != null && !_cts.IsCancellationRequested;
 
@@ -41,7 +41,21 @@ namespace NetworkMapViewerV2.Services
                                 var app = Application.Current;
                                 if (app != null && app.Dispatcher != null && !app.Dispatcher.HasShutdownStarted)
                                 {
-                                    app.Dispatcher.InvokeAsync(() =>
+                                    await app.Dispatcher.InvokeAsync(() =>
+                                    {
+                                        device.IsOnline = isUp;
+                                    }).Task;
+                                }
+                                if (app != null && app.Dispatcher != null && !app.Dispatcher.HasShutdownStarted)
+                                {
+                                    _ = app.Dispatcher.InvokeAsync(() =>
+                                    {
+                                        device.IsOnline = isUp;
+                                    });
+                                }
+                                if (app != null && app.Dispatcher != null && !app.Dispatcher.HasShutdownStarted)
+                                {
+                                    app.Dispatcher.Invoke(() =>
                                     {
                                         device.IsOnline = isUp;
                                     });
@@ -71,7 +85,7 @@ namespace NetworkMapViewerV2.Services
             }
         }
 
-        private async Task<bool> PingHostAsync(string ipAddress)
+        private static async Task<bool> PingHostAsync(string ipAddress)
         {
             // 1. THE GUARD CLAUSE: Reject empty strings or "0.0.0.0" immediately!
             if (string.IsNullOrWhiteSpace(ipAddress) || ipAddress == "0.0.0.0")
@@ -81,12 +95,10 @@ namespace NetworkMapViewerV2.Services
 
             try
             {
-                using (var ping = new Ping())
-                {
-                    // 2. The ping is now safe to execute
-                    var reply = await ping.SendPingAsync(ipAddress, 2000); // 2000ms timeout
-                    return reply.Status == IPStatus.Success;
-                }
+                using var ping = new Ping();
+                // 2. The ping is now safe to execute
+                var reply = await ping.SendPingAsync(ipAddress, 2000); // 2000ms timeout
+                return reply.Status == IPStatus.Success;
             }
             catch (PingException)
             {
