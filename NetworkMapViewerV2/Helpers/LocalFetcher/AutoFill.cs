@@ -10,16 +10,16 @@ namespace NetworkMapViewerV2.Helpers.LocalFetcher
 {
     internal class AutoFill
     {
-        private static AppSettings settings = SettingsService.Load();
+        private static readonly AppSettings settings = SettingsService.Load();
 
-        private static string ScriptsPath = settings.ScriptsPath ?? "";
-        private static string HintImagesPath = settings.HintImagesPath ?? "";
-        private static string decryptedPasswordSSH = SecureSettingsHelper.UnprotectPassword(settings.SSHPassword) ?? "";
-        private static string decryptedPasswordManagers = SecureSettingsHelper.UnprotectPassword(settings.ManagersPCPassword) ?? "";
-        private static string decryptedPasswordQMS = SecureSettingsHelper.UnprotectPassword(settings.QMSPassword) ?? "";
+        private static readonly string ScriptsPath = settings.ScriptsPath ?? "";
+        private static readonly string HintImagesPath = settings.HintImagesPath ?? "";
+        private static readonly string decryptedPasswordSSH = SecureSettingsHelper.UnprotectPassword(settings.SSHPassword) ?? "";
+        private static readonly string decryptedPasswordManagers = SecureSettingsHelper.UnprotectPassword(settings.ManagersPCPassword) ?? "";
+        private static readonly string decryptedPasswordQMS = SecureSettingsHelper.UnprotectPassword(settings.QMSPassword) ?? "";
 
         // Caller must pass the MapCanvasView instance
-        public static async Task RunAutoFillScript(MapCanvasView mapCanvas, NetworkDevice device, string scriptName)
+        public static async Task RunAutoFillScript(MainViewModel vm, MapCanvasView mapCanvas, NetworkDevice device, string scriptName)
         {
             if (string.IsNullOrWhiteSpace(device.Address) || device.Address == "0.0.0.0")
             {
@@ -69,7 +69,7 @@ namespace NetworkMapViewerV2.Helpers.LocalFetcher
                 string err = await process.StandardError.ReadToEndAsync();
 
                 await process.WaitForExitAsync();
-                               
+
 
 
                 // ==========================================
@@ -89,7 +89,7 @@ namespace NetworkMapViewerV2.Helpers.LocalFetcher
                     {
                         if (lines[i].StartsWith("USERNAME="))
                         {
-                            string rawUser = lines[i].Substring(9).Trim();
+                            string rawUser = lines[i][9..].Trim();
                             if (!string.IsNullOrWhiteSpace(rawUser))
                             {
                                 // Show a loading message so you know it's querying AD
@@ -98,7 +98,10 @@ namespace NetworkMapViewerV2.Helpers.LocalFetcher
                                 if (mapCanvas._currentState != null) mapCanvas.DrawMap(mapCanvas._currentState);
                                 // Replace the raw username with the real AD Name!
                                 string adName = await new ADName().ResolveADNameAsync(rawUser);
-                                lines[i] = $"USERNAME={adName}";
+                                if (!adName.Contains("ERROR"))
+                                {
+                                    lines[i] = $"USERNAME={adName}";
+                                }
                             }
                         }
                     }
@@ -117,6 +120,11 @@ namespace NetworkMapViewerV2.Helpers.LocalFetcher
                 {
                     var parser = new ParseScriptOutput();
                     parser.ParseScriptOutputToHints(device, output);
+
+                    if (vm != null && vm.SelectedTab != null)
+                    {
+                        vm.SelectedTab.HasUnsavedChanges = true;
+                    }
                 }
 
                 // Mark unsaved changes via mapCanvas's state (adjust visibility if needed)
@@ -146,9 +154,9 @@ namespace NetworkMapViewerV2.Helpers.LocalFetcher
                 return fetcher.FetchPrinters(device.Address);
             });
 
-            if (results.ContainsKey("ERROR"))
+            if (results.TryGetValue("ERROR", out string? value))
             {
-                MessageBox.Show($"Web Scraper failed:\n{results["ERROR"]}", "Scan Failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show($"Web Scraper failed:\n{value}", "Scan Failed", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 

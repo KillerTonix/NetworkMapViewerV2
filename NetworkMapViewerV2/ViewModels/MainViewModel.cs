@@ -5,8 +5,10 @@ using NetworkMapViewerV2.Services;
 using NetworkMapViewerV2.Views;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Reflection.Metadata.Ecma335;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 
 namespace NetworkMapViewerV2.ViewModels
 {
@@ -19,7 +21,7 @@ namespace NetworkMapViewerV2.ViewModels
 
         // 2. The currently active tab
         [ObservableProperty]
-        private MapTabState _selectedTab = new();
+        public MapTabState _selectedTab = new();
 
         // 3. Global App States
         [ObservableProperty]
@@ -33,6 +35,8 @@ namespace NetworkMapViewerV2.ViewModels
 
         private AppSettings _appSettings = new();
 
+        private DispatcherTimer? _autoRefreshTimer; // Timer for auto-refreshing tabs
+
         public MainViewModel()
         {
             _appSettings = SettingsService.Load();
@@ -45,6 +49,22 @@ namespace NetworkMapViewerV2.ViewModels
                     OpenMapFromDatabase(_appSettings.LastOpenedMapId);
                 }
             });
+
+            _autoRefreshTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMinutes(30) // Set to 10 minutes
+            };
+            _autoRefreshTimer.Tick += AutoRefreshTimer_Tick;
+            _autoRefreshTimer.Start();
+        }
+
+        private void AutoRefreshTimer_Tick(object? sender, EventArgs e)
+        {
+            // SAFETY CHECK: Never reload if they are actively editing or have unsaved changes!
+            if (SelectedTab != null && !SelectedTab.IsEditingEnabled && !SelectedTab.HasUnsavedChanges)
+            {
+                ReloadMap(); // Your existing method
+            }
         }
 
         // --- COMMANDS ---
@@ -161,6 +181,19 @@ namespace NetworkMapViewerV2.ViewModels
             }
         }
 
+        [RelayCommand]
+        private void ToggleHotkeys()
+        {
+            HelpWindow helpWindow = new(0) { Owner = Application.Current.MainWindow };
+            helpWindow.ShowDialog();
+        }
+        [RelayCommand]
+        private void ToggleAbout()
+        {
+            HelpWindow helpWindow = new(1) { Owner = Application.Current.MainWindow };
+            helpWindow.ShowDialog();
+        }       
+
 
         [RelayCommand]
         private void Options()
@@ -175,27 +208,49 @@ namespace NetworkMapViewerV2.ViewModels
             Application.Current.Shutdown();
         }
 
-
         [RelayCommand]
         private void ToggleEditMode()
         {
             if (SelectedTab == null) return;
 
-            // If we are turning it OFF, and there are changes...
-            if (SelectedTab.IsEditingEnabled && SelectedTab.HasUnsavedChanges)
+            // If we are currently IN Edit Mode and want to turn it OFF...
+            if (SelectedTab.IsEditingEnabled)
             {
-                var result = MessageBox.Show(
-                    "You have unsaved edits. Do you want to save them to the database?",
-                    "Save Changes?", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+                if (SelectedTab.HasUnsavedChanges)
+                {
+                    var result = MessageBox.Show(
+                        "You have unsaved edits. Do you want to save them to the database?",
+                        "Save Changes?", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
 
-                if (result == MessageBoxResult.Yes) SaveMap();
-                else if (result == MessageBoxResult.Cancel) return;
-                else if (result == MessageBoxResult.No) { SelectedTab.HasUnsavedChanges = false; ReloadMap(); }
+                    if (result == MessageBoxResult.Cancel)
+                    {
+                        return; // Abort everything, stay in Edit Mode
+                    }
+                    else if (result == MessageBoxResult.Yes)
+                    {
+                        SaveMap();
+                    }
+                    else if (result == MessageBoxResult.No)
+                    {
+                        SelectedTab.HasUnsavedChanges = false;
+                        ReloadMap();
+                    }
+                }
+
+                // We use a null check here just in case ReloadMap() completely destroyed and recreated the tab
+                if (SelectedTab != null)
+                {
+                    SelectedTab.IsEditingEnabled = false; // EXPLICITLY turn off
+                }
+            }
+            else
+            {
+                // We are currently in View Mode and want to turn Edit Mode ON
+                SelectedTab.IsEditingEnabled = true; // EXPLICITLY turn on
             }
 
-            SelectedTab.IsEditingEnabled = !SelectedTab.IsEditingEnabled;
-            IsEditingEnabled = SelectedTab.IsEditingEnabled;
-
+            // Sync the global toolbar button state to match the tab's final state
+            IsEditingEnabled = SelectedTab?.IsEditingEnabled ?? false;
         }
 
         [RelayCommand]

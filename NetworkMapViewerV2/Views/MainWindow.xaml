@@ -10,12 +10,11 @@
         <KeyBinding Key="O" Modifiers="Ctrl" Command="{Binding OpenMapCommand}" />
         <KeyBinding Key="R" Modifiers="Ctrl" Command="{Binding ReloadMapCommand}" />
         <KeyBinding Key="S" Modifiers="Ctrl" Command="{Binding SaveMapCommand}" />
-        <KeyBinding Key="S" Modifiers="Ctrl+Shift" Command="{Binding ExportMapCommand}" />
         <KeyBinding Key="K" Modifiers="Ctrl" Command="{Binding OptionsCommand}" />
 
         <KeyBinding Key="E" Modifiers="Ctrl" Command="{Binding ToggleEditModeCommand}" />
         <KeyBinding Key="G" Modifiers="Ctrl" Command="{Binding ToggleGridModeCommand}" />
-        <KeyBinding Key="F1" Modifiers="Ctrl" Command="{Binding OutOfBoundsDevicesCommand}" />
+        <KeyBinding Key="F2" Modifiers="Ctrl" Command="{Binding OutOfBoundsDevicesCommand}" />
 
         <KeyBinding Key="F5" Command="{Binding StartPingCommand}" />
         <KeyBinding Key="F4" Command="{Binding StopPingCommand}" />
@@ -31,6 +30,8 @@
         <KeyBinding Key="F" Modifiers="Ctrl+Shift" Command="{Binding SearchOptionsCommand}" />
         
         <KeyBinding Key="L" Modifiers="Ctrl" Command="{Binding ActionLogsCommand}" />
+        <KeyBinding Key="F1" Command="{Binding ToggleAboutCommand}" />
+        <KeyBinding Key="F1" Modifiers="Shift" Command="{Binding ToggleHotkeysCommand}" />
 
     </Window.InputBindings>
     
@@ -66,12 +67,7 @@
                         <TextBlock Text="💾" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     </MenuItem.Icon>
                 </MenuItem>
-
-                <MenuItem Header="Save _As (.map Export)" InputGestureText="Ctrl+Shift+S" Command="{Binding ExportMapCommand}">
-                    <MenuItem.Icon>
-                        <TextBlock Text="📤" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                    </MenuItem.Icon>
-                </MenuItem>
+              
                 <Separator />
                 <MenuItem x:Name="OptionsMI" Header="_Options" InputGestureText="Ctrl+K"  Command="{Binding OptionsCommand}">
                     <MenuItem.Icon>
@@ -147,6 +143,18 @@
                 <MenuItem Header="Action Logs" InputGestureText="Ctrl+L" Command="{Binding ActionLogsCommand}" >
                     <MenuItem.Icon>
                         <TextBlock Text="📜" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                    </MenuItem.Icon>
+                </MenuItem>
+            </MenuItem>
+            <MenuItem Header="_Help">
+                <MenuItem Header="Hotkeys" InputGestureText="Shift+F1"  Command="{Binding ToggleHotkeysCommand}">
+                    <MenuItem.Icon>
+                        <TextBlock Text="⌨" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                    </MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="About" InputGestureText="F1"  Command="{Binding ToggleAboutCommand}">
+                    <MenuItem.Icon>
+                        <TextBlock Text="ℹ️" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     </MenuItem.Icon>
                 </MenuItem>
             </MenuItem>

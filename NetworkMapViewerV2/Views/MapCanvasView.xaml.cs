@@ -1,9 +1,7 @@
 ﻿using NetworkMapViewerV2.Helpers;
 using NetworkMapViewerV2.Helpers.Alignment;
 using NetworkMapViewerV2.Helpers.LocalFetcher;
-using NetworkMapViewerV2.Helpers.Passwords;
 using NetworkMapViewerV2.Models;
-using NetworkMapViewerV2.Services;
 using NetworkMapViewerV2.ViewModels;
 using System.IO;
 using System.Text.RegularExpressions;
@@ -542,32 +540,39 @@ namespace NetworkMapViewerV2.Views
                 double totalDeltaX = currentPosition.X - _clickPosition.X;
                 double totalDeltaY = currentPosition.Y - _clickPosition.Y;
 
-                // SHIFT-LOCK LOGIC (Still works for batch movement!)
+                // ==========================================
+                // THE FIX: ADD A DRAG THRESHOLD & UPDATE TAB STATE
+                // ==========================================
+                // Only trigger the Red Tab if they moved it more than 3 pixels!
+                if (Math.Abs(totalDeltaX) > 3 || Math.Abs(totalDeltaY) > 3)
+                {
+                    _currentState?.HasUnsavedChanges = true;
+                }
+
+                // SHIFT-LOCK LOGIC
                 if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
                 {
                     if (Math.Abs(totalDeltaX) > Math.Abs(totalDeltaY))
-                        totalDeltaY = 0; // Lock vertically, move horizontally
+                        totalDeltaY = 0;
                     else
-                        totalDeltaX = 0; // Lock horizontally, move vertically
+                        totalDeltaX = 0;
                 }
 
-                // --- BATCH MOVEMENT: Apply the movement delta to ALL selected items! ---
+                // --- BATCH MOVEMENT ---
                 if (_selectedElements != null)
                 {
                     foreach (var el in _selectedElements)
                     {
                         if (el is FrameworkElement fw && _dragStartPositions.TryGetValue(fw, out Point startPos))
                         {
-                            // Apply the distance to their ORIGINAL starting positions
                             double newLeft = startPos.X + totalDeltaX;
                             double newTop = startPos.Y + totalDeltaY;
 
-                            EnforceBounds(fw, ref newLeft, ref newTop); // Keep them on screen
+                            EnforceBounds(fw, ref newLeft, ref newTop);
 
                             Canvas.SetLeft(fw, newLeft);
                             Canvas.SetTop(fw, newTop);
 
-                            // Update the SQLite memory model
                             UpdateModelPosition(fw, newLeft, newTop);
                         }
                     }
@@ -778,19 +783,19 @@ namespace NetworkMapViewerV2.Views
                 {
 
                     // --- AUTO-FILL SCRIPTS ---
-                    var miAutoFill = new MenuItem { Icon = "🔍", Header = "Auto-Fill PC Specs" };
+                    var miAutoFill = new MenuItem { Icon = "🔍", Header = "Auto-Fill Specs" };
 
                     var miDomain = new MenuItem { Icon = "💻", Header = "Domain Joined PC" };
-                    miDomain.Click += async (sender, args) => await AutoFill.RunAutoFillScript(this, device, "SystemInfo.ps1");
+                    miDomain.Click += async (sender, args) => await AutoFill.RunAutoFillScript(GlobalViewModel, this, device, "SystemInfo.ps1");
 
                     var miNonDomain = new MenuItem { Icon = "🖥️", Header = "Non-Domain PC" };
-                    miNonDomain.Click += async (sender, args) => await AutoFill.RunAutoFillScript(this, device, $"SystemInfo Non Domain.ps1");
+                    miNonDomain.Click += async (sender, args) => await AutoFill.RunAutoFillScript(GlobalViewModel, this, device, $"SystemInfo Non Domain.ps1");
 
                     var miDefaultPC = new MenuItem { Icon = "🖥️", Header = "Default PC" };
-                    miDefaultPC.Click += async (sender, args) => await AutoFill.RunAutoFillScript(this, device, $"SystemInfo Default.ps1");
+                    miDefaultPC.Click += async (sender, args) => await AutoFill.RunAutoFillScript(GlobalViewModel, this, device, $"SystemInfo Default.ps1");
 
                     var miLinux = new MenuItem { Icon = "🐧", Header = "Linux PC (SSH)" };
-                    miLinux.Click += async (sender, args) => await AutoFill.RunAutoFillScript(this, device, $"SystemInfo Linux.ps1");
+                    miLinux.Click += async (sender, args) => await AutoFill.RunAutoFillScript(GlobalViewModel, this, device, $"SystemInfo Linux.ps1");
 
                     var miPrinter = new MenuItem { Icon = "🖨️", Header = "Printer" };
                     miPrinter.Click += async (sender, args) => await AutoFill.RunPrinterAutoFill(GlobalViewModel, this, device);
@@ -813,9 +818,13 @@ namespace NetworkMapViewerV2.Views
                     {
                         if (_currentState != null)
                         {
-                            _currentState.Devices.Remove(device);
-                            _currentState?.HasUnsavedChanges = true;
-                            DrawMap(_currentState);
+                            var result = MessageBox.Show("Are you sure you want to delete this item?", "Delete", MessageBoxButton.YesNo);
+                            if (result == MessageBoxResult.Yes)
+                            {
+                                _currentState.Devices.Remove(device);
+                                _currentState?.HasUnsavedChanges = true;
+                                DrawMap(_currentState);
+                            }
                         }
                     };
                     menu.Items.Add(miDelete);
@@ -1451,7 +1460,7 @@ namespace NetworkMapViewerV2.Views
             }
 
             // 1. DELETION LOGIC
-            if (e.Key == Key.Delete)
+            if (e.Key == Key.Delete && _currentState.IsEditingEnabled)
             {
                 var result = MessageBox.Show($"Delete {_selectedElements.Count} selected item(s)?", "Confirm Delete", MessageBoxButton.YesNo, MessageBoxImage.Warning);
                 if (result == MessageBoxResult.Yes)
@@ -1480,7 +1489,7 @@ namespace NetworkMapViewerV2.Views
             bool isCtrlDown = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
 
             // --- FIND AND REPLACE LOGIC (Ctrl + H) ---
-            if (isCtrlDown && e.Key == Key.H)
+            if (isCtrlDown && e.Key == Key.H && _currentState.IsEditingEnabled)
             {
                 ExecuteFindAndReplace();
                 e.Handled = true;
@@ -1489,7 +1498,7 @@ namespace NetworkMapViewerV2.Views
 
 
             // --- COPY LOGIC (Ctrl + C) ---
-            if (isCtrlDown && e.Key == Key.C)
+            if (isCtrlDown && e.Key == Key.C && _currentState.IsEditingEnabled)
             {
                 _copiedDevices.Clear();
                 _copiedLabels.Clear();
@@ -1505,7 +1514,7 @@ namespace NetworkMapViewerV2.Views
             }
 
             // --- PASTE LOGIC (Ctrl + V / Ctrl + Shift + V) ---
-            if (isCtrlDown && e.Key == Key.V && _currentState != null)
+            if (isCtrlDown && e.Key == Key.V && _currentState.IsEditingEnabled)
             {
                 // 1. Detect if Shift is held down for "Paste in Place"
                 bool isShiftDown = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
@@ -1568,7 +1577,7 @@ namespace NetworkMapViewerV2.Views
                     _pasteOffsetMultiplier++;
                 }
 
-                if (_currentState != null) _currentState.HasUnsavedChanges = true;
+                _currentState?.HasUnsavedChanges = true;
                 DrawMap(_currentState);
 
                 e.Handled = true;
@@ -1597,7 +1606,7 @@ namespace NetworkMapViewerV2.Views
                     Canvas.SetTop(el, newTop);
                     UpdateModelPosition(el, newLeft, newTop);
                 }
-                if (_currentState != null) _currentState.HasUnsavedChanges = true;
+                _currentState?.HasUnsavedChanges = true;
                 e.Handled = true; // Prevents the window from scrolling if it's inside a ScrollViewer
             }
 

@@ -17,12 +17,12 @@ namespace NetworkMapViewerV2.Helpers.LocalFetcher
 
         public static async Task<string> RunPsExecFallbackAsync(string ipAddress)
         {
-            string localScriptPath = Path.Combine(ScriptsPath, "SystemInfo Local.ps1");
+            string localScriptPath = Path.Combine(ScriptsPath, "SystemInfo PSExec.ps1");
             string psExecPath = Path.Combine(ScriptsPath, "psexec.exe");
 
             if (!File.Exists(localScriptPath) || !File.Exists(psExecPath))
             {
-                return "ERROR=PsExec.exe or 'SystemInfo Local.ps1' not found in Scripts folder.";
+                return "ERROR=PsExec.exe or 'SystemInfo PSExec.ps1' not found in Scripts folder.";
             }
 
             try
