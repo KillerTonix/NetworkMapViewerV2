@@ -398,19 +398,14 @@ namespace NetworkMapViewerV2.Views
                     });
                 }
 
-              
-                var combinedTitles = new List<string>();
-                foreach (var lbl in device.Titles)
+                var displayLabels = device.Titles;
+                foreach (var lbl in displayLabels)
                 {
                     if (string.IsNullOrWhiteSpace(lbl)) continue;
-                    combinedTitles.Add(lbl.Replace("%Address", device.Address));
-                }
-
-                if (combinedTitles.Count != 0)
-                {
+                    string parsedText = lbl.Replace("%Address", device.Address);
                     sp.Children.Add(new TextBlock
                     {
-                        Text = string.Join("\n", combinedTitles), // One single TextBlock!
+                        Text = parsedText,
                         FontSize = 12,
                         FontFamily = new FontFamily("MS Sans Serif"),
                         FontWeight = FontWeights.Bold,

@@ -53,21 +53,5 @@ namespace NetworkMapViewerV2.Services
                 DefaultDoubleClickCommands = []
             };
         }
-
-
-        public static void UpdateGroupDefaultCommand(int groupId, string commandName)
-        {
-            var settings = Load();
-
-            // Ensure the dictionary exists (in case it's an old settings.json file)
-            if (settings.GroupDefaultCommands == null)
-            {
-                settings.GroupDefaultCommands = new Dictionary<int, string>();
-            }
-
-            // Update the user's personal preference and save to file
-            settings.GroupDefaultCommands[groupId] = commandName;
-            Save(settings);
-        }
     }
 }

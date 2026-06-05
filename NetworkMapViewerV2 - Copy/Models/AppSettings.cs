@@ -9,7 +9,6 @@
 
         public int LastOpenedMapId { get; set; } = 0;
         public List<ExternalCommand> Commands { get; set; } = [];
-        public Dictionary<int, string> GroupDefaultCommands { get; set; } = [];
         public Dictionary<int, string> DefaultDoubleClickCommands { get; set; } = [];
 
 
