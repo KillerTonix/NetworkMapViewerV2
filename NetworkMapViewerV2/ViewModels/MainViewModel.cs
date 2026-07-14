@@ -436,7 +436,6 @@ namespace NetworkMapViewerV2.ViewModels
                 }
 
                 // 3. Restart the ping service if it was running
-                if (PingService.IsRunning && SelectedTab != null)
                 {
                     PingService.StopPinging();
                     PingService.StartPinging(SelectedTab.Devices);
