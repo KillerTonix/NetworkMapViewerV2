@@ -1,11 +1,11 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using NetworkMapViewerV2.Helpers.LocalFetcher;
 using NetworkMapViewerV2.Models;
 using NetworkMapViewerV2.Services;
 using NetworkMapViewerV2.Views;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
-using System.Reflection.Metadata.Ecma335;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
@@ -33,6 +33,12 @@ namespace NetworkMapViewerV2.ViewModels
         [ObservableProperty]
         private bool _isGridVisible = false;
 
+        [ObservableProperty]
+        private ObservableCollection<MapTabState> _headOfficeMaps = [];
+
+        [ObservableProperty]
+        private ObservableCollection<MapTabState> _branchMaps = [];
+
         private AppSettings _appSettings = new();
 
         private DispatcherTimer? _autoRefreshTimer; // Timer for auto-refreshing tabs
@@ -41,6 +47,7 @@ namespace NetworkMapViewerV2.ViewModels
         {
             _appSettings = SettingsService.Load();
 
+            LoadMapDirectories();
             Application.Current.Dispatcher.InvokeAsync(() =>
             {
                 // Instantly load from SQLite on startup!
@@ -94,20 +101,20 @@ namespace NetworkMapViewerV2.ViewModels
         [RelayCommand]
         private void NewMap()
         {
-            string newName = ShowNewTabDialog();
-            if (!string.IsNullOrWhiteSpace(newName))
+            var (mapName, mapType) = ShowNewTabDialog();
+            if (!string.IsNullOrWhiteSpace(mapName))
             {
                 try
                 {
                     // 1. Create the map in the database instantly
                     var repo = new Data.MapRepository();
-                    int newMapId = repo.CreateNewMap(newName);
+                    int newMapId = repo.CreateNewMap(mapName, mapType);
 
                     // 2. Create the blank Tab State tied to the real Database ID
                     var newTab = new MapTabState
                     {
                         MapId = newMapId,
-                        MapName = newName,
+                        MapName = mapName,
                         Devices = [], // Start with empty lists
                         Labels = []
                     };
@@ -143,28 +150,80 @@ namespace NetworkMapViewerV2.ViewModels
         }
 
 
-
-
         // ─── PURE SQLITE RELOAD ──────────────────────────────
         [RelayCommand]
-        private void ReloadMap()
+        private async Task ReloadMap() // Notice the change to async Task!
         {
             var state = SelectedTab;
             if (state != null && state.MapId > 0)
             {
-                int mapId = state.MapId;
+                var repo = new Data.MapRepository();
 
-                CloseTab(state);
-                OpenMapFromDatabase(mapId); // Re-fetches the clean state from SQLite
-                SelectedTab.HasUnsavedChanges = false;
+                // 1. Fetch the fresh data from SQLite quietly in the background
+                var freshData = repo.LoadMap(state.MapId);
 
-                // ==========================================
-                // THE FIX: FORCE WPF TO DUMP OLD UI MEMORY
-                // ==========================================
+                // 2. Clear the old items and add the new ones directly to the EXISTING tab
+                state.Devices.Clear();
+                foreach (var device in freshData.Devices)
+                {
+                    state.Devices.Add(device);
+                }
+
+                state.Labels.Clear();
+                foreach (var label in freshData.Labels)
+                {
+                    state.Labels.Add(label);
+                }
+
+                state.HasUnsavedChanges = false;
+
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
                 GC.Collect();
+
+                // 3. FIRE THE SAFE PING RECALCULATION
+                await RecalculatePingsAsync(state.Devices);
             }
+        }
+
+        // Add this new helper method right below it!
+        private static async Task RecalculatePingsAsync(IEnumerable<NetworkDevice> devices)
+        {
+            // ==========================================
+            // THE SAFEGUARD: Only allow 2000 pings at a time
+            // to prevent the memory/network avalanche!
+            // ==========================================
+            using var semaphore = new SemaphoreSlim(2000);
+            var pingTasks = new List<Task>();
+
+            foreach (var device in devices)
+            {
+                if (string.IsNullOrWhiteSpace(device.Address)) continue;
+
+                pingTasks.Add(Task.Run(async () =>
+                {
+                    await semaphore.WaitAsync(); // Wait in line if 20 are already running
+                    try
+                    {
+                        using var ping = new System.Net.NetworkInformation.Ping();
+                        var reply = await ping.SendPingAsync(device.Address, 2000); // Strict 2-second timeout
+
+                        // Changing this property instantly triggers your PingStatusImageConverter!
+                        device.IsOnline = (reply.Status == System.Net.NetworkInformation.IPStatus.Success);
+                    }
+                    catch
+                    {
+                        device.IsOnline = false;
+                    }
+                    finally
+                    {
+                        semaphore.Release(); // Let the next ping in line start
+                    }
+                }));
+            }
+
+            // Wait for all background pings to completely finish
+            await Task.WhenAll(pingTasks);
         }
 
         // ─── SAVE TO DATABASE (Ctrl + S) ─────────────────────
@@ -189,6 +248,7 @@ namespace NetworkMapViewerV2.ViewModels
             }
         }
 
+
         [RelayCommand]
         private void ToggleHotkeys()
         {
@@ -200,7 +260,7 @@ namespace NetworkMapViewerV2.ViewModels
         {
             HelpWindow helpWindow = new(1) { Owner = Application.Current.MainWindow };
             helpWindow.ShowDialog();
-        }       
+        }
 
 
         [RelayCommand]
@@ -213,7 +273,7 @@ namespace NetworkMapViewerV2.ViewModels
         [RelayCommand]
         private void ExitApplication()
         {
-            Application.Current.Shutdown();
+            Environment.Exit(0);
         }
 
         [RelayCommand]
@@ -269,25 +329,9 @@ namespace NetworkMapViewerV2.ViewModels
 
 
         [RelayCommand]
-        private void StartPing()
-        {
-            PingService.StartPinging(SelectedTab.Devices);
-            IsPinging = true;
-
-        }
-
-
-        [RelayCommand]
-        private void StopPing()
-        {
-            PingService.StopPinging();
-            IsPinging = false;
-        }
-
-        [RelayCommand]
         private void PingOptions()
         {
-            OpenOptionsWindow(1); //options 1 page
+            OpenOptionsWindow(2); //options 2 page
         }
 
         [RelayCommand]
@@ -323,8 +367,6 @@ namespace NetworkMapViewerV2.ViewModels
 
             try
             {
-                // Purge old events first
-                NotificationService.PurgeOldEvents(_appSettings.DeleteEventsOlderThanDays);
 
                 string path;
                 if (result == MessageBoxResult.Yes)
@@ -344,13 +386,13 @@ namespace NetworkMapViewerV2.ViewModels
         [RelayCommand]
         private void NotificationOptions()
         {
-            OpenOptionsWindow(2); //options 2 page
+            OpenOptionsWindow(3); //options 3 page
         }
 
         [RelayCommand]
         private void SearchOptions()
         {
-            OpenOptionsWindow(3); //options 2 page
+            OpenOptionsWindow(4); //options 4 page
         }
 
 
@@ -366,10 +408,12 @@ namespace NetworkMapViewerV2.ViewModels
         private readonly PingService _pingService = new();
 
         [ObservableProperty]
-        private bool _isPinging = false;
+        public partial bool IsPinging { get; set; } = false;
 
         public PingService PingService => _pingService;
 
+
+       
         [RelayCommand]
         public void TogglePing()
         {
@@ -381,13 +425,161 @@ namespace NetworkMapViewerV2.ViewModels
                 // Clear the colors when stopped
                 if (SelectedTab != null)
                 {
-                    foreach (var device in SelectedTab.Devices) device.IsOnline = null;
+                    foreach (var device in SelectedTab.Devices) device.IsOnline = false;
                 }
             }
             else if (SelectedTab != null)
             {
                 PingService.StartPinging(SelectedTab.Devices);
                 IsPinging = true;
+            }
+        }
+
+        // --- HEAD OFFICE MAP SELECTION ---
+        private MapTabState? _selectedHeadOfficeMap;
+        public MapTabState? SelectedHeadOfficeMap
+        {
+            get => _selectedHeadOfficeMap;
+            set
+            {
+                // SetProperty updates the UI and returns true if the value actually changed
+                if (SetProperty(ref _selectedHeadOfficeMap, value))
+                {
+                    if (value != null)
+                    {
+                        // 1. Open the map
+                        OpenMapFromDatabase(value.MapId);
+
+                        // 2. Reset the ComboBox
+                        Application.Current.Dispatcher.InvokeAsync(() =>
+                        {
+                            SelectedHeadOfficeMap = null;
+                        });
+                    }
+                }
+            }
+        }
+
+        // --- BRANCH MAP SELECTION ---
+        private MapTabState? _selectedBranchMap;
+        public MapTabState? SelectedBranchMap
+        {
+            get => _selectedBranchMap;
+            set
+            {
+                if (SetProperty(ref _selectedBranchMap, value))
+                {
+                    if (value != null)
+                    {
+                        // 1. Open the map
+                        OpenMapFromDatabase(value.MapId);
+
+                        // 2. Reset the ComboBox
+                        Application.Current.Dispatcher.InvokeAsync(() =>
+                        {
+                            SelectedBranchMap = null;
+                        });
+                    }
+                }
+            }
+        }
+
+
+        [RelayCommand]
+        private async Task UpdateGroupData()
+        {
+            var tab = SelectedTab;
+            if (tab == null || tab.Devices.Count == 0) return;
+
+            var activeGroupIds = tab.Devices.GroupBy(d => d.GroupId).Select(g => new { Id = g.Key, Count = g.Count() }).ToList();
+            var repo = new Data.MapRepository();
+            var allDbGroups = repo.GetAllDeviceGroups().ToDictionary(g => g.GroupId, g => g.GroupName);
+
+            var activeGroupsForDialog = new List<ActiveGroupItem>();
+            foreach (var groupInfo in activeGroupIds)
+            {
+                switch (groupInfo.Id)
+                {
+                    case 1:
+                    case 2:
+                    case 3:
+                    case 4:
+                        string name = allDbGroups.TryGetValue(groupInfo.Id, out string? gName) ? gName : "Unknown";
+                        activeGroupsForDialog.Add(new ActiveGroupItem { GroupId = groupInfo.Id, GroupName = name, DeviceCount = groupInfo.Count });
+                        break;
+                    default:
+                        continue; // Skip any other group IDs
+
+                }
+            }
+
+            if (activeGroupsForDialog.Count == 0) return;
+
+            var dialog = new UpdateGroupDataWindow(activeGroupsForDialog, _appSettings.ScriptsPath)
+            {
+                Owner = Application.Current.MainWindow
+            };
+
+            if (dialog.ShowDialog() == true)
+            {
+                int targetGroupId = dialog.SelectedGroupId;
+                string targetScript = dialog.SelectedScript;
+
+                // ==========================================
+                // THE NEW LOGIC: STRICTLY ONLINE DEVICES ONLY
+                // ==========================================
+                var devicesToUpdate = tab.Devices.Where(d =>
+                    d.GroupId == targetGroupId &&
+                    d.IsOnline == true && // <-- The crucial check!
+                    !string.IsNullOrWhiteSpace(d.Address) &&
+                    d.Address != "0.0.0.0").ToList();
+
+                if (devicesToUpdate.Count == 0)
+                {
+                    MessageBox.Show("No ONLINE devices found in this group. Scan aborted.", "Skipped", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                // ==========================================
+                // MULTI-THREADING: PROCESS 3 AT A TIME
+                // ==========================================
+                using var semaphore = new SemaphoreSlim(3); // Change this to 2 or 4 if you want to tweak the speed!
+                var scanTasks = new List<Task>();
+
+                foreach (var device in devicesToUpdate)
+                {
+                    scanTasks.Add(Task.Run(async () =>
+                    {
+                        await semaphore.WaitAsync(); // Wait in line if 3 are already running
+                        try
+                        {
+                            if (targetScript == "Printer Web Scraper")
+                            {
+                                await AutoFill.RunPrinterAutoFill(this, device);
+                            }
+                            else if (targetScript == "Grandstream Web Scraper")
+                            {
+                                await AutoFill.RunGrandstreamAutoFill(this, device);
+                            }
+                            else
+                            {
+                                await AutoFill.RunAutoFillScript(this, device, targetScript);
+                            }
+
+                            // A tiny delay ensures the UI thread has time to draw the changes smoothly
+                            await Task.Delay(100);
+                        }
+                        finally
+                        {
+                            semaphore.Release(); // Let the next device in line start
+                        }
+                    }));
+                }
+
+                // Wait for all the parallel batches to completely finish
+                await Task.WhenAll(scanTasks);
+                tab.HasUnsavedChanges = true;
+                MessageBox.Show($"Update complete for {devicesToUpdate.Count} online devices.\nOffline devices were skipped.", "Finished", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
 
@@ -409,9 +601,9 @@ namespace NetworkMapViewerV2.ViewModels
                 // Save the SQLite MapId to settings
                 if (value.MapId > 0 && _appSettings?.LastOpenedMapId != value.MapId)
                 {
-                    _appSettings?.LastOpenedMapId = value.MapId;
+                    _appSettings.LastOpenedMapId = value.MapId;
                     SettingsService.Save(_appSettings);
-                }
+                }                
             }
         }
 
@@ -435,7 +627,7 @@ namespace NetworkMapViewerV2.ViewModels
                     SelectedTab = currentTab;
                 }
 
-                // 3. Restart the ping service if it was running
+                if (PingService.IsRunning && SelectedTab != null)
                 {
                     PingService.StopPinging();
                     PingService.StartPinging(SelectedTab.Devices);
@@ -444,13 +636,13 @@ namespace NetworkMapViewerV2.ViewModels
         }
 
 
-        private string ShowNewTabDialog()
+        private (string, string) ShowNewTabDialog()
         {
             var dlg = new Window
             {
                 Title = "New Map",
                 Width = 360,
-                Height = 160,
+                Height = 240, // Increased height from 220 to 240 to fit the extra spacing perfectly
                 WindowStartupLocation = WindowStartupLocation.CenterScreen,
                 WindowStyle = WindowStyle.ToolWindow,
                 ResizeMode = ResizeMode.NoResize
@@ -462,7 +654,13 @@ namespace NetworkMapViewerV2.ViewModels
             var txtName = new TextBox { Text = "New Map", Padding = new Thickness(4), FontSize = 14 };
             sp.Children.Add(txtName);
 
-            var btnPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
+            // FIXED: Added a top margin of 15 so it doesn't touch the TextBox above it
+            sp.Children.Add(new TextBlock { Text = "Select map type:", Margin = new Thickness(0, 15, 0, 8) });
+
+            var cmbType = new ComboBox { ItemsSource = new List<string> { "Head Office", "Branch" }, SelectedIndex = 0, Padding = new Thickness(4), FontSize = 14 };
+            sp.Children.Add(cmbType);
+
+            var btnPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 15, 0, 0) };
             var btnOk = new Button { Content = "OK", Width = 80, Margin = new Thickness(0, 0, 10, 0), IsDefault = true };
             var btnCancel = new Button { Content = "Cancel", Width = 80, IsCancel = true };
 
@@ -473,12 +671,31 @@ namespace NetworkMapViewerV2.ViewModels
             dlg.Content = sp;
             dlg.ContentRendered += (s, ev) => { txtName.Focus(); txtName.SelectAll(); };
 
-            string result = string.Empty;
-            btnOk.Click += (s, ev) => { result = txtName.Text.Trim(); dlg.Close(); };
-            btnCancel.Click += (s, ev) => dlg.Close();
+            string resultName = string.Empty;
+            string resultType = string.Empty;
 
-            dlg.ShowDialog();
-            return result;
+            btnOk.Click += (s, ev) =>
+            {
+                resultName = txtName.Text.Trim();
+
+                // FIXED: Uses SelectedItem and the null-coalescing operator to prevent crashes
+                resultType = cmbType.SelectedItem?.ToString() ?? "Head Office";
+
+                // FIXED: Tells WPF the user successfully submitted the dialog
+                dlg.DialogResult = true;
+            };
+
+            // FIXED: Tells WPF the user backed out
+            btnCancel.Click += (s, ev) => dlg.DialogResult = false;
+
+            // ShowDialog pauses the code here until the window closes.
+            // If they clicked OK, return the values. If they cancelled, return empty strings!
+            if (dlg.ShowDialog() == true)
+            {
+                return (resultName, resultType);
+            }
+
+            return (string.Empty, string.Empty);
         }
 
 
@@ -542,6 +759,27 @@ namespace NetworkMapViewerV2.ViewModels
         }
 
 
+        public void LoadMapDirectories()
+        {
+            var repo = new Data.MapRepository();
+            var allMaps = repo.GetAvailableMaps(); // Uses the updated method from the previous step
+
+            HeadOfficeMaps.Clear();
+            BranchMaps.Clear();
+
+            foreach (var map in allMaps)
+            {
+                if (map.MapType == "Branch")
+                {
+                    BranchMaps.Add(map);
+                }
+                else
+                {
+                    HeadOfficeMaps.Add(map);
+                }
+            }
+        }
+
         private int? ShowDatabaseMapSelector()
         {
             var repo = new Data.MapRepository();
@@ -595,7 +833,7 @@ namespace NetworkMapViewerV2.ViewModels
 
         private string _lastSearchQuery = "";
         private int _currentSearchIndex = 0;
-        private List<GlobalSearchResult> _globalSearchResults = new();
+        private List<GlobalSearchResult> _globalSearchResults = [];
 
         [RelayCommand]
         public void ToggleSearch()
@@ -649,6 +887,15 @@ namespace NetworkMapViewerV2.ViewModels
                 HighlightedDeviceId = 0;
                 HighlightedDeviceId = target.DeviceId;
             }
+        }
+
+        public void StopAllScanners()
+        {
+            try
+            {
+                PingService.StopPinging();
+            }
+            catch { }
         }
 
 

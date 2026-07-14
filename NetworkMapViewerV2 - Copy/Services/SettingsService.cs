@@ -50,8 +50,21 @@ namespace NetworkMapViewerV2.Services
                 ],
 
                 // --- NEW: Define the default double-click actions here! ---
-                DefaultDoubleClickCommands = []
+                GroupDefaultCommands = []
             };
+        }
+
+
+        public static void UpdateGroupDefaultCommand(int groupId, string commandName)
+        {
+            var settings = Load();
+
+            // Ensure the dictionary exists (in case it's an old settings.json file)
+            settings.GroupDefaultCommands ??= [];
+
+            // Update the user's personal preference and save to file
+            settings.GroupDefaultCommands[groupId] = commandName;
+            Save(settings);
         }
     }
 }

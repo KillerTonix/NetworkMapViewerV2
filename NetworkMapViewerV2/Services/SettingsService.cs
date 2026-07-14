@@ -50,7 +50,7 @@ namespace NetworkMapViewerV2.Services
                 ],
 
                 // --- NEW: Define the default double-click actions here! ---
-                DefaultDoubleClickCommands = []
+                GroupDefaultCommands = []
             };
         }
 
@@ -60,10 +60,7 @@ namespace NetworkMapViewerV2.Services
             var settings = Load();
 
             // Ensure the dictionary exists (in case it's an old settings.json file)
-            if (settings.GroupDefaultCommands == null)
-            {
-                settings.GroupDefaultCommands = new Dictionary<int, string>();
-            }
+            settings.GroupDefaultCommands ??= [];
 
             // Update the user's personal preference and save to file
             settings.GroupDefaultCommands[groupId] = commandName;

@@ -7,43 +7,44 @@ namespace NetworkMapViewerV2.Helpers // Ensure this matches your namespace!
 {
     public class PingStatusImageConverter : IValueConverter
     {
+        private static readonly Dictionary<string, BitmapImage> _imageCache = [];
+
         public object? Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            // 1. Get the base path from the Database (passed in as the ConverterParameter)
-            string dbIconPath = parameter as string ?? "";
-            if (string.IsNullOrWhiteSpace(dbIconPath)) return null;
+            string? basePath = parameter?.ToString();
+            if (string.IsNullOrWhiteSpace(basePath)) return null;
+            
+            
+            bool isOnline = true;
 
-            bool? isOnline = value as bool?;
-            string finalPath = dbIconPath;
-
-            // 2. If the device is OFFLINE (False), securely swap \ON\ to \OFF\
-            if (isOnline.HasValue && isOnline.Value == false)
+            if (value is bool actualStatus)
             {
-                // StringComparison.OrdinalIgnoreCase makes sure it works even if someone typed \On\ or \on\
-                finalPath = dbIconPath.Replace("\\ON\\", "\\OFF\\", StringComparison.OrdinalIgnoreCase);
+                isOnline = actualStatus;
             }
 
-            // NOTE: If isOnline is NULL (meaning it hasn't been pinged yet), 
-            // it will default to leaving it as the \ON\ image.
+            string targetPath = isOnline ? basePath : basePath.Replace("\\ON\\", "\\OFF\\", StringComparison.OrdinalIgnoreCase);
 
-            // 3. Check if the network path actually exists before trying to load it
-            if (!File.Exists(finalPath)) return null;
+            if (!File.Exists(targetPath))
+            {
+                targetPath = basePath;
+                if (!File.Exists(targetPath)) return null;
+            }
 
-            // 4. Load the image and return it to the UI
-            try
+            // 4. Load, Freeze, and Cache the image
+            if (!_imageCache.TryGetValue(targetPath, out BitmapImage? value1))
             {
                 var bmp = new BitmapImage();
                 bmp.BeginInit();
-                bmp.UriSource = new Uri(finalPath, UriKind.Absolute);
-                bmp.CacheOption = BitmapCacheOption.OnLoad; // Forces it to load into memory
+                bmp.CacheOption = BitmapCacheOption.OnLoad;
+                bmp.UriSource = new Uri(targetPath, UriKind.Absolute);
                 bmp.EndInit();
+
                 bmp.Freeze();
-                return bmp;
+                value1 = bmp;
+                _imageCache[targetPath] = value1;
             }
-            catch
-            {
-                return null;
-            }
+
+            return value1;
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

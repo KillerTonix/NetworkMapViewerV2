@@ -4,7 +4,7 @@
         xmlns:views="clr-namespace:NetworkMapViewerV2.Views"
         Title="Network Map Viewer V2" Height="1000" Width="1920"
         WindowState="Maximized"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen" >
     <Window.InputBindings>
         <KeyBinding Key="N" Modifiers="Ctrl" Command="{Binding NewMapCommand}" />
         <KeyBinding Key="O" Modifiers="Ctrl" Command="{Binding OpenMapCommand}" />
@@ -16,8 +16,6 @@
         <KeyBinding Key="G" Modifiers="Ctrl" Command="{Binding ToggleGridModeCommand}" />
         <KeyBinding Key="F2" Modifiers="Ctrl" Command="{Binding OutOfBoundsDevicesCommand}" />
 
-        <KeyBinding Key="F5" Command="{Binding StartPingCommand}" />
-        <KeyBinding Key="F4" Command="{Binding StopPingCommand}" />
         <KeyBinding Key="F5" Modifiers="Ctrl" Command="{Binding PingOptionsCommand}" />
 
         <KeyBinding Key="F11" Command="{Binding NotifiactionCommand}" />
@@ -33,6 +31,7 @@
         <KeyBinding Key="F1" Command="{Binding ToggleAboutCommand}" />
         <KeyBinding Key="F1" Modifiers="Shift" Command="{Binding ToggleHotkeysCommand}" />
 
+        <KeyBinding Key="U" Modifiers="Ctrl" Command="{Binding UpdateGroupDataCommand}" />
     </Window.InputBindings>
     
     <Window.Resources>
@@ -84,25 +83,14 @@
                     </MenuItem.Icon>
                 </MenuItem>
                 <Separator />
-                <MenuItem x:Name="menuGridMode" Header="Display _Grid" InputGestureText="Ctrl+G" IsCheckable="True" IsChecked="{Binding IsGridVisible}" Command="{Binding ToggleGridModeCommand}">
+                <MenuItem x:Name="menuGridMode" Header="Display _Grid" InputGestureText="Ctrl+G" IsCheckable="True" Command="{Binding ToggleGridModeCommand}">
                     <MenuItem.Icon>
                         <TextBlock Text="▦" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     </MenuItem.Icon>
                 </MenuItem>
             </MenuItem>
 
-            <MenuItem Header="_Ping">
-                <MenuItem x:Name="menuStartPing" Header="_Start Ping" InputGestureText="F5"  Command="{Binding StartPingCommand}" >
-                    <MenuItem.Icon>
-                        <TextBlock Text="▶" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                    </MenuItem.Icon>
-                </MenuItem>
-                <MenuItem x:Name="menuStopPing" Header="S_top Ping" InputGestureText="F4"  Command="{Binding StopPingCommand}" IsEnabled="False" >
-                    <MenuItem.Icon>
-                        <TextBlock Text="⏹" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                    </MenuItem.Icon>
-                </MenuItem>
-                <Separator />
+            <MenuItem Header="_Ping">               
                 <MenuItem Header="Ping _Settings" InputGestureText="Ctrl+F5"  Command="{Binding PingOptionsCommand}" >
                     <MenuItem.Icon>
                         <TextBlock Text="⚙️" VerticalAlignment="Center" HorizontalAlignment="Center"/>

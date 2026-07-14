@@ -44,7 +44,7 @@ namespace NetworkMapViewerV2.Helpers.LocalFetcher
             {
                 // Alert the user, but DO NOT touch the device properties!
                 string failReason = hasError ? errorMessage : "The script returned no usable data.";
-                MessageBox.Show($"Auto-Fill failed. Your previous data has been preserved.\n\nReason: {failReason}", "Scan Failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show($"Auto-Fill failed. Your previous data has been preserved.\n\nReason: {failReason} \n\nProblematic IP: {device.Address}", "Scan Failed", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return; // Abort! The old data survives!
             }
 

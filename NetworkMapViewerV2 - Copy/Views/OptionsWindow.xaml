@@ -5,10 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:NetworkMapViewerV2"
         xmlns:views="clr-namespace:NetworkMapViewerV2.Views"
-        WindowState="Normal"
-        WindowStyle="ToolWindow"
-        WindowStartupLocation="CenterScreen"
-        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
         mc:Ignorable="d"
         Title="OptionsWindow" Height="580" Width="600">
     <Grid>
@@ -142,47 +139,111 @@
             <TabItem Header="Notification">
                 <TabControl Margin="10">
                     <TabItem Header="General">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-                            <GroupBox Grid.Row="0" Header="Log file" Margin="10,10,10,10" >
-                                <StackPanel Orientation="Horizontal">
-                                    <Label Content="Delete Events older than" />
-                                    <TextBox x:Name="DeleteDaysTextBox" Text="7" Margin="10,0,10,0" FontSize="16" Width="40" HorizontalContentAlignment="Center" VerticalAlignment="Top"/>
-                                    <Label Content="days"/>
-                                </StackPanel>
-                            </GroupBox>
-                            <GroupBox Grid.Row="1" Header="Message Notification" Margin="10,10,10,10">
-                                <StackPanel Orientation="Horizontal">
-                                    <CheckBox Content="Hide message after" VerticalAlignment="Center" />
-                                    <TextBox x:Name="HideMessageTextBox" Text="5" Margin="10,0,10,0" FontSize="16" Width="40" HorizontalContentAlignment="Center" VerticalAlignment="Top"/>
-                                    <Label Content="seconds"/>
-                                </StackPanel>
-                            </GroupBox>
+                        <Grid Margin="15">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="100"/>
+                            </Grid.ColumnDefinitions>
+
+                            <ListBox x:Name="lstRules" BorderThickness="1" BorderBrush="Black">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal" Margin="2">
+                                            <TextBlock Text="✔️" Foreground="LightGreen" Margin="0,0,10,0"/>
+                                            <TextBlock Text="{Binding TargetName}"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+
+                            <StackPanel Grid.Column="1" VerticalAlignment="Top">
+                                <Button x:Name="AddNotifButton" Margin="0,0,0,5" HorizontalContentAlignment="Left" Width="90" Click="AddNotifButton_Click">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="➕" FontSize="16" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="Add" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="5,0,0,0"/>
+                                    </StackPanel>
+                                </Button>
+
+                                <Button x:Name="RemoveNotifButton" HorizontalContentAlignment="Left" Width="90" Click="RemoveNotifButton_Click">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="➖" FontSize="16" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="Remove" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="5,0,0,0"/>
+                                    </StackPanel>
+                                </Button>                                                       
+
+                            </StackPanel>
                         </Grid>
 
                     </TabItem>
-                    <TabItem Header="Messages">
-                        <Grid>
+                    <TabItem Header="Options">
+                        <Grid Margin="15">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
-                            <StackPanel Grid.Row="0" Margin="10">
-                                <Label Content="Header"/>
-                                <TextBox x:Name="NotificationHeaderTextBox" />
-                            </StackPanel>
-                            <StackPanel Grid.Row="1" Margin="10">
-                                <Label Content="Item: When wakes up"/>
-                                <TextBox x:Name="NotificationUpTextBox" />
-                            </StackPanel>
-                            <StackPanel Grid.Row="2" Margin="10">
-                                <Label Content="Item: When goes down"/>
-                                <TextBox x:Name="NotificationDownTextBox" />
-                            </StackPanel>
+
+                            <Grid Grid.Row="0" Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="170"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <CheckBox x:Name="chkSaveToLog" Content="Save to log-file" VerticalAlignment="Center"/>
+                            </Grid>
+
+                            <Grid Grid.Row="1" Margin="0,0,0,15">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="170"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <CheckBox x:Name="chkShowMessage" Content="Show message" VerticalAlignment="Center"/>
+                            </Grid>
+
+                            <GroupBox Grid.Row="2" Header="Play sound" Margin="0,0,0,15" Padding="10">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <Grid Grid.Row="0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="100"/>
+                                            <ColumnDefinition Width="55"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <CheckBox x:Name="EnableOfflineSoundChk" Content="Enable" VerticalAlignment="Center"/>
+                                        <Label Grid.Column="1" Content="Offline:" VerticalAlignment="Center"/>
+
+                                        <TextBox x:Name="txtOfflineSoundPath" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,5,0" IsEnabled="{Binding IsChecked, ElementName=EnableOfflineSoundChk}"/>
+
+                                        <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Button Content="📂" Width="30" ToolTip="Browse..." Click="BtnBrowseOffline_Click" IsEnabled="{Binding IsChecked, ElementName=EnableOfflineSoundChk}"/>
+                                            <Button Content="▶️" Width="30" Margin="5,0,0,0" ToolTip="Test Sound" Click="BtnTestOffline_Click" IsEnabled="{Binding IsChecked, ElementName=EnableOfflineSoundChk}"/>
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <Grid Grid.Row="1" Margin="0,10,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="100"/>
+                                            <ColumnDefinition Width="55"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <CheckBox x:Name="EnableOnlineSoundChk" Content="Enable" VerticalAlignment="Center"/>
+                                        <Label Grid.Column="1" Content="Online:" VerticalAlignment="Center" />
+
+                                        <TextBox x:Name="txtOnlineSoundPath" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,5,0" IsEnabled="{Binding IsChecked, ElementName=EnableOnlineSoundChk}"/>
+
+                                        <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Button Content="📂" Width="30" ToolTip="Browse..." Click="BtnBrowseOnline_Click" IsEnabled="{Binding IsChecked, ElementName=EnableOnlineSoundChk}"/>
+                                            <Button Content="▶️" Width="30" Margin="5,0,0,0" ToolTip="Test Sound" Click="BtnTestOnline_Click" IsEnabled="{Binding IsChecked, ElementName=EnableOnlineSoundChk}"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Grid>
+                            </GroupBox>                                                     
                         </Grid>
                     </TabItem>
                 </TabControl>

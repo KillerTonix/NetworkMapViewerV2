@@ -1,0 +1,20 @@
+﻿<Window x:Class="NetworkMapViewerV2.Views.AddNotificationRuleWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Add Notification Rule" Height="270" Width="350"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
+
+    <StackPanel Margin="20">
+        <TextBlock Text="Target Devices:" FontWeight="Bold" Margin="0,0,0,5"/>
+        <ComboBox x:Name="cmbTargets" DisplayMemberPath="GroupName" SelectedValuePath="GroupId" Height="28" Margin="0,0,0,20"/>
+
+        <TextBlock Text="Triggers:" FontWeight="Bold" Margin="0,0,0,5"/>
+        <CheckBox x:Name="chkGoesDown" Content="When device goes down" IsChecked="True" Margin="0,0,0,8"/>
+        <CheckBox x:Name="chkWakesUp" Content="When device wakes up" IsChecked="True" Margin="0,0,0,20"/>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+            <Button Content="Cancel" Width="80" Height="28" Margin="0,0,10,0" Click="BtnCancel_Click"/>
+            <Button Content="OK" Width="80" Height="28" Click="BtnOK_Click" FontWeight="Bold"/>
+        </StackPanel>
+    </StackPanel>
+</Window>

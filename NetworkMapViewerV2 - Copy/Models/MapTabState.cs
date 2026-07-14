@@ -31,6 +31,7 @@ namespace NetworkMapViewerV2.Models
             set { _hasUnsavedChanges = value; OnPropertyChanged(); }
         }
 
+        public Action? TriggerRedraw { get; set; }
 
         // ==========================================
         // --- INOTIFYPROPERTYCHANGED LOGIC ---

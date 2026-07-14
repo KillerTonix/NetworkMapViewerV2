@@ -1,4 +1,5 @@
-﻿using NetworkMapViewerV2.ViewModels;
+﻿using NetworkMapViewerV2.Services;
+using NetworkMapViewerV2.ViewModels;
 using System.Windows;
 
 namespace NetworkMapViewerV2.Views
@@ -10,10 +11,21 @@ namespace NetworkMapViewerV2.Views
         public MainWindow()
         {
             InitializeComponent();
-
-            // Create the ViewModel and assign it as the DataContext for the entire window
             ViewModel = new MainViewModel();
             this.DataContext = ViewModel;
+
+            this.Closed += (sender, args) =>
+            {
+                // 1. Tell your ViewModel/PingService to stop the network loop
+                try { ViewModel?.PingService.StopPinging(); } catch { }
+
+                // 2. Release all MS SQL connection pools 
+                try { Microsoft.Data.SqlClient.SqlConnection.ClearAllPools(); } catch { }
+
+                // 3. Annihilate the background process
+                System.Diagnostics.Process.GetCurrentProcess().Kill();
+            };
+            NotificationEngine.ActiveRules = SettingsService.Load().ENS_Rules;
         }
 
         private void TxtSearch_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -30,5 +42,13 @@ namespace NetworkMapViewerV2.Views
             }
         }
 
+
+        protected override void OnClosed(EventArgs e)
+        {
+            base.OnClosed(e);
+            Environment.Exit(0);
+        }
+
+        
     }
 }

@@ -1,7 +1,10 @@
-﻿using NetworkMapViewerV2.Helpers.Passwords;
+﻿using Microsoft.Win32;
+using NetworkMapViewerV2.Helpers.Passwords;
 using NetworkMapViewerV2.Models;
 using NetworkMapViewerV2.Services;
 using System.Collections.ObjectModel;
+using System.IO;
+using System.Media;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -12,11 +15,10 @@ namespace NetworkMapViewerV2.Views
         private readonly AppSettings _settings;
         public ObservableCollection<ExternalCommand> Commands { get; set; }
         public ObservableCollection<DeviceGroup> DeviceGroups { get; set; }
-        /// <summary>True if user pressed OK (settings should be re-read by caller).</summary>
+        public ObservableCollection<NotificationRule> ActiveUI_Rules { get; set; } = [];
         public bool Saved { get; private set; }
         private static AppSettings settings = SettingsService.Load();
-
-        private static string DbPath = settings.DatabasePath ?? "";
+        private static readonly string DbPath = settings.DatabasePath ?? "";
         public OptionsWindow(int tabIndex = 0)
         {
             InitializeComponent();
@@ -29,12 +31,6 @@ namespace NetworkMapViewerV2.Views
             AutostartPingChk.IsChecked = _settings.PingAutostart;
             PingPeriodTextBox.Text = _settings.PingPeriodSeconds.ToString();
 
-            // --- LOAD NOTIFICATION SETTINGS ---
-            DeleteDaysTextBox.Text = _settings.DeleteEventsOlderThanDays.ToString();
-            HideMessageTextBox.Text = _settings.HideMessageSeconds.ToString();
-            NotificationHeaderTextBox.Text = _settings.NotificationHeaderTemplate;
-            NotificationUpTextBox.Text = _settings.NotificationUpTemplate;
-            NotificationDownTextBox.Text = _settings.NotificationDownTemplate;
 
             // --- LOAD SEARCH SETTINGS ---
             DeeperSearchRB.IsChecked = _settings.DeepperSearchMode;
@@ -56,6 +52,28 @@ namespace NetworkMapViewerV2.Views
                 QmsPasswordTextBox.Text = "******";
             }
 
+            // --- LOAD NOTIFICATION SETTINGS ---
+            lstRules.ItemsSource = ActiveUI_Rules;
+            ActiveUI_Rules.Clear();
+            if (_settings.ENS_Rules != null)
+            {
+                foreach (var rule in _settings.ENS_Rules)
+                {
+                    ActiveUI_Rules.Add(rule);
+                }
+            }
+            NotificationEngine.ActiveRules = [.. ActiveUI_Rules];
+            // 1. General
+            chkSaveToLog.IsChecked = _settings.ENS_SaveToLog;
+            chkShowMessage.IsChecked = _settings.ENS_ShowMessage;
+
+            // 2. Offline Sound
+            EnableOfflineSoundChk.IsChecked = _settings.ENS_PlayOfflineSound;
+            txtOfflineSoundPath.Text = _settings.ENS_OfflineSoundFilePath;
+
+            // 3. Online Sound
+            EnableOnlineSoundChk.IsChecked = _settings.ENS_PlayOnlineSound;
+            txtOnlineSoundPath.Text = _settings.ENS_OnlineSoundFilePath;
 
             SettingsTC.SelectedIndex = tabIndex;
             var repo = new Data.MapRepository();
@@ -288,16 +306,6 @@ namespace NetworkMapViewerV2.Views
             if (int.TryParse(PingPeriodTextBox.Text, out int period) && period > 0)
                 _settings.PingPeriodSeconds = period;
 
-            // Save Notification settings
-            if (int.TryParse(DeleteDaysTextBox.Text, out int days) && days > 0)
-                _settings.DeleteEventsOlderThanDays = days;
-
-            if (int.TryParse(HideMessageTextBox.Text, out int hideSecs) && hideSecs > 0)
-                _settings.HideMessageSeconds = hideSecs;
-
-            _settings.NotificationHeaderTemplate = NotificationHeaderTextBox.Text;
-            _settings.NotificationUpTemplate = NotificationUpTextBox.Text;
-            _settings.NotificationDownTemplate = NotificationDownTextBox.Text;
 
             // Save Search settings
             _settings.DeepperSearchMode = DeeperSearchRB.IsChecked == true;
@@ -318,9 +326,22 @@ namespace NetworkMapViewerV2.Views
             if (SshPasswordTextBox.Text != "******")
                 _settings.SSHPassword = SecureSettingsHelper.ProtectPassword(SshPasswordTextBox.Text.Trim());
             if (ManagersPcPasswordTextBox.Text != "******")
-                _settings.ManagersPCPassword = SecureSettingsHelper.ProtectPassword(ManagersPcPasswordTextBox.Text.Trim()); 
+                _settings.ManagersPCPassword = SecureSettingsHelper.ProtectPassword(ManagersPcPasswordTextBox.Text.Trim());
             if (QmsPasswordTextBox.Text != "******")
                 _settings.QMSPassword = SecureSettingsHelper.ProtectPassword(QmsPasswordTextBox.Text.Trim());
+
+
+            _settings.ENS_Rules = [.. ActiveUI_Rules];
+            NotificationEngine.ActiveRules = [.. settings.ENS_Rules];
+
+            _settings.ENS_SaveToLog = chkSaveToLog.IsChecked == true;
+            _settings.ENS_ShowMessage = chkShowMessage.IsChecked == true;
+
+            _settings.ENS_PlayOfflineSound = EnableOfflineSoundChk.IsChecked == true;
+            _settings.ENS_OfflineSoundFilePath = txtOfflineSoundPath.Text;
+
+            _settings.ENS_PlayOnlineSound = EnableOnlineSoundChk.IsChecked == true;
+            _settings.ENS_OnlineSoundFilePath = txtOnlineSoundPath.Text;
 
 
             // Write to disk
@@ -334,6 +355,119 @@ namespace NetworkMapViewerV2.Views
             this.Close();
         }
 
+        private void AddNotifButton_Click(object sender, RoutedEventArgs e)
+        {
+            var repo = new Data.MapRepository();
+            var dbGroups = repo.GetAllDeviceGroups();
 
+            var groupItems = new List<TargetGroupItem>();
+            foreach (var group in dbGroups)
+            {
+                groupItems.Add(new TargetGroupItem { GroupId = group.GroupId, GroupName = group.GroupName });
+            }
+
+            var dialog = new AddNotificationRuleWindow(groupItems)
+            {
+                Owner = Window.GetWindow(this)
+            };
+
+            if (dialog.ShowDialog() == true && dialog.CreatedRule != null)
+            {
+                // 1. Add directly to the Observable Collection (NEVER use lstRules.Items.Add!)
+                ActiveUI_Rules.Add(dialog.CreatedRule);
+
+                var settings = SettingsService.Load();
+                settings.ENS_Rules = [.. ActiveUI_Rules]; // Convert the UI list to standard list
+                SettingsService.Save(settings);      // Save to JSON instantly
+
+                NotificationEngine.ActiveRules = [.. ActiveUI_Rules];
+            }
+        }
+
+        private void RemoveNotifButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (lstRules.SelectedItem is NotificationRule selectedRule)
+            {
+                var result = MessageBox.Show(
+                    $"Are you sure you want to delete the notification rule for:\n'{selectedRule.TargetName}'?",
+                    "Confirm Delete", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+
+                if (result == MessageBoxResult.Yes)
+                {
+                    // 1. Remove from the Observable Collection
+                    ActiveUI_Rules.Remove(selectedRule);
+
+                  
+                    var settings = SettingsService.Load();
+                    settings.ENS_Rules = [.. ActiveUI_Rules];
+                    SettingsService.Save(settings);
+
+                    // Instantly remove it from the background Engine
+                    NotificationEngine.ActiveRules = [.. ActiveUI_Rules];
+                }
+            }
+            else
+            {
+                MessageBox.Show("Please select a rule from the list to remove.", "No Selection", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
+        private void BtnBrowseOffline_Click(object sender, RoutedEventArgs e)
+        {
+            var openFileDialog = new OpenFileDialog
+            {
+                Filter = "Audio Files (*.wav)|*.wav",
+                Title = "Select Offline Sound"
+            };
+
+            if (openFileDialog.ShowDialog() == true)
+            {
+                txtOfflineSoundPath.Text = openFileDialog.FileName;
+            }
+        }
+
+        private void BtnTestOffline_Click(object sender, RoutedEventArgs e)
+        {
+            PlayTestSound(txtOfflineSoundPath.Text);
+        }
+
+        private void BtnBrowseOnline_Click(object sender, RoutedEventArgs e)
+        {
+            var openFileDialog = new OpenFileDialog
+            {
+                Filter = "Audio Files (*.wav)|*.wav",
+                Title = "Select Online Sound"
+            };
+
+            if (openFileDialog.ShowDialog() == true)
+            {
+                txtOnlineSoundPath.Text = openFileDialog.FileName;
+            }
+        }
+
+        private void BtnTestOnline_Click(object sender, RoutedEventArgs e)
+        {
+            PlayTestSound(txtOnlineSoundPath.Text);
+        }
+
+        // Reusable sound player for the Test buttons
+        private void PlayTestSound(string filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+            {
+                MessageBox.Show("Sound file not found! Please check the path.", "File Missing", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            try
+            {
+                using var player = new SoundPlayer(filePath);
+                player.Play();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to play sound: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
     }
 }

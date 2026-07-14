@@ -22,9 +22,9 @@ namespace NetworkMapViewerV2.Views
     {
 
         // --- NEW: Interactivity State ---
-        private List<FrameworkElement>? _selectedElements = [];
-        public MapTabState? _currentState; // Keep track of the current map
-        private DropShadowEffect? _selectionGlow = new() { Color = Colors.Cyan, BlurRadius = 20, ShadowDepth = 0 };
+        private readonly List<FrameworkElement> _selectedElements = [];
+        public MapTabState _currentState = new(); // Keep track of the current map
+        private readonly DropShadowEffect _selectionGlow = new() { Color = Colors.Cyan, BlurRadius = 20, ShadowDepth = 0 };
         private Brush? _gridBrush;
         private readonly Brush _standardBrush = new SolidColorBrush(Color.FromRgb(105, 105, 105));
 
@@ -33,7 +33,7 @@ namespace NetworkMapViewerV2.Views
         private Point _clickPosition;
         private FrameworkElement? _draggedElement;
         private int _originalZIndex;
-        private Dictionary<FrameworkElement, Point> _dragStartPositions = new();
+        private readonly Dictionary<FrameworkElement, Point> _dragStartPositions = [];
         private Point _lastRightClickPosition;
 
         // --- NEW: Marquee Selection & Clipboard State ---
@@ -41,13 +41,12 @@ namespace NetworkMapViewerV2.Views
         private Rectangle? _selectionBox;
         private bool _isMarqueeSelecting = false;
 
-        private static List<NetworkDevice> _copiedDevices = [];
-        private static List<NetworkLabel> _copiedLabels = [];
+        private readonly static List<NetworkDevice> _copiedDevices = [];
+        private readonly static List<NetworkLabel> _copiedLabels = [];
         private static int _pasteOffsetMultiplier = 1; // Makes multiple pastes cascade nicely!
 
         // Helper to get global state from our ViewModel
-        private MainViewModel? GlobalViewModel => Application.Current.MainWindow.DataContext as MainViewModel;
-
+        private static MainViewModel GlobalViewModel => (MainViewModel)Application.Current.MainWindow.DataContext;
 
         public MapCanvasView()
         {
@@ -86,6 +85,11 @@ namespace NetworkMapViewerV2.Views
                 _currentState = state;
                 state.RequestGatherDevices += GatherOutOfBoundsDevices;
 
+                state.TriggerRedraw = () =>
+                {
+                    // Ensure UI updates happen on the main UI thread
+                    Application.Current.Dispatcher.Invoke(() => DrawMap(state));
+                };
 
                 // Subscribe to per-tab property changes (e.g. IsEditingEnabled toggled from another tab)
                 state.PropertyChanged += CurrentState_PropertyChanged;
@@ -174,14 +178,14 @@ namespace NetworkMapViewerV2.Views
                 DrawingCanvas.ReleaseMouseCapture();
 
                 // 1. Calculate the bounding box of our selection rectangle
-                Rect selectionRect = new Rect(Canvas.GetLeft(_selectionBox), Canvas.GetTop(_selectionBox), _selectionBox.Width, _selectionBox.Height);
+                Rect selectionRect = new(Canvas.GetLeft(_selectionBox), Canvas.GetTop(_selectionBox), _selectionBox.Width, _selectionBox.Height);
 
                 // 2. Loop through all children and see if they intersect with the box!
                 foreach (UIElement child in DrawingCanvas.Children)
                 {
                     if (child is Border b && (b.Tag is NetworkDevice || b.Tag is NetworkLabel))
                     {
-                        Rect elementBounds = new Rect(Canvas.GetLeft(b), Canvas.GetTop(b), b.ActualWidth, b.ActualHeight);
+                        Rect elementBounds = new(Canvas.GetLeft(b), Canvas.GetTop(b), b.ActualWidth, b.ActualHeight);
                         if (selectionRect.IntersectsWith(elementBounds))
                         {
                             SelectElement(b, true); // True = Multi-select!
@@ -237,6 +241,22 @@ namespace NetworkMapViewerV2.Views
 
         public void DrawMap(MapTabState? state)
         {
+            // 1. DESTROY ALL BINDINGS SO WPF CAN DELETE THE OLD UI ELEMENTS
+            foreach (UIElement child in DrawingCanvas.Children)
+            {
+                System.Windows.Data.BindingOperations.ClearAllBindings(child);
+
+                // Because your Image is buried inside a Border -> StackPanel, we must clear those too!
+                if (child is Border b && b.Child is StackPanel sp)
+                {
+                    foreach (UIElement spChild in sp.Children)
+                    {
+                        System.Windows.Data.BindingOperations.ClearAllBindings(spChild);
+                    }
+                }
+            }
+
+            // 2. Now it is safe to clear the canvas
             DrawingCanvas.Children.Clear();
             _selectedElements?.Clear();
 
@@ -398,14 +418,19 @@ namespace NetworkMapViewerV2.Views
                     });
                 }
 
-                var displayLabels = device.Titles;
-                foreach (var lbl in displayLabels)
+
+                var combinedTitles = new List<string>();
+                foreach (var lbl in device.Titles)
                 {
                     if (string.IsNullOrWhiteSpace(lbl)) continue;
-                    string parsedText = lbl.Replace("%Address", device.Address);
+                    combinedTitles.Add(lbl.Replace("%Address", device.Address));
+                }
+
+                if (combinedTitles.Count != 0)
+                {
                     sp.Children.Add(new TextBlock
                     {
-                        Text = parsedText,
+                        Text = string.Join("\n", combinedTitles), // One single TextBlock!
                         FontSize = 12,
                         FontFamily = new FontFamily("MS Sans Serif"),
                         FontWeight = FontWeights.Bold,
@@ -467,7 +492,7 @@ namespace NetworkMapViewerV2.Views
                         // VIEW MODE: Run the Ping command or Open the Map Link
                         if (element.Tag is NetworkDevice dev)
                         {
-                            var dlg = new DevicePropertiesWindow(dev, true) { Owner = Window.GetWindow(this) };
+                            _ = new DevicePropertiesWindow(dev, true) { Owner = Window.GetWindow(this) };
                             HandleDeviceDoubleClick(dev);
                         }
                     }
@@ -634,7 +659,7 @@ namespace NetworkMapViewerV2.Views
             else if (el.Tag is NetworkLabel label) { if (left.HasValue) label.Left = left.Value; if (top.HasValue) label.Top = top.Value; }
         }
 
-        private bool HandleDeviceDoubleClick(NetworkDevice device)
+        private static bool HandleDeviceDoubleClick(NetworkDevice device)
         {
             var repo = new Data.MapRepository();
 
@@ -712,7 +737,6 @@ namespace NetworkMapViewerV2.Views
 
         private void AttachDeviceContextMenu(Border container, NetworkDevice device)
         {
-
             // 1. Give it a blank menu immediately so WPF knows it can be right-clicked!
             container.ContextMenu = new ContextMenu();
 
@@ -765,6 +789,15 @@ namespace NetworkMapViewerV2.Views
                 menu.Items.Add(miEdit);
 
 
+                menu.Items.Add(new Separator());
+                var miCopy = new MenuItem { Icon = "🗐", Header = "Copy IPAddress" };
+                miCopy.Click += (sender, args) =>
+                {
+                    Clipboard.SetText(device.Address.ToString());
+                };
+                menu.Items.Add(miCopy);
+
+
                 // If it's a Map Link, add the option to jump to the other map!
                 var repo = new Data.MapRepository();
                 var groups = repo.GetAllDeviceGroups();
@@ -791,22 +824,22 @@ namespace NetworkMapViewerV2.Views
                     var miAutoFill = new MenuItem { Icon = "🔍", Header = "Auto-Fill Specs" };
 
                     var miDomain = new MenuItem { Icon = "💻", Header = "Domain Joined PC" };
-                    miDomain.Click += async (sender, args) => await AutoFill.RunAutoFillScript(GlobalViewModel, this, device, "SystemInfo.ps1");
+                    miDomain.Click += async (sender, args) => await AutoFill.RunAutoFillScript(GlobalViewModel,  device, "SystemInfo.ps1");
 
                     var miNonDomain = new MenuItem { Icon = "🖥️", Header = "Non-Domain PC" };
-                    miNonDomain.Click += async (sender, args) => await AutoFill.RunAutoFillScript(GlobalViewModel, this, device, $"SystemInfo Non Domain.ps1");
+                    miNonDomain.Click += async (sender, args) => await AutoFill.RunAutoFillScript(GlobalViewModel,  device, $"SystemInfo Non Domain.ps1");
 
                     var miDefaultPC = new MenuItem { Icon = "🖥️", Header = "Default PC" };
-                    miDefaultPC.Click += async (sender, args) => await AutoFill.RunAutoFillScript(GlobalViewModel, this, device, $"SystemInfo Default.ps1");
+                    miDefaultPC.Click += async (sender, args) => await AutoFill.RunAutoFillScript(GlobalViewModel,  device, $"SystemInfo Default.ps1");
 
                     var miLinux = new MenuItem { Icon = "🐧", Header = "Linux PC (SSH)" };
-                    miLinux.Click += async (sender, args) => await AutoFill.RunAutoFillScript(GlobalViewModel, this, device, $"SystemInfo Linux.ps1");
+                    miLinux.Click += async (sender, args) => await AutoFill.RunAutoFillScript(GlobalViewModel,  device, $"SystemInfo Linux.ps1");
 
                     var miPrinter = new MenuItem { Icon = "🖨️", Header = "Printer" };
-                    miPrinter.Click += async (sender, args) => await AutoFill.RunPrinterAutoFill(GlobalViewModel, this, device);
+                    miPrinter.Click += async (sender, args) => await AutoFill.RunPrinterAutoFill(GlobalViewModel,  device);
 
                     var miPhone = new MenuItem { Icon = "☎️", Header = "Grandstream" };
-                    miPhone.Click += async (sender, args) => await AutoFill.RunGrandstreamAutoFill(GlobalViewModel, this, device);
+                    miPhone.Click += async (sender, args) => await AutoFill.RunGrandstreamAutoFill(GlobalViewModel,  device);
 
                     miAutoFill.Items.Add(miDomain);
                     miAutoFill.Items.Add(miNonDomain);
@@ -871,7 +904,7 @@ namespace NetworkMapViewerV2.Views
                     var dlg = new LabelPropertiesWindow(label, true) { Owner = Window.GetWindow(this) };
                     if (dlg.ShowDialog() == true)
                     {
-                        if (_currentState != null) _currentState.HasUnsavedChanges = true;
+                        _currentState?.HasUnsavedChanges = true;
                         DrawMap(_currentState);
                     }
                 };
@@ -884,7 +917,7 @@ namespace NetworkMapViewerV2.Views
                     if (_currentState != null)
                     {
                         _currentState.Labels.Remove(label);
-                        if (_currentState != null) _currentState.HasUnsavedChanges = true;
+                        _currentState?.HasUnsavedChanges = true;
                         DrawMap(_currentState);
                     }
                 };
@@ -993,7 +1026,7 @@ namespace NetworkMapViewerV2.Views
                 var drawingGroup = new DrawingGroup();
                 drawingGroup.Children.Add(new GeometryDrawing(_standardBrush, null, new RectangleGeometry(new Rect(0, 0, 10, 10))));
 
-                var pen = new Pen((Brush)new BrushConverter().ConvertFrom("#191919"), 1);
+                var pen = new Pen(new BrushConverter().ConvertFrom("#191919") as Brush, 1);
                 var lineGeometry = new GeometryGroup();
                 lineGeometry.Children.Add(new LineGeometry(new Point(0, 0), new Point(10, 0)));
                 lineGeometry.Children.Add(new LineGeometry(new Point(0, 0), new Point(0, 10)));
@@ -1074,6 +1107,10 @@ namespace NetworkMapViewerV2.Views
             // Dynamically build the menu!
             var menu = new ContextMenu();
 
+            var miUpdateDevices = new MenuItem { Icon = "🔄", Header = "Update All Devices..." };
+            //miUpdateDevices.Click += MainViewModel.UpdateGroupData();
+
+
             var miAddDevice = new MenuItem { Icon = "🖥️", Header = "Add Device Here...", FontWeight = FontWeights.Bold };
 
             // Fetch groups from DB so you can select the type BEFORE adding!
@@ -1111,7 +1148,7 @@ namespace NetworkMapViewerV2.Views
                     {
                         _currentState.Labels.Add(lbl);
                     }
-                    if (GlobalViewModel != null) if (_currentState != null) _currentState.HasUnsavedChanges = true;
+                    if (GlobalViewModel != null) _currentState?.HasUnsavedChanges = true;
                     DrawMap(_currentState);
                 }
             };
@@ -1152,13 +1189,18 @@ namespace NetworkMapViewerV2.Views
                 menu.Items.Add(miAlign);
             }
 
-            if (_selectedElements.Any(e => e.Tag is NetworkDevice) && _selectedElements.Any(e => e.Tag is NetworkLabel))
+            if (_selectedElements != null)
             {
-                var miAutoAlign = new MenuItem { Icon = "✨", Header = "Auto-Align Devices (Alt+A)" };
-                miAutoAlign.Click += (sender, args) => AutoAlignSelectedPairs();
-                menu.Items.Add(miAutoAlign);
+                if (_selectedElements.Any(e => e.Tag is NetworkDevice) && _selectedElements.Any(e => e.Tag is NetworkLabel))
+                {
+                    var miAutoAlign = new MenuItem { Icon = "✨", Header = "Auto-Align Devices (Alt+A)" };
+                    miAutoAlign.Click += (sender, args) => AutoAlignSelectedPairs();
+                    menu.Items.Add(miAutoAlign);
+                }
             }
 
+            menu.Items.Add(miUpdateDevices);
+            menu.Items.Add(new Separator());
             menu.Items.Add(miAddDevice);
             menu.Items.Add(miBatchAdd);
             menu.Items.Add(new Separator());
@@ -1233,7 +1275,7 @@ namespace NetworkMapViewerV2.Views
             if (dlg.ShowDialog() == true)
             {
                 _currentState.Devices.Add(newDevice);
-                if (GlobalViewModel != null) if (_currentState != null) _currentState.HasUnsavedChanges = true;
+                if (GlobalViewModel != null) _currentState?.HasUnsavedChanges = true;
                 DrawMap(_currentState);
             }
         }
@@ -1259,7 +1301,7 @@ namespace NetworkMapViewerV2.Views
             if (dlg.ShowDialog() == true)
             {
                 _currentState.Labels.Add(newLabel);
-                if (GlobalViewModel != null) if (_currentState != null) _currentState.HasUnsavedChanges = true;
+                if (GlobalViewModel != null) _currentState?.HasUnsavedChanges = true;
                 DrawMap(_currentState);
             }
         }
@@ -1309,10 +1351,10 @@ namespace NetworkMapViewerV2.Views
             if (dlg.ShowDialog() == true && int.TryParse(txtCount.Text, out int count))
             {
                 // 1. Properly parse ALL the text boxes
-                double.TryParse(txtWidth.Text, out double w);
-                double.TryParse(txtHeight.Text, out double h);
-                double.TryParse(txtLeft.Text, out double baseLeft);
-                double.TryParse(txtTop.Text, out double baseTop);
+                _ = double.TryParse(txtWidth.Text, out double w);
+                _ = double.TryParse(txtHeight.Text, out double h);
+                _ = double.TryParse(txtLeft.Text, out double baseLeft);
+                _ = double.TryParse(txtTop.Text, out double baseTop);
                 string selectedColor = colorPicker.SelectedColor?.ToString() ?? "Transparent";
                 for (int i = 0; i < count; i++)
                 {
@@ -1336,10 +1378,12 @@ namespace NetworkMapViewerV2.Views
                     _currentState.Labels.Add(newLabel);
                 }
 
-                if (GlobalViewModel != null) if (_currentState != null) _currentState.HasUnsavedChanges = true;
+                if (GlobalViewModel != null) _currentState?.HasUnsavedChanges = true;
                 DrawMap(_currentState);
             }
         }
+
+
 
         private void BatchAdd_Click(object sender, RoutedEventArgs e)
         {
@@ -1389,7 +1433,7 @@ namespace NetworkMapViewerV2.Views
                     newDevice.Titles.Add("%Address");
                     _currentState.Devices.Add(newDevice);
                 }
-                if (GlobalViewModel != null) if (_currentState != null) _currentState.HasUnsavedChanges = true;
+                if (GlobalViewModel != null) _currentState?.HasUnsavedChanges = true;
                 DrawMap(_currentState);
             }
         }
@@ -1410,7 +1454,7 @@ namespace NetworkMapViewerV2.Views
             newDevice.Titles.Add("New Device"); // Adds text safely to the JSON list!
 
             _currentState.Devices.Add(newDevice);
-            if (GlobalViewModel != null) if (_currentState != null) _currentState.HasUnsavedChanges = true;
+            GlobalViewModel?.HasUnsavedChanges = true;
             DrawMap(_currentState);
         }
 
@@ -1485,7 +1529,7 @@ namespace NetworkMapViewerV2.Views
                         }
                     }
                     _selectedElements.Clear();
-                    if (_currentState != null) _currentState.HasUnsavedChanges = true;
+                    _currentState?.HasUnsavedChanges = true;
                     DrawMap(_currentState);
                 }
                 e.Handled = true;
@@ -1696,14 +1740,14 @@ namespace NetworkMapViewerV2.Views
             // =======================================================
             // 4. USE YOUR EXISTING ALIGNMENT LOGIC!
             // =======================================================
-            foreach (var pair in pairings)
+            foreach (var (device, label) in pairings)
             {
                 // Temporarily isolate the selection to JUST this one pair
                 _selectedElements.Clear();
-                _selectedElements.Add(pair.device);
-                _selectedElements.Add(pair.label);
+                _selectedElements.Add(device);
+                _selectedElements.Add(label);
 
-                var devData = (NetworkDevice)pair.device.Tag;
+                var devData = (NetworkDevice)device.Tag;
 
                 if (devData.GroupId == 9) // Phones
                 {
@@ -1821,10 +1865,7 @@ namespace NetworkMapViewerV2.Views
 
             if (mapRequiresRedraw)
             {
-                if (GlobalViewModel != null)
-                {
-                    GlobalViewModel.HasUnsavedChanges = true;
-                }
+                GlobalViewModel?.HasUnsavedChanges = true;
 
                 DrawMap(_currentState);
             }

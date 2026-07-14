@@ -22,9 +22,9 @@ namespace NetworkMapViewerV2.Views
     {
 
         // --- NEW: Interactivity State ---
-        private List<FrameworkElement>? _selectedElements = [];
-        public MapTabState? _currentState; // Keep track of the current map
-        private DropShadowEffect? _selectionGlow = new() { Color = Colors.Cyan, BlurRadius = 20, ShadowDepth = 0 };
+        private readonly List<FrameworkElement> _selectedElements = [];
+        public MapTabState _currentState = new(); // Keep track of the current map
+        private readonly DropShadowEffect _selectionGlow = new() { Color = Colors.Cyan, BlurRadius = 20, ShadowDepth = 0 };
         private Brush? _gridBrush;
         private readonly Brush _standardBrush = new SolidColorBrush(Color.FromRgb(105, 105, 105));
 
@@ -33,21 +33,20 @@ namespace NetworkMapViewerV2.Views
         private Point _clickPosition;
         private FrameworkElement? _draggedElement;
         private int _originalZIndex;
-        private Dictionary<FrameworkElement, Point> _dragStartPositions = new();
+        private readonly Dictionary<FrameworkElement, Point> _dragStartPositions = [];
         private Point _lastRightClickPosition;
 
         // --- NEW: Marquee Selection & Clipboard State ---
         private Point _selectionStartPoint;
         private Rectangle? _selectionBox;
         private bool _isMarqueeSelecting = false;
-
-        private static List<NetworkDevice> _copiedDevices = [];
-        private static List<NetworkLabel> _copiedLabels = [];
+        private Stack<Action> _undoStack = new Stack<Action>();
+        private readonly static List<NetworkDevice> _copiedDevices = [];
+        private readonly static List<NetworkLabel> _copiedLabels = [];
         private static int _pasteOffsetMultiplier = 1; // Makes multiple pastes cascade nicely!
 
         // Helper to get global state from our ViewModel
-        private MainViewModel? GlobalViewModel => Application.Current.MainWindow.DataContext as MainViewModel;
-
+        private static MainViewModel GlobalViewModel => (MainViewModel)Application.Current.MainWindow.DataContext;
 
         public MapCanvasView()
         {
@@ -86,6 +85,11 @@ namespace NetworkMapViewerV2.Views
                 _currentState = state;
                 state.RequestGatherDevices += GatherOutOfBoundsDevices;
 
+                state.TriggerRedraw = () =>
+                {
+                    // Ensure UI updates happen on the main UI thread
+                    Application.Current.Dispatcher.Invoke(() => DrawMap(state));
+                };
 
                 // Subscribe to per-tab property changes (e.g. IsEditingEnabled toggled from another tab)
                 state.PropertyChanged += CurrentState_PropertyChanged;
@@ -174,14 +178,14 @@ namespace NetworkMapViewerV2.Views
                 DrawingCanvas.ReleaseMouseCapture();
 
                 // 1. Calculate the bounding box of our selection rectangle
-                Rect selectionRect = new Rect(Canvas.GetLeft(_selectionBox), Canvas.GetTop(_selectionBox), _selectionBox.Width, _selectionBox.Height);
+                Rect selectionRect = new(Canvas.GetLeft(_selectionBox), Canvas.GetTop(_selectionBox), _selectionBox.Width, _selectionBox.Height);
 
                 // 2. Loop through all children and see if they intersect with the box!
                 foreach (UIElement child in DrawingCanvas.Children)
                 {
                     if (child is Border b && (b.Tag is NetworkDevice || b.Tag is NetworkLabel))
                     {
-                        Rect elementBounds = new Rect(Canvas.GetLeft(b), Canvas.GetTop(b), b.ActualWidth, b.ActualHeight);
+                        Rect elementBounds = new(Canvas.GetLeft(b), Canvas.GetTop(b), b.ActualWidth, b.ActualHeight);
                         if (selectionRect.IntersectsWith(elementBounds))
                         {
                             SelectElement(b, true); // True = Multi-select!
@@ -237,6 +241,22 @@ namespace NetworkMapViewerV2.Views
 
         public void DrawMap(MapTabState? state)
         {
+            // 1. DESTROY ALL BINDINGS SO WPF CAN DELETE THE OLD UI ELEMENTS
+            foreach (UIElement child in DrawingCanvas.Children)
+            {
+                System.Windows.Data.BindingOperations.ClearAllBindings(child);
+
+                // Because your Image is buried inside a Border -> StackPanel, we must clear those too!
+                if (child is Border b && b.Child is StackPanel sp)
+                {
+                    foreach (UIElement spChild in sp.Children)
+                    {
+                        System.Windows.Data.BindingOperations.ClearAllBindings(spChild);
+                    }
+                }
+            }
+
+            // 2. Now it is safe to clear the canvas
             DrawingCanvas.Children.Clear();
             _selectedElements?.Clear();
 
@@ -398,7 +418,7 @@ namespace NetworkMapViewerV2.Views
                     });
                 }
 
-              
+
                 var combinedTitles = new List<string>();
                 foreach (var lbl in device.Titles)
                 {
@@ -472,7 +492,7 @@ namespace NetworkMapViewerV2.Views
                         // VIEW MODE: Run the Ping command or Open the Map Link
                         if (element.Tag is NetworkDevice dev)
                         {
-                            var dlg = new DevicePropertiesWindow(dev, true) { Owner = Window.GetWindow(this) };
+                            _ = new DevicePropertiesWindow(dev, true) { Owner = Window.GetWindow(this) };
                             HandleDeviceDoubleClick(dev);
                         }
                     }
@@ -639,7 +659,7 @@ namespace NetworkMapViewerV2.Views
             else if (el.Tag is NetworkLabel label) { if (left.HasValue) label.Left = left.Value; if (top.HasValue) label.Top = top.Value; }
         }
 
-        private bool HandleDeviceDoubleClick(NetworkDevice device)
+        private static bool HandleDeviceDoubleClick(NetworkDevice device)
         {
             var repo = new Data.MapRepository();
 
@@ -717,7 +737,6 @@ namespace NetworkMapViewerV2.Views
 
         private void AttachDeviceContextMenu(Border container, NetworkDevice device)
         {
-
             // 1. Give it a blank menu immediately so WPF knows it can be right-clicked!
             container.ContextMenu = new ContextMenu();
 
@@ -770,6 +789,15 @@ namespace NetworkMapViewerV2.Views
                 menu.Items.Add(miEdit);
 
 
+                menu.Items.Add(new Separator());
+                var miCopy = new MenuItem { Icon = "🗐", Header = "Copy IPAddress" };
+                miCopy.Click += (sender, args) =>
+                {
+                    Clipboard.SetText(device.Address.ToString());
+                };
+                menu.Items.Add(miCopy);
+
+
                 // If it's a Map Link, add the option to jump to the other map!
                 var repo = new Data.MapRepository();
                 var groups = repo.GetAllDeviceGroups();
@@ -796,22 +824,22 @@ namespace NetworkMapViewerV2.Views
                     var miAutoFill = new MenuItem { Icon = "🔍", Header = "Auto-Fill Specs" };
 
                     var miDomain = new MenuItem { Icon = "💻", Header = "Domain Joined PC" };
-                    miDomain.Click += async (sender, args) => await AutoFill.RunAutoFillScript(GlobalViewModel, this, device, "SystemInfo.ps1");
+                    miDomain.Click += async (sender, args) => await AutoFill.RunAutoFillScript(GlobalViewModel,  device, "SystemInfo.ps1");
 
                     var miNonDomain = new MenuItem { Icon = "🖥️", Header = "Non-Domain PC" };
-                    miNonDomain.Click += async (sender, args) => await AutoFill.RunAutoFillScript(GlobalViewModel, this, device, $"SystemInfo Non Domain.ps1");
+                    miNonDomain.Click += async (sender, args) => await AutoFill.RunAutoFillScript(GlobalViewModel,  device, $"SystemInfo Non Domain.ps1");
 
                     var miDefaultPC = new MenuItem { Icon = "🖥️", Header = "Default PC" };
-                    miDefaultPC.Click += async (sender, args) => await AutoFill.RunAutoFillScript(GlobalViewModel, this, device, $"SystemInfo Default.ps1");
+                    miDefaultPC.Click += async (sender, args) => await AutoFill.RunAutoFillScript(GlobalViewModel,  device, $"SystemInfo Default.ps1");
 
                     var miLinux = new MenuItem { Icon = "🐧", Header = "Linux PC (SSH)" };
-                    miLinux.Click += async (sender, args) => await AutoFill.RunAutoFillScript(GlobalViewModel, this, device, $"SystemInfo Linux.ps1");
+                    miLinux.Click += async (sender, args) => await AutoFill.RunAutoFillScript(GlobalViewModel,  device, $"SystemInfo Linux.ps1");
 
                     var miPrinter = new MenuItem { Icon = "🖨️", Header = "Printer" };
-                    miPrinter.Click += async (sender, args) => await AutoFill.RunPrinterAutoFill(GlobalViewModel, this, device);
+                    miPrinter.Click += async (sender, args) => await AutoFill.RunPrinterAutoFill(GlobalViewModel,  device);
 
                     var miPhone = new MenuItem { Icon = "☎️", Header = "Grandstream" };
-                    miPhone.Click += async (sender, args) => await AutoFill.RunGrandstreamAutoFill(GlobalViewModel, this, device);
+                    miPhone.Click += async (sender, args) => await AutoFill.RunGrandstreamAutoFill(GlobalViewModel,  device);
 
                     miAutoFill.Items.Add(miDomain);
                     miAutoFill.Items.Add(miNonDomain);
@@ -876,7 +904,7 @@ namespace NetworkMapViewerV2.Views
                     var dlg = new LabelPropertiesWindow(label, true) { Owner = Window.GetWindow(this) };
                     if (dlg.ShowDialog() == true)
                     {
-                        if (_currentState != null) _currentState.HasUnsavedChanges = true;
+                        _currentState?.HasUnsavedChanges = true;
                         DrawMap(_currentState);
                     }
                 };
@@ -889,7 +917,7 @@ namespace NetworkMapViewerV2.Views
                     if (_currentState != null)
                     {
                         _currentState.Labels.Remove(label);
-                        if (_currentState != null) _currentState.HasUnsavedChanges = true;
+                        _currentState?.HasUnsavedChanges = true;
                         DrawMap(_currentState);
                     }
                 };
@@ -998,7 +1026,7 @@ namespace NetworkMapViewerV2.Views
                 var drawingGroup = new DrawingGroup();
                 drawingGroup.Children.Add(new GeometryDrawing(_standardBrush, null, new RectangleGeometry(new Rect(0, 0, 10, 10))));
 
-                var pen = new Pen((Brush)new BrushConverter().ConvertFrom("#191919"), 1);
+                var pen = new Pen(new BrushConverter().ConvertFrom("#191919") as Brush, 1);
                 var lineGeometry = new GeometryGroup();
                 lineGeometry.Children.Add(new LineGeometry(new Point(0, 0), new Point(10, 0)));
                 lineGeometry.Children.Add(new LineGeometry(new Point(0, 0), new Point(0, 10)));
@@ -1079,6 +1107,10 @@ namespace NetworkMapViewerV2.Views
             // Dynamically build the menu!
             var menu = new ContextMenu();
 
+            var miUpdateDevices = new MenuItem { Icon = "🔄", Header = "Update All Devices..." };
+            //miUpdateDevices.Click += MainViewModel.UpdateGroupData();
+
+
             var miAddDevice = new MenuItem { Icon = "🖥️", Header = "Add Device Here...", FontWeight = FontWeights.Bold };
 
             // Fetch groups from DB so you can select the type BEFORE adding!
@@ -1116,7 +1148,7 @@ namespace NetworkMapViewerV2.Views
                     {
                         _currentState.Labels.Add(lbl);
                     }
-                    if (GlobalViewModel != null) if (_currentState != null) _currentState.HasUnsavedChanges = true;
+                    if (GlobalViewModel != null) _currentState?.HasUnsavedChanges = true;
                     DrawMap(_currentState);
                 }
             };
@@ -1157,13 +1189,18 @@ namespace NetworkMapViewerV2.Views
                 menu.Items.Add(miAlign);
             }
 
-            if (_selectedElements.Any(e => e.Tag is NetworkDevice) && _selectedElements.Any(e => e.Tag is NetworkLabel))
+            if (_selectedElements != null)
             {
-                var miAutoAlign = new MenuItem { Icon = "✨", Header = "Auto-Align Devices (Alt+A)" };
-                miAutoAlign.Click += (sender, args) => AutoAlignSelectedPairs();
-                menu.Items.Add(miAutoAlign);
+                if (_selectedElements.Any(e => e.Tag is NetworkDevice) && _selectedElements.Any(e => e.Tag is NetworkLabel))
+                {
+                    var miAutoAlign = new MenuItem { Icon = "✨", Header = "Auto-Align Devices (Alt+A)" };
+                    miAutoAlign.Click += (sender, args) => AutoAlignSelectedPairs();
+                    menu.Items.Add(miAutoAlign);
+                }
             }
 
+            menu.Items.Add(miUpdateDevices);
+            menu.Items.Add(new Separator());
             menu.Items.Add(miAddDevice);
             menu.Items.Add(miBatchAdd);
             menu.Items.Add(new Separator());
@@ -1238,7 +1275,7 @@ namespace NetworkMapViewerV2.Views
             if (dlg.ShowDialog() == true)
             {
                 _currentState.Devices.Add(newDevice);
-                if (GlobalViewModel != null) if (_currentState != null) _currentState.HasUnsavedChanges = true;
+                if (GlobalViewModel != null) _currentState?.HasUnsavedChanges = true;
                 DrawMap(_currentState);
             }
         }
@@ -1264,7 +1301,7 @@ namespace NetworkMapViewerV2.Views
             if (dlg.ShowDialog() == true)
             {
                 _currentState.Labels.Add(newLabel);
-                if (GlobalViewModel != null) if (_currentState != null) _currentState.HasUnsavedChanges = true;
+                if (GlobalViewModel != null) _currentState?.HasUnsavedChanges = true;
                 DrawMap(_currentState);
             }
         }
@@ -1314,10 +1351,10 @@ namespace NetworkMapViewerV2.Views
             if (dlg.ShowDialog() == true && int.TryParse(txtCount.Text, out int count))
             {
                 // 1. Properly parse ALL the text boxes
-                double.TryParse(txtWidth.Text, out double w);
-                double.TryParse(txtHeight.Text, out double h);
-                double.TryParse(txtLeft.Text, out double baseLeft);
-                double.TryParse(txtTop.Text, out double baseTop);
+                _ = double.TryParse(txtWidth.Text, out double w);
+                _ = double.TryParse(txtHeight.Text, out double h);
+                _ = double.TryParse(txtLeft.Text, out double baseLeft);
+                _ = double.TryParse(txtTop.Text, out double baseTop);
                 string selectedColor = colorPicker.SelectedColor?.ToString() ?? "Transparent";
                 for (int i = 0; i < count; i++)
                 {
@@ -1341,10 +1378,12 @@ namespace NetworkMapViewerV2.Views
                     _currentState.Labels.Add(newLabel);
                 }
 
-                if (GlobalViewModel != null) if (_currentState != null) _currentState.HasUnsavedChanges = true;
+                if (GlobalViewModel != null) _currentState?.HasUnsavedChanges = true;
                 DrawMap(_currentState);
             }
         }
+
+
 
         private void BatchAdd_Click(object sender, RoutedEventArgs e)
         {
@@ -1394,7 +1433,7 @@ namespace NetworkMapViewerV2.Views
                     newDevice.Titles.Add("%Address");
                     _currentState.Devices.Add(newDevice);
                 }
-                if (GlobalViewModel != null) if (_currentState != null) _currentState.HasUnsavedChanges = true;
+                if (GlobalViewModel != null) _currentState?.HasUnsavedChanges = true;
                 DrawMap(_currentState);
             }
         }
@@ -1415,7 +1454,7 @@ namespace NetworkMapViewerV2.Views
             newDevice.Titles.Add("New Device"); // Adds text safely to the JSON list!
 
             _currentState.Devices.Add(newDevice);
-            if (GlobalViewModel != null) if (_currentState != null) _currentState.HasUnsavedChanges = true;
+            GlobalViewModel?.HasUnsavedChanges = true;
             DrawMap(_currentState);
         }
 
@@ -1438,6 +1477,26 @@ namespace NetworkMapViewerV2.Views
         private void UserControl_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             if (_currentState == null) return;
+
+            bool isCtrlDown = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
+            bool isShiftDown = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
+            bool isAltDown = Keyboard.Modifiers.HasFlag(ModifierKeys.Alt);
+
+            // --- UNDO LOGIC (Ctrl + Z) ---
+            if (isCtrlDown && e.Key == Key.Z && _currentState.IsEditingEnabled)
+            {
+                if (_undoStack.Count > 0)
+                {
+                    var undoAction = _undoStack.Pop();
+                    undoAction.Invoke(); // Executes the reverse action!
+
+                    _selectedElements.Clear();
+                    _currentState?.HasUnsavedChanges = true;
+                    DrawMap(_currentState);
+                }
+                e.Handled = true;
+                return;
+            }
 
             // --- EDIT LOGIC (F2) ---
             if (e.Key == Key.F2 && _selectedElements.Count == 1)
@@ -1469,34 +1528,48 @@ namespace NetworkMapViewerV2.Views
                 return;
             }
 
-            // 1. DELETION LOGIC
+            // --- DELETION LOGIC (Delete) ---
             if (e.Key == Key.Delete && _currentState.IsEditingEnabled)
             {
                 var result = MessageBox.Show($"Delete {_selectedElements.Count} selected item(s)?", "Confirm Delete", MessageBoxButton.YesNo, MessageBoxImage.Warning);
                 if (result == MessageBoxResult.Yes)
                 {
                     var repo = new Data.MapRepository();
+
+                    // Capture items for Undo before removing them
+                    var deletedDevices = new List<NetworkDevice>();
+                    var deletedLabels = new List<NetworkLabel>();
+
                     foreach (var el in _selectedElements)
                     {
                         if (el.Tag is NetworkDevice d)
                         {
+                            deletedDevices.Add(d);
                             _currentState?.Devices.Remove(d);
                             if (d.DeviceId > 0) repo.DeleteDevice(d.DeviceId);
                         }
                         else if (el.Tag is NetworkLabel l)
                         {
+                            deletedLabels.Add(l);
                             _currentState?.Labels.Remove(l);
                             if (l.LabelId > 0) repo.DeleteLabel(l.LabelId);
                         }
                     }
+
+                    // UNDO HISTORY: How to reverse a Delete
+                    _undoStack.Push(() => {
+                        // We set ID to 0 so when you hit "Save", the DB recreates them seamlessly
+                        foreach (var d in deletedDevices) { d.DeviceId = 0; _currentState.Devices.Add(d); }
+                        foreach (var l in deletedLabels) { l.LabelId = 0; _currentState.Labels.Add(l); }
+                    });
+
                     _selectedElements.Clear();
-                    if (_currentState != null) _currentState.HasUnsavedChanges = true;
+                    _currentState?.HasUnsavedChanges = true;
                     DrawMap(_currentState);
                 }
                 e.Handled = true;
                 return;
             }
-            bool isCtrlDown = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
 
             // --- FIND AND REPLACE LOGIC (Ctrl + H) ---
             if (isCtrlDown && e.Key == Key.H && _currentState.IsEditingEnabled)
@@ -1505,7 +1578,6 @@ namespace NetworkMapViewerV2.Views
                 e.Handled = true;
                 return;
             }
-
 
             // --- COPY LOGIC (Ctrl + C) ---
             if (isCtrlDown && e.Key == Key.C && _currentState.IsEditingEnabled)
@@ -1523,19 +1595,59 @@ namespace NetworkMapViewerV2.Views
                 return;
             }
 
+            // --- CUT LOGIC (Ctrl + X) ---
+            if (isCtrlDown && e.Key == Key.X && _currentState.IsEditingEnabled)
+            {
+                _copiedDevices.Clear();
+                _copiedLabels.Clear();
+                _pasteOffsetMultiplier = 1;
+
+                var repo = new Data.MapRepository();
+                var cutDevices = new List<NetworkDevice>();
+                var cutLabels = new List<NetworkLabel>();
+
+                foreach (var el in _selectedElements)
+                {
+                    if (el.Tag is NetworkDevice d)
+                    {
+                        _copiedDevices.Add(d);
+                        cutDevices.Add(d);
+                        _currentState?.Devices.Remove(d);
+                        if (d.DeviceId > 0) repo.DeleteDevice(d.DeviceId);
+                    }
+                    else if (el.Tag is NetworkLabel l)
+                    {
+                        _copiedLabels.Add(l);
+                        cutLabels.Add(l);
+                        _currentState?.Labels.Remove(l);
+                        if (l.LabelId > 0) repo.DeleteLabel(l.LabelId);
+                    }
+                }
+
+                // UNDO HISTORY: How to reverse a Cut
+                _undoStack.Push(() => {
+                    foreach (var d in cutDevices) { d.DeviceId = 0; _currentState.Devices.Add(d); }
+                    foreach (var l in cutLabels) { l.LabelId = 0; _currentState.Labels.Add(l); }
+                });
+
+                _selectedElements.Clear();
+                _currentState?.HasUnsavedChanges = true;
+                DrawMap(_currentState);
+
+                e.Handled = true;
+                return;
+            }
+
             // --- PASTE LOGIC (Ctrl + V / Ctrl + Shift + V) ---
             if (isCtrlDown && e.Key == Key.V && _currentState.IsEditingEnabled)
             {
-                // 1. Detect if Shift is held down for "Paste in Place"
-                bool isShiftDown = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
-
-                // 2. If Shift is down, offset is 0. Otherwise, calculate normal offset.
                 double offset = isShiftDown ? 0 : 30 * _pasteOffsetMultiplier;
-
                 SelectElement(null, false); // Clear current selection
 
-                if (_copiedDevices.Count == 0 && _copiedLabels.Count == 0)
-                    return;
+                if (_copiedDevices.Count == 0 && _copiedLabels.Count == 0) return;
+
+                var newlyPastedDevices = new List<NetworkDevice>();
+                var newlyPastedLabels = new List<NetworkLabel>();
 
                 // Paste Devices
                 foreach (var d in _copiedDevices)
@@ -1554,6 +1666,7 @@ namespace NetworkMapViewerV2.Views
                     foreach (var h in d.Hints) newDev.Hints.Add(h);
 
                     _currentState.Devices.Add(newDev);
+                    newlyPastedDevices.Add(newDev);
                 }
 
                 // Paste Labels
@@ -1579,23 +1692,37 @@ namespace NetworkMapViewerV2.Views
                     foreach (var t in l.TextLines) newLab.TextLines.Add(t);
 
                     _currentState.Labels.Add(newLab);
+                    newlyPastedLabels.Add(newLab);
                 }
 
-                // 3. Only increment the offset multiplier if it was a normal paste!
-                if (!isShiftDown)
-                {
-                    _pasteOffsetMultiplier++;
-                }
+                // UNDO HISTORY: How to reverse a Paste
+                _undoStack.Push(() => {
+                    var repo = new Data.MapRepository();
+                    foreach (var d in newlyPastedDevices) { _currentState.Devices.Remove(d); if (d.DeviceId > 0) repo.DeleteDevice(d.DeviceId); }
+                    foreach (var l in newlyPastedLabels) { _currentState.Labels.Remove(l); if (l.LabelId > 0) repo.DeleteLabel(l.LabelId); }
+                });
+
+                if (!isShiftDown) _pasteOffsetMultiplier++;
 
                 _currentState?.HasUnsavedChanges = true;
                 DrawMap(_currentState);
+
+                // --- NEW: AUTO-SELECT PASTED ITEMS ---
+                // Change "MapCanvas" to whatever x:Name is in your XAML file!
+                foreach (FrameworkElement child in DrawingCanvas.Children)
+                {
+                    if (child.Tag != null && (newlyPastedDevices.Contains(child.Tag) || newlyPastedLabels.Contains(child.Tag)))
+                    {
+                        SelectElement(child, true); // true = add to multi-select
+                    }
+                }
 
                 e.Handled = true;
                 return;
             }
 
-            // 2. ARROW KEY MOVEMENT LOGIC
-            double step = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) ? 10.0 : 1.0;
+            // --- ARROW KEY MOVEMENT LOGIC ---
+            double step = isShiftDown ? 10.0 : 1.0;
             double dx = 0, dy = 0;
 
             if (e.Key == Key.Left) dx = -step;
@@ -1605,28 +1732,43 @@ namespace NetworkMapViewerV2.Views
 
             if (dx != 0 || dy != 0)
             {
+                // Capture old positions for Undo
+                var moveHistory = new List<Tuple<object, double, double>>();
+
                 foreach (var el in _selectedElements)
                 {
-                    double newLeft = Canvas.GetLeft(el) + dx;
-                    double newTop = Canvas.GetTop(el) + dy;
+                    double oldLeft = Canvas.GetLeft(el);
+                    double oldTop = Canvas.GetTop(el);
 
-                    EnforceBounds(el, ref newLeft, ref newTop); // Keeps keyboard movement on screen too!
+                    // Save state before move
+                    moveHistory.Add(new Tuple<object, double, double>(el.Tag, oldLeft, oldTop));
+
+                    double newLeft = oldLeft + dx;
+                    double newTop = oldTop + dy;
+
+                    EnforceBounds(el, ref newLeft, ref newTop);
 
                     Canvas.SetLeft(el, newLeft);
                     Canvas.SetTop(el, newTop);
                     UpdateModelPosition(el, newLeft, newTop);
                 }
+
+                // UNDO HISTORY: How to reverse a move
+                _undoStack.Push(() => {
+                    foreach (var historyItem in moveHistory)
+                    {
+                        if (historyItem.Item1 is NetworkDevice d) { d.Left = historyItem.Item2; d.Top = historyItem.Item3; }
+                        if (historyItem.Item1 is NetworkLabel l) { l.Left = historyItem.Item2; l.Top = historyItem.Item3; }
+                    }
+                });
+
                 _currentState?.HasUnsavedChanges = true;
-                e.Handled = true; // Prevents the window from scrolling if it's inside a ScrollViewer
+                e.Handled = true;
             }
-
-
-            bool isAltDown = Keyboard.Modifiers.HasFlag(ModifierKeys.Alt);
 
             // --- ALIGNMENT SHORTCUTS (Alt + Keys) ---
             if (isAltDown && _selectedElements.Count > 1 && _currentState != null && _currentState.IsEditingEnabled)
             {
-                // Because Alt is a System modifier, WPF puts the actual key inside e.SystemKey!
                 Key actualKey = e.Key == Key.System ? e.SystemKey : e.Key;
 
                 switch (actualKey)
@@ -1701,14 +1843,14 @@ namespace NetworkMapViewerV2.Views
             // =======================================================
             // 4. USE YOUR EXISTING ALIGNMENT LOGIC!
             // =======================================================
-            foreach (var pair in pairings)
+            foreach (var (device, label) in pairings)
             {
                 // Temporarily isolate the selection to JUST this one pair
                 _selectedElements.Clear();
-                _selectedElements.Add(pair.device);
-                _selectedElements.Add(pair.label);
+                _selectedElements.Add(device);
+                _selectedElements.Add(label);
 
-                var devData = (NetworkDevice)pair.device.Tag;
+                var devData = (NetworkDevice)device.Tag;
 
                 if (devData.GroupId == 9) // Phones
                 {
@@ -1826,10 +1968,7 @@ namespace NetworkMapViewerV2.Views
 
             if (mapRequiresRedraw)
             {
-                if (GlobalViewModel != null)
-                {
-                    GlobalViewModel.HasUnsavedChanges = true;
-                }
+                GlobalViewModel?.HasUnsavedChanges = true;
 
                 DrawMap(_currentState);
             }

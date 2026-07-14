@@ -2,7 +2,6 @@
 using NetworkMapViewerV2.Models;
 using NetworkMapViewerV2.Services;
 using NetworkMapViewerV2.ViewModels;
-using NetworkMapViewerV2.Views;
 using System.IO;
 using System.Windows;
 
@@ -18,8 +17,8 @@ namespace NetworkMapViewerV2.Helpers.LocalFetcher
         private static readonly string decryptedPasswordManagers = SecureSettingsHelper.UnprotectPassword(settings.ManagersPCPassword) ?? "";
         private static readonly string decryptedPasswordQMS = SecureSettingsHelper.UnprotectPassword(settings.QMSPassword) ?? "";
 
-        // Caller must pass the MapCanvasView instance
-        public static async Task RunAutoFillScript(MainViewModel vm, MapCanvasView mapCanvas, NetworkDevice device, string scriptName)
+        // REMOVED MapCanvasView mapCanvas from parameters
+        public static async Task RunAutoFillScript(MainViewModel vm, NetworkDevice device, string scriptName)
         {
             if (string.IsNullOrWhiteSpace(device.Address) || device.Address == "0.0.0.0")
             {
@@ -36,9 +35,13 @@ namespace NetworkMapViewerV2.Helpers.LocalFetcher
 
             try
             {
+                var oldHintText = device.Hints.ToList();
                 device.Hints.Clear();
                 device.Hints.Add("<b>STATUS:</b> Scanning WMI via PowerShell...");
-                mapCanvas.DrawMap(mapCanvas._currentState);
+
+                // THE NEW WAY TO REDRAW:
+                vm.SelectedTab?.TriggerRedraw?.Invoke();
+
                 string additionalArgs = "";
 
                 if (scriptName.Contains("Linux"))
@@ -52,8 +55,6 @@ namespace NetworkMapViewerV2.Helpers.LocalFetcher
                 byte[] commandBytes = System.Text.Encoding.Unicode.GetBytes(rawCommand);
                 string encodedCommand = Convert.ToBase64String(commandBytes);
 
-
-
                 var psi = new System.Diagnostics.ProcessStartInfo
                 {
                     FileName = "powershell.exe",
@@ -64,9 +65,6 @@ namespace NetworkMapViewerV2.Helpers.LocalFetcher
                     CreateNoWindow = true
                 };
 
-                // ==========================================
-                // THE FIX: SAFE PROCESS DISPOSAL
-                // ==========================================
                 System.Diagnostics.Process? process = null;
                 string output = "";
                 string err = "";
@@ -83,7 +81,6 @@ namespace NetworkMapViewerV2.Helpers.LocalFetcher
                 }
                 finally
                 {
-                    // GUARANTEE the process is killed and wiped from memory
                     if (process != null)
                     {
                         if (!process.HasExited)
@@ -94,18 +91,22 @@ namespace NetworkMapViewerV2.Helpers.LocalFetcher
                     }
                 }
 
+                if (scriptName.Contains("Linux") && output.Contains("refused"))
+                {
+                    device.Hints.Clear();
+                    foreach (var oldLine in oldHintText)                    
+                        device.Hints.Add(oldLine);                    
 
+                    vm?.SelectedTab?.TriggerRedraw?.Invoke();
+                    return;
+                }
 
-                // ==========================================
-                // --- THE FIX: RPC FAILURE DETECTION ---
-                // ==========================================
                 if (string.IsNullOrWhiteSpace(output) || output.Contains("ERROR="))
                 {
                     device.Hints.Clear();
                     device.Hints.Add("<b>STATUS:</b> WMI Blocked. Tunneling via PsExec...");
-                    mapCanvas.DrawMap(mapCanvas._currentState);
+                    vm.SelectedTab?.TriggerRedraw?.Invoke();
 
-                    // Trigger the fallback!
                     output = await PsExec.RunPsExecFallbackAsync(device.Address);
 
                     var lines = output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).ToList();
@@ -116,11 +117,10 @@ namespace NetworkMapViewerV2.Helpers.LocalFetcher
                             string rawUser = lines[i][9..].Trim();
                             if (!string.IsNullOrWhiteSpace(rawUser))
                             {
-                                // Show a loading message so you know it's querying AD
                                 device.Hints.Clear();
                                 device.Hints.Add($"<b>STATUS:</b> Resolving AD User: {rawUser}...");
-                                if (mapCanvas._currentState != null) mapCanvas.DrawMap(mapCanvas._currentState);
-                                // Replace the raw username with the real AD Name!
+                                vm.SelectedTab?.TriggerRedraw?.Invoke();
+
                                 string adName = await new ADName().ResolveADNameAsync(rawUser);
                                 if (!adName.Contains("ERROR"))
                                 {
@@ -130,12 +130,12 @@ namespace NetworkMapViewerV2.Helpers.LocalFetcher
                         }
                     }
 
-                    // Re-assemble the text and hand it safely to the parser
                     output = string.Join("\n", lines);
                 }
 
                 if (string.IsNullOrWhiteSpace(output))
                 {
+                    // Optional: Comment this MessageBox out if you don't want popups during batch scans!
                     MessageBox.Show("Both WMI and PsExec failed to return data.", "Scan Failed", MessageBoxButton.OK, MessageBoxImage.Error);
                     device.Hints.Clear();
                     device.Hints.Add("<b>STATUS:</b> Scan Failed");
@@ -145,15 +145,13 @@ namespace NetworkMapViewerV2.Helpers.LocalFetcher
                     var parser = new ParseScriptOutput();
                     parser.ParseScriptOutputToHints(device, output);
 
-                    if (vm != null && vm.SelectedTab != null)
+                    if (vm?.SelectedTab != null)
                     {
                         vm.SelectedTab.HasUnsavedChanges = true;
                     }
                 }
 
-                // Mark unsaved changes via mapCanvas's state (adjust visibility if needed)
-                // if mapCanvas.GlobalViewModel != null) mapCanvas.GlobalViewModel.HasUnsavedChanges = true;
-                mapCanvas.DrawMap(mapCanvas._currentState);
+                vm?.SelectedTab?.TriggerRedraw?.Invoke();
             }
             catch (Exception ex)
             {
@@ -162,16 +160,15 @@ namespace NetworkMapViewerV2.Helpers.LocalFetcher
         }
 
 
-
-        public static async Task RunPrinterAutoFill(MainViewModel? GlobalViewModel, MapCanvasView mapCanvas, NetworkDevice device)
+        // REMOVED MapCanvasView mapCanvas from parameters
+        public static async Task RunPrinterAutoFill(MainViewModel? GlobalViewModel, NetworkDevice device)
         {
             if (string.IsNullOrWhiteSpace(device.Address) || device.Address == "0.0.0.0") return;
 
             device.Hints.Clear();
             device.Hints.Add("<b>STATUS:</b> Scraping HP Web Interface...");
-            mapCanvas.DrawMap(mapCanvas._currentState);
+            GlobalViewModel?.SelectedTab?.TriggerRedraw?.Invoke();
 
-            // Run Selenium on a background thread so the UI doesn't freeze!
             var results = await Task.Run(() =>
             {
                 var fetcher = new Helpers.WebFetcher.PrintersWebFetcher();
@@ -199,33 +196,33 @@ namespace NetworkMapViewerV2.Helpers.LocalFetcher
 
                 device.HintImagePath = HintImagesPath + "\\HP LaserJet.png";
 
-                if (GlobalViewModel != null) mapCanvas._currentState?.HasUnsavedChanges = true;
-                mapCanvas.DrawMap(mapCanvas._currentState);
+                if (GlobalViewModel?.SelectedTab != null) GlobalViewModel.SelectedTab.HasUnsavedChanges = true;
+                GlobalViewModel?.SelectedTab?.TriggerRedraw?.Invoke();
             }
         }
 
-        public static async Task RunGrandstreamAutoFill(MainViewModel? GlobalViewModel, MapCanvasView mapCanvas, NetworkDevice device)
+
+        // REMOVED MapCanvasView mapCanvas from parameters
+        public static async Task RunGrandstreamAutoFill(MainViewModel? GlobalViewModel, NetworkDevice device)
         {
             if (string.IsNullOrWhiteSpace(device.Address) || device.Address == "0.0.0.0") return;
 
             device.Hints.Clear();
             device.Hints.Add("<b>STATUS:</b> Scraping Grandstream Web Interface...");
-            if (mapCanvas._currentState != null) mapCanvas.DrawMap(mapCanvas._currentState);
+            GlobalViewModel?.SelectedTab?.TriggerRedraw?.Invoke();
 
             var fetcher = new WebFetcher.GrandstreamsWebFetcher();
             var results = await fetcher.FetchGrandstreamsAsync(device.Address);
 
             if (results.TryGetValue("ERROR", out string? errorMessage))
             {
-                // Explicitly clear the scraping status if it failed
                 device.Hints.Clear();
                 device.Hints.Add("<b>STATUS:</b> Scan Failed");
-                if (mapCanvas._currentState != null) mapCanvas.DrawMap(mapCanvas._currentState);
+                GlobalViewModel?.SelectedTab?.TriggerRedraw?.Invoke();
 
                 MessageBox.Show($"Web Scraper failed:\n{errorMessage}", "Scan Failed", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-
 
             if (results.Count > 0)
             {
@@ -250,8 +247,8 @@ namespace NetworkMapViewerV2.Helpers.LocalFetcher
                 else if (model.Contains("GXP1628"))
                     device.HintImagePath = HintImagesPath + "\\GXP1628.png";
 
-                GlobalViewModel?.HasUnsavedChanges = true;
-                if (mapCanvas._currentState != null) mapCanvas.DrawMap(mapCanvas._currentState);
+                if (GlobalViewModel?.SelectedTab != null) GlobalViewModel.SelectedTab.HasUnsavedChanges = true;
+                GlobalViewModel?.SelectedTab?.TriggerRedraw?.Invoke();
             }
         }
     }

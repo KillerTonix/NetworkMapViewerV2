@@ -8,6 +8,7 @@ namespace NetworkMapViewerV2.Models
         public int MapId { get; set; }
         public string FilePath { get; set; } = string.Empty;    
         public string MapName { get; set; } = string.Empty;
+        public string MapType { get; set; } = "Head Office";
         public List<NetworkDevice> Devices { get; set; } = [];
         public List<NetworkLabel> Labels { get; set; } = [];
 
@@ -31,6 +32,7 @@ namespace NetworkMapViewerV2.Models
             set { _hasUnsavedChanges = value; OnPropertyChanged(); }
         }
 
+        public Action? TriggerRedraw { get; set; }
 
         // ==========================================
         // --- INOTIFYPROPERTYCHANGED LOGIC ---

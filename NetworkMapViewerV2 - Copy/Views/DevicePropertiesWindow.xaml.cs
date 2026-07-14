@@ -230,5 +230,20 @@ namespace NetworkMapViewerV2.Views
                 }), System.Windows.Threading.DispatcherPriority.ContextIdle);
             }
         }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            // 1. Destroy the background data bindings
+            this.DataContext = null;
+
+            // 2. Explicitly wipe the ItemsSource for both ComboBoxes to break the memory locks
+            if (cmbType != null) cmbType.ItemsSource = null;
+            if (cmbTargetMap != null) cmbTargetMap.ItemsSource = null;
+
+            // 3. Drop the reference to the device just to be perfectly safe
+            EditingDevice = null;
+
+            base.OnClosed(e);
+        }
     }
 }

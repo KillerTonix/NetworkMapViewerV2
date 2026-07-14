@@ -1,4 +1,5 @@
-﻿using NetworkMapViewerV2.Models;
+﻿using NetworkMapViewerV2.Data;
+using NetworkMapViewerV2.Models;
 using System.Net.NetworkInformation;
 using System.Windows;
 
@@ -10,68 +11,64 @@ namespace NetworkMapViewerV2.Services
 
         public bool IsRunning => _cts != null && !_cts.IsCancellationRequested;
 
-        public void StartPinging(IEnumerable<NetworkDevice> devices)
+        // NOTICE: We added the parameter back so the ViewModel can pass the Hybrid list!
+        // 1. Add the "Action<string, bool> onPingResult" parameter
+        public void StartPinging(IEnumerable<NetworkDevice> devicesToPing, Action<string, bool>? onPingResult = null)
         {
-            StopPinging(); // Stop any existing sweeps before starting a new one
-
+            StopPinging();
             _cts = new CancellationTokenSource();
             var token = _cts.Token;
 
             Task.Run(async () =>
             {
-                // --- FIX 1: Give the UI a 2-second head start to draw the window! ---
-                await Task.Delay(2000, token);
-
-                while (!token.IsCancellationRequested)
+                try
                 {
-                    var tasks = new List<Task>();
+                    await Task.Delay(2000, token);
 
-                    foreach (var device in devices)
+                    while (!token.IsCancellationRequested)
                     {
-                        if (string.IsNullOrWhiteSpace(device.Address)) continue;
+                        var tasks = new List<Task>();
+                        using var throttler = new SemaphoreSlim(20); // Keep the Traffic Cop!
 
-                        // Create an async task for each device
-                        tasks.Add(Task.Run(async () =>
+                        foreach (var device in devicesToPing)
                         {
-                            bool isUp = await PingHostAsync(device.Address);
+                            if (string.IsNullOrWhiteSpace(device.Address)) continue;
 
-                            if (!token.IsCancellationRequested)
+                            tasks.Add(Task.Run(async () =>
                             {
-                                // --- FIX: Safely check if the app is still alive before updating the UI! ---
-                                var app = Application.Current;
-                                if (app != null && app.Dispatcher != null && !app.Dispatcher.HasShutdownStarted)
+                                await throttler.WaitAsync(token);
+                                try
                                 {
-                                    await app.Dispatcher.InvokeAsync(() =>
+                                    bool isUp = await PingHostAsync(device.Address);
+
+                                    if (!token.IsCancellationRequested)
                                     {
-                                        device.IsOnline = isUp;
-                                    }).Task;
+                                        var app = Application.Current;
+                                        if (app != null && app.Dispatcher != null && !app.Dispatcher.HasShutdownStarted)
+                                        {
+                                            await app.Dispatcher.InvokeAsync(() =>
+                                            {
+                                                // Updates the background DB object (Triggers your Notification)
+                                                device.IsOnline = isUp;
+
+                                                // 2. CRITICAL: Broadcasts the result to the UI!
+                                                onPingResult?.Invoke(device.Address, isUp);
+                                            });
+                                        }
+                                    }
                                 }
-                                if (app != null && app.Dispatcher != null && !app.Dispatcher.HasShutdownStarted)
-                                {
-                                    _ = app.Dispatcher.InvokeAsync(() =>
-                                    {
-                                        device.IsOnline = isUp;
-                                    });
-                                }
-                                if (app != null && app.Dispatcher != null && !app.Dispatcher.HasShutdownStarted)
-                                {
-                                    app.Dispatcher.Invoke(() =>
-                                    {
-                                        device.IsOnline = isUp;
-                                    });
-                                }
-                            }
-                        }, token));
+                                catch { }
+                                finally { throttler.Release(); }
+                            }, token));
+                        }
+
+                        await Task.WhenAll(tasks);
+                        var settings = SettingsService.Load();
+                        int delayMs = (settings.PingPeriodSeconds > 0 ? settings.PingPeriodSeconds : 4) * 1000;
+                        await Task.Delay(delayMs, token);
                     }
-
-                    // Execute all pings simultaneously
-                    await Task.WhenAll(tasks);
-
-                    // Wait for the next sweep based on your settings
-                    var settings = SettingsService.Load();
-                    int delayMs = (settings.PingPeriodSeconds > 0 ? settings.PingPeriodSeconds : 4) * 1000;
-                    await Task.Delay(delayMs, token);
                 }
+                catch { }
             }, token);
         }
 
@@ -79,32 +76,52 @@ namespace NetworkMapViewerV2.Services
         {
             if (_cts != null)
             {
-                _cts.Cancel();
-                _cts.Dispose();
+                _cts.Cancel(); // Tell the loop to stop
+                // THE FIX: DO NOT call _cts.Dispose() here! 
+                // Let the garbage collector handle it, otherwise running tasks crash when checking IsCancellationRequested
                 _cts = null;
             }
         }
 
-        private static async Task<bool> PingHostAsync(string ipAddress)
+        public static async Task<bool> PingHostAsync(string ipAddress, int maxAttempts = 2)
         {
-            // 1. THE GUARD CLAUSE: Reject empty strings or "0.0.0.0" immediately!
             if (string.IsNullOrWhiteSpace(ipAddress) || ipAddress == "0.0.0.0")
             {
                 return false;
             }
 
-            try
+            using var ping = new Ping();
+
+            // 2. The Retry Loop
+            for (int attempt = 1; attempt <= maxAttempts; attempt++)
             {
-                using var ping = new Ping();
-                // 2. The ping is now safe to execute
-                var reply = await ping.SendPingAsync(ipAddress, 2000); // 2000ms timeout
-                return reply.Status == IPStatus.Success;
+                try
+                {
+                    var reply = await ping.SendPingAsync(ipAddress, 1000);
+
+                    if (reply.Status == IPStatus.Success)
+                    {                       
+                        return true;
+                    }
+                }
+                catch (PingException)
+                {
+                    // A network exception occurred (e.g., DNS failed or route dropped)
+                    // Do nothing here, just let it proceed to the retry delay
+                }
+
+                // 3. The "Phantom Drop" Delay
+                // If the ping failed, and we still have attempts left, wait 500ms 
+                // to let the switch catch its breath before we hit it again.
+                if (attempt < maxAttempts)
+                {
+                    await Task.Delay(500);
+                }
             }
-            catch (PingException)
-            {
-                // This catches legitimate network failures (like unresolvable DNS)
-                return false;
-            }
+
+            // 4. If we reach this line, it failed all 3 attempts.
+            // It is officially offline.
+            return false;
         }
     }
 }

@@ -9,9 +9,7 @@ namespace NetworkMapViewerV2.Services
     /// </summary>
     public class NotificationService
     {
-        private static readonly string LogDirectory = Path.Combine(
-            AppDomain.CurrentDomain.BaseDirectory, "Logs");
-
+        private static readonly string LogDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Logs");
         private static readonly string EventLogPath = Path.Combine(LogDirectory, "events.log");
 
         private readonly object _lock = new();
@@ -27,7 +25,7 @@ namespace NetworkMapViewerV2.Services
         /// <summary>
         /// Logs a device state change to disk and keeps it in session memory.
         /// </summary>
-        public void LogEvent(string deviceName, string address, bool isOnline, long roundtripMs = 0)
+        public void LogEvent(string deviceName, string address, bool isOnline)
         {
             var evt = new DeviceEvent
             {
@@ -35,7 +33,6 @@ namespace NetworkMapViewerV2.Services
                 DeviceName = deviceName,
                 Address = address,
                 Status = isOnline ? "Online" : "Offline",
-                RoundtripMs = roundtripMs
             };
 
             lock (_lock)
@@ -44,7 +41,7 @@ namespace NetworkMapViewerV2.Services
 
                 try
                 {
-                    string line = $"{evt.Timestamp:yyyy-MM-dd HH:mm:ss}\t{evt.Status}\t{evt.DeviceName}\t{evt.Address}\t{evt.RoundtripMs}ms";
+                    string line = $"{evt.Timestamp:yyyy-MM-dd HH:mm:ss}\t{evt.DeviceName}\t{evt.Status}\t{evt.Address}";
                     File.AppendAllText(EventLogPath, line + Environment.NewLine);
                 }
                 catch { /* Don't crash if log write fails */ }
@@ -64,7 +61,7 @@ namespace NetworkMapViewerV2.Services
                 foreach (var line in File.ReadAllLines(EventLogPath))
                 {
                     var parts = line.Split('\t');
-                    if (parts.Length >= 5 && DateTime.TryParse(parts[0], out DateTime ts))
+                    if (parts.Length >= 4 && DateTime.TryParse(parts[0], out DateTime ts))
                     {
                         events.Add(new DeviceEvent
                         {
@@ -72,7 +69,6 @@ namespace NetworkMapViewerV2.Services
                             Status = parts[1],
                             DeviceName = parts[2],
                             Address = parts[3],
-                            RoundtripMs = long.TryParse(parts[4].Replace("ms", ""), out long ms) ? ms : 0
                         });
                     }
                 }
@@ -132,13 +128,13 @@ namespace NetworkMapViewerV2.Services
             sb.AppendLine("</style></head><body>");
             sb.AppendLine($"<h1>Network Event Report</h1>");
             sb.AppendLine($"<p>Generated: {DateTime.Now:yyyy-MM-dd HH:mm:ss} &mdash; Total events: {events.Count}</p>");
-            sb.AppendLine("<table><tr><th>#</th><th>Time</th><th>Status</th><th>Device</th><th>Address</th><th>RTT</th></tr>");
+            sb.AppendLine("<table><tr><th>#</th><th>Time</th><th>Status</th><th>Device</th><th>Address</th></tr>");
 
             for (int i = 0; i < events.Count; i++)
             {
                 var e = events[i];
                 string cls = e.Status == "Online" ? "online" : "offline";
-                sb.AppendLine($"<tr><td>{i + 1}</td><td>{e.Timestamp:yyyy-MM-dd HH:mm:ss}</td><td class='{cls}'>{e.Status}</td><td>{e.DeviceName}</td><td>{e.Address}</td><td>{e.RoundtripMs}ms</td></tr>");
+                sb.AppendLine($"<tr><td>{i + 1}</td><td>{e.Timestamp:yyyy-MM-dd HH:mm:ss}</td><td class='{cls}'>{e.DeviceName}</td><td>{e.Status}</td><td>{e.Address}</td></tr>");
             }
 
             sb.AppendLine("</table></body></html>");
@@ -159,7 +155,7 @@ namespace NetworkMapViewerV2.Services
             sb.AppendLine("Timestamp,Status,DeviceName,Address,RoundtripMs");
             foreach (var e in events)
             {
-                sb.AppendLine($"{e.Timestamp:yyyy-MM-dd HH:mm:ss},{e.Status},{EscapeCsv(e.DeviceName)},{e.Address},{e.RoundtripMs}");
+                sb.AppendLine($"{e.Timestamp:yyyy-MM-dd HH:mm:ss},{EscapeCsv(e.DeviceName)},{e.Status},{e.Address}");
             }
 
             string reportPath = Path.Combine(LogDirectory, $"report_{DateTime.Now:yyyyMMdd_HHmmss}.csv");

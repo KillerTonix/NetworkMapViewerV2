@@ -15,6 +15,11 @@ namespace NetworkMapViewerV2
             // Ensure the SQLite database exists before any windows open
             DatabaseService.InitializeDatabase();
         }
+        protected override void OnExit(ExitEventArgs e)
+        {
+            base.OnExit(e);
+            Environment.FailFast("Force closing application from App.OnExit");
+        }
     }
 
 }

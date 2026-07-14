@@ -1,4 +1,4 @@
-﻿using Microsoft.Data.Sqlite;
+﻿using Microsoft.Data.SqlClient;
 using NetworkMapViewerV2.Data;
 using System;
 
@@ -9,7 +9,8 @@ namespace NetworkMapViewerV2.Services
         /// <summary>
         /// Logs an action to the database. Can be used inside an existing transaction, or standalone.
         /// </summary>
-        public static void LogAction(string actionType, string tableName, int recordId, string details, SqliteTransaction? transaction = null)
+        // Changed SqliteTransaction to SqlTransaction
+        public static void LogAction(string actionType, string tableName, int recordId, string details, SqlTransaction? transaction = null)
         {
             string insertSql = @"
                 INSERT INTO AuditLogs (Timestamp, Username, ActionType, TableName, RecordId, Details) 
@@ -19,29 +20,34 @@ namespace NetworkMapViewerV2.Services
             // Otherwise, open a quick new one just for this log.
             if (transaction != null)
             {
-                using var cmd = new SqliteCommand(insertSql, transaction.Connection, transaction);
+                // Changed SqliteCommand to SqlCommand
+                using var cmd = new SqlCommand(insertSql, transaction.Connection, transaction);
                 ExecuteLogCommand(cmd, actionType, tableName, recordId, details);
             }
             else
             {
-                using var connection = new SqliteConnection(DatabaseService.ConnectionString);
+                // Changed SqliteConnection to SqlConnection
+                using var connection = new SqlConnection(DatabaseService.ConnectionString);
                 connection.Open();
 
-                using var cmd = new SqliteCommand(insertSql, connection);
+                using var cmd = new SqlCommand(insertSql, connection);
                 ExecuteLogCommand(cmd, actionType, tableName, recordId, details);
             }
         }
 
-        private static void ExecuteLogCommand(SqliteCommand cmd, string actionType, string tableName, int recordId, string details)
+        // Changed SqliteCommand to SqlCommand
+        private static void ExecuteLogCommand(SqlCommand cmd, string actionType, string tableName, int recordId, string details)
         {
-            cmd.Parameters.AddWithValue("@Time", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+            // MS SQL natively handles C# DateTime objects, so no string conversion is needed
+            cmd.Parameters.AddWithValue("@Time", DateTime.Now);
+
             cmd.Parameters.AddWithValue("@User", Environment.UserName); // Automatically gets the Windows user!
             cmd.Parameters.AddWithValue("@Action", actionType);
             cmd.Parameters.AddWithValue("@Table", tableName);
             cmd.Parameters.AddWithValue("@RecordId", recordId);
-            cmd.Parameters.AddWithValue("@Details", details ?? (object)DBNull.Value);
 
-            cmd.ExecuteNonQuery();
+            // Slightly safer null check for the details column
+            cmd.Parameters.AddWithValue("@Details", string.IsNullOrEmpty(details) ? DBNull.Value : details);
         }
     }
 }
