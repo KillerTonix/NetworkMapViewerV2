@@ -1529,7 +1529,7 @@ namespace NetworkMapViewerV2.Views
             }
 
             // --- DELETION LOGIC (Delete) ---
-            if (e.Key == Key.Delete && _currentState.IsEditingEnabled)
+            if (e.Key == Key.Delete && _currentState.IsEditingEnabled && _selectedElements.Count > 0)
             {
                 var result = MessageBox.Show($"Delete {_selectedElements.Count} selected item(s)?", "Confirm Delete", MessageBoxButton.YesNo, MessageBoxImage.Warning);
                 if (result == MessageBoxResult.Yes)

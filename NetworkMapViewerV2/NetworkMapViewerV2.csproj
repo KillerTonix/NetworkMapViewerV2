@@ -19,13 +19,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="..\..\..\Downloads\icon.png">
-      <Pack>True</Pack>
-      <PackagePath>\</PackagePath>
-    </None>
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="DotNetSeleniumExtras.WaitHelpers" Version="3.11.0" />
     <PackageReference Include="Extended.Wpf.Toolkit" Version="5.1.2" />

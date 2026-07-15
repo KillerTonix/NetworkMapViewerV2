@@ -57,6 +57,11 @@
                         <TextBlock Text="📁" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     </MenuItem.Icon>
                 </MenuItem>
+                <MenuItem Header="_Delete Map..." Command="{Binding DeleteMapCommand}">
+                    <MenuItem.Icon>
+                        <TextBlock Text="❌" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                    </MenuItem.Icon>
+                </MenuItem>
                 <MenuItem Header="_Reload"  Command="{Binding ReloadMapCommand}" InputGestureText="Ctrl+R">
                     <MenuItem.Icon>
                         <TextBlock Text="🔄" VerticalAlignment="Center" HorizontalAlignment="Center"/>

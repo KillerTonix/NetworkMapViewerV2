@@ -149,6 +149,11 @@ namespace NetworkMapViewerV2.ViewModels
             }
         }
 
+        [RelayCommand]
+        public void DeleteMap()
+        {
+           DeleteMapFromDatabase();
+        }
 
         // ─── PURE SQLITE RELOAD ──────────────────────────────
         [RelayCommand]
@@ -780,11 +785,89 @@ namespace NetworkMapViewerV2.ViewModels
             }
         }
 
+        // Removed the 'int mapId' parameter since the user selects it from the list anyway!
+        private void DeleteMapFromDatabase()
+        {
+            var repo = new Data.MapRepository();
+            var allMaps = repo.GetAvailableMaps();
+            Dictionary<int, string> availableMaps = allMaps.ToDictionary(m => m.MapId, m => $"{m.MapName} ({m.MapType})");
+
+            if (availableMaps.Count == 0)
+            {
+                MessageBox.Show("There are no maps in the database.", "No Maps Found", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var dlg = new Window
+            {
+                Title = "Delete Map from Database",
+                Width = 350,
+                Height = 400,
+                WindowStartupLocation = WindowStartupLocation.CenterScreen,
+                WindowStyle = WindowStyle.ToolWindow,
+                ResizeMode = ResizeMode.NoResize
+            };
+
+            var sp = new StackPanel { Margin = new Thickness(15) };
+            sp.Children.Add(new TextBlock { Text = "Select a map to delete:", Margin = new Thickness(0, 0, 0, 10) });
+
+            var listBox = new ListBox { Height = 250, DisplayMemberPath = "Value", SelectedValuePath = "Key", ItemsSource = availableMaps };
+            sp.Children.Add(listBox);
+
+            var btnPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 15, 0, 0) };
+            var btnDelete = new Button { Content = "Delete", Width = 80, Margin = new Thickness(0, 0, 10, 0), IsDefault = true };
+            var btnCancel = new Button { Content = "Cancel", Width = 80, IsCancel = true };
+
+            btnPanel.Children.Add(btnDelete);
+            btnPanel.Children.Add(btnCancel);
+            sp.Children.Add(btnPanel);
+            dlg.Content = sp;
+
+            btnDelete.Click += (s, ev) =>
+            {
+                // 1. CRASH PREVENTION: Ensure they actually clicked something!
+                if (listBox.SelectedValue == null)
+                {
+                    MessageBox.Show("Please select a map to delete first.", "No Selection", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                int selectedMapId = (int)listBox.SelectedValue;
+
+                // 2. WARNING: Give them a chance to back out!
+                var confirm = MessageBox.Show("Are you sure you want to permanently delete this map?\nAll devices and labels on this map will also be destroyed.", "Confirm Deletion", MessageBoxButton.YesNo, MessageBoxImage.Error);
+                if (confirm != MessageBoxResult.Yes) return;
+
+                // 3. THE FIX: Actually delete it from the SQLite Database!
+                repo.DeleteMap(selectedMapId);
+
+                // 4. Remove the tab if it happens to be open right now (Fixed variable name)
+                var tabToRemove = OpenTabs.FirstOrDefault(t => t.MapId == selectedMapId);
+                if (tabToRemove != null)
+                {
+                    OpenTabs.Remove(tabToRemove);
+                    if (SelectedTab == tabToRemove)
+                    {
+                        SelectedTab = OpenTabs.FirstOrDefault();
+                    }
+                }
+
+                // 5. Refresh the sidebars so the deleted map disappears from the ComboBoxes!
+                LoadMapDirectories();
+                dlg.Close();
+            };
+
+            btnCancel.Click += (s, ev) => dlg.Close();
+
+            dlg.ShowDialog();
+        }
+
         private int? ShowDatabaseMapSelector()
         {
             var repo = new Data.MapRepository();
-            var availableMaps = repo.GetAvailableMaps();
-
+            var allMaps = repo.GetAvailableMaps(); // Uses the updated method from the previous step
+            Dictionary<int, string> availableMaps = allMaps.ToDictionary(m => m.MapId, m => $"{m.MapName} ({m.MapType})");
+                      
             if (availableMaps.Count == 0)
             {
                 MessageBox.Show("There are no maps in the database yet.\nPlease use 'Import Legacy Map' first.", "No Maps Found", MessageBoxButton.OK, MessageBoxImage.Information);

@@ -47,6 +47,21 @@ namespace NetworkMapViewerV2.Data
             return Convert.ToInt32(cmd.ExecuteScalar());
         }
 
+        public void DeleteMap(int mapId)
+        {
+            if (mapId <= 0) return;
+
+            using var connection = GetOpenConnection(); // Ensure this returns a SqlConnection now!
+
+            // 2. Change SqliteCommand to SqlCommand
+            using var cmd = new SqlCommand("DELETE FROM Maps WHERE MapId = @MapId", connection);
+
+            cmd.Parameters.AddWithValue("@MapId", mapId);
+            cmd.ExecuteNonQuery();
+
+            InsertAuditLog("DELETE", "Maps", mapId, "Entire map deleted.");
+        }
+
         public MapTabState LoadMap(int mapId)
         {
             var state = new MapTabState { MapId = mapId };
@@ -82,8 +97,8 @@ namespace NetworkMapViewerV2.Data
                         HintImagePath = reader["HintImagePath"].ToString() ?? "",
                         TargetMapId = reader["TargetMapId"] != DBNull.Value ? Convert.ToInt32(reader["TargetMapId"]) : (int?)null,
                         // Deserialize JSON back into C# ObservableCollections
-                        Titles = JsonSerializer.Deserialize<ObservableCollection<string>>(titlesJson) ?? new(),
-                        Hints = JsonSerializer.Deserialize<ObservableCollection<string>>(hintsJson) ?? new()
+                        Titles = JsonSerializer.Deserialize<ObservableCollection<string>>(titlesJson) ?? [],
+                        Hints = JsonSerializer.Deserialize<ObservableCollection<string>>(hintsJson) ?? []
                     });
                 }
             }
@@ -157,7 +172,7 @@ namespace NetworkMapViewerV2.Data
             else // UPDATE
             {
                 bool hasChanges = false;
-                List<string> changedFields = new();
+                List<string> changedFields = [];
 
                 // Wrapped Left and Top in brackets
                 string checkSql = "SELECT GroupId, [Left], [Top], Address, TitleJson, HintsJson, HintImagePath, TargetMapId FROM Devices WHERE DeviceId = @DeviceId";
@@ -236,7 +251,7 @@ namespace NetworkMapViewerV2.Data
             else // UPDATE
             {
                 bool hasChanges = false;
-                List<string> changedFields = new();
+                List<string> changedFields = [];
 
                 // Wrapped Left and Top in brackets
                 string checkSql = "SELECT [Left], [Top], Width, Height, TextJson FROM Labels WHERE LabelId = @LabelId";
