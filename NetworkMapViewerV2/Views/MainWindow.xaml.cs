@@ -132,10 +132,6 @@ namespace NetworkMapViewerV2.Views
                     txtSearch.SelectAll(); // Highlights any existing text so you can instantly overwrite it
                 }, System.Windows.Threading.DispatcherPriority.Input);
             }
-        }
-
-
-
-        
+        }        
     }
 }

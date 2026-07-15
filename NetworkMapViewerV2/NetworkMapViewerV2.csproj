@@ -12,6 +12,7 @@
     <Title>Network Map Viewer </Title>
     <Copyright>Artur Tonoyan</Copyright>
     <PackageIcon>icon.png</PackageIcon>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
