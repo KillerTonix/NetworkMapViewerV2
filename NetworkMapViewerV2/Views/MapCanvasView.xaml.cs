@@ -824,22 +824,22 @@ namespace NetworkMapViewerV2.Views
                     var miAutoFill = new MenuItem { Icon = "🔍", Header = "Auto-Fill Specs" };
 
                     var miDomain = new MenuItem { Icon = "💻", Header = "Domain Joined PC" };
-                    miDomain.Click += async (sender, args) => await AutoFill.RunAutoFillScript(GlobalViewModel,  device, "SystemInfo.ps1");
+                    miDomain.Click += async (sender, args) => await AutoFill.RunAutoFillScript(GlobalViewModel, device, "SystemInfo.ps1");
 
                     var miNonDomain = new MenuItem { Icon = "🖥️", Header = "Non-Domain PC" };
-                    miNonDomain.Click += async (sender, args) => await AutoFill.RunAutoFillScript(GlobalViewModel,  device, $"SystemInfo Non Domain.ps1");
+                    miNonDomain.Click += async (sender, args) => await AutoFill.RunAutoFillScript(GlobalViewModel, device, $"SystemInfo Non Domain.ps1");
 
                     var miDefaultPC = new MenuItem { Icon = "🖥️", Header = "Default PC" };
-                    miDefaultPC.Click += async (sender, args) => await AutoFill.RunAutoFillScript(GlobalViewModel,  device, $"SystemInfo Default.ps1");
+                    miDefaultPC.Click += async (sender, args) => await AutoFill.RunAutoFillScript(GlobalViewModel, device, $"SystemInfo Default.ps1");
 
                     var miLinux = new MenuItem { Icon = "🐧", Header = "Linux PC (SSH)" };
-                    miLinux.Click += async (sender, args) => await AutoFill.RunAutoFillScript(GlobalViewModel,  device, $"SystemInfo Linux.ps1");
+                    miLinux.Click += async (sender, args) => await AutoFill.RunAutoFillScript(GlobalViewModel, device, $"SystemInfo Linux.ps1");
 
                     var miPrinter = new MenuItem { Icon = "🖨️", Header = "Printer" };
-                    miPrinter.Click += async (sender, args) => await AutoFill.RunPrinterAutoFill(GlobalViewModel,  device);
+                    miPrinter.Click += async (sender, args) => await AutoFill.RunPrinterAutoFill(GlobalViewModel, device);
 
                     var miPhone = new MenuItem { Icon = "☎️", Header = "Grandstream" };
-                    miPhone.Click += async (sender, args) => await AutoFill.RunGrandstreamAutoFill(GlobalViewModel,  device);
+                    miPhone.Click += async (sender, args) => await AutoFill.RunGrandstreamAutoFill(GlobalViewModel, device);
 
                     miAutoFill.Items.Add(miDomain);
                     miAutoFill.Items.Add(miNonDomain);
@@ -1105,7 +1105,7 @@ namespace NetworkMapViewerV2.Views
             _lastRightClickPosition = Mouse.GetPosition(DrawingCanvas);
 
             // Dynamically build the menu!
-            var menu = new ContextMenu();
+            var menu = new ContextMenu();     
 
             var miUpdateDevices = new MenuItem { Icon = "🔄", Header = "Update All Devices..." };
             //miUpdateDevices.Click += MainViewModel.UpdateGroupData();
@@ -1198,7 +1198,7 @@ namespace NetworkMapViewerV2.Views
                     menu.Items.Add(miAutoAlign);
                 }
             }
-
+          
             menu.Items.Add(miUpdateDevices);
             menu.Items.Add(new Separator());
             menu.Items.Add(miAddDevice);
@@ -1383,7 +1383,7 @@ namespace NetworkMapViewerV2.Views
             }
         }
 
-
+      
 
         private void BatchAdd_Click(object sender, RoutedEventArgs e)
         {
@@ -1459,18 +1459,29 @@ namespace NetworkMapViewerV2.Views
         }
 
 
-        private void EnforceBounds(FrameworkElement element, ref double newLeft, ref double newTop)
+        private void EnforceBounds(FrameworkElement el, ref double newLeft, ref double newTop)
         {
-            // Floor constraint (Top/Left)
+            // 1. Lock the Top/Left edges at 0
             if (newLeft < 0) newLeft = 0;
             if (newTop < 0) newTop = 0;
 
-            // Ceiling constraint (Bottom/Right)
-            if (DrawingCanvas.ActualWidth > 0 && newLeft > DrawingCanvas.ActualWidth - element.ActualWidth)
-                newLeft = DrawingCanvas.ActualWidth;
+            // 2. CRITICAL CHANGE: Use .Width and .Height, NOT ActualWidth!
+            double canvasWidth = DrawingCanvas.Width + 30;
+            double canvasHeight = DrawingCanvas.Height;
 
-            if (DrawingCanvas.ActualHeight > 0 && newTop > DrawingCanvas.ActualHeight - element.ActualHeight)
-                newTop = DrawingCanvas.ActualHeight;
+            if (double.IsNaN(canvasWidth) || canvasWidth <= 0 || double.IsNaN(el.ActualWidth))
+                return;
+
+            // 3. Math now calculates based on your giant 5000x5000 area
+            double maxLeft = canvasWidth - el.ActualWidth;
+            double maxTop = canvasHeight - el.ActualHeight;
+
+            if (maxLeft < 0) maxLeft = 0;
+            if (maxTop < 0) maxTop = 0;
+
+            // 4. Lock the Right/Bottom edges
+            if (newLeft > maxLeft) newLeft = maxLeft;
+            if (newTop > maxTop) newTop = maxTop;
         }
 
 
@@ -1557,7 +1568,8 @@ namespace NetworkMapViewerV2.Views
                     }
 
                     // UNDO HISTORY: How to reverse a Delete
-                    _undoStack.Push(() => {
+                    _undoStack.Push(() =>
+                    {
                         // We set ID to 0 so when you hit "Save", the DB recreates them seamlessly
                         foreach (var d in deletedDevices) { d.DeviceId = 0; _currentState.Devices.Add(d); }
                         foreach (var l in deletedLabels) { l.LabelId = 0; _currentState.Labels.Add(l); }
@@ -1625,7 +1637,8 @@ namespace NetworkMapViewerV2.Views
                 }
 
                 // UNDO HISTORY: How to reverse a Cut
-                _undoStack.Push(() => {
+                _undoStack.Push(() =>
+                {
                     foreach (var d in cutDevices) { d.DeviceId = 0; _currentState.Devices.Add(d); }
                     foreach (var l in cutLabels) { l.LabelId = 0; _currentState.Labels.Add(l); }
                 });
@@ -1696,7 +1709,8 @@ namespace NetworkMapViewerV2.Views
                 }
 
                 // UNDO HISTORY: How to reverse a Paste
-                _undoStack.Push(() => {
+                _undoStack.Push(() =>
+                {
                     var repo = new Data.MapRepository();
                     foreach (var d in newlyPastedDevices) { _currentState.Devices.Remove(d); if (d.DeviceId > 0) repo.DeleteDevice(d.DeviceId); }
                     foreach (var l in newlyPastedLabels) { _currentState.Labels.Remove(l); if (l.LabelId > 0) repo.DeleteLabel(l.LabelId); }
@@ -1721,49 +1735,53 @@ namespace NetworkMapViewerV2.Views
                 return;
             }
 
-            // --- ARROW KEY MOVEMENT LOGIC ---
-            double step = isShiftDown ? 10.0 : 1.0;
-            double dx = 0, dy = 0;
-
-            if (e.Key == Key.Left) dx = -step;
-            else if (e.Key == Key.Right) dx = step;
-            else if (e.Key == Key.Up) dy = -step;
-            else if (e.Key == Key.Down) dy = step;
-
-            if (dx != 0 || dy != 0)
+            if (_currentState.IsEditingEnabled)
             {
-                // Capture old positions for Undo
-                var moveHistory = new List<Tuple<object, double, double>>();
+                // --- ARROW KEY MOVEMENT LOGIC ---
+                double step = isShiftDown ? 10.0 : 1.0;
+                double dx = 0, dy = 0;
 
-                foreach (var el in _selectedElements)
+                if (e.Key == Key.Left) dx = -step;
+                else if (e.Key == Key.Right) dx = step;
+                else if (e.Key == Key.Up) dy = -step;
+                else if (e.Key == Key.Down) dy = step;
+
+                if (dx != 0 || dy != 0)
                 {
-                    double oldLeft = Canvas.GetLeft(el);
-                    double oldTop = Canvas.GetTop(el);
+                    // Capture old positions for Undo
+                    var moveHistory = new List<Tuple<object, double, double>>();
 
-                    // Save state before move
-                    moveHistory.Add(new Tuple<object, double, double>(el.Tag, oldLeft, oldTop));
-
-                    double newLeft = oldLeft + dx;
-                    double newTop = oldTop + dy;
-
-                    EnforceBounds(el, ref newLeft, ref newTop);
-
-                    Canvas.SetLeft(el, newLeft);
-                    Canvas.SetTop(el, newTop);
-                    UpdateModelPosition(el, newLeft, newTop);
-                }
-
-                // UNDO HISTORY: How to reverse a move
-                _undoStack.Push(() => {
-                    foreach (var historyItem in moveHistory)
+                    foreach (var el in _selectedElements)
                     {
-                        if (historyItem.Item1 is NetworkDevice d) { d.Left = historyItem.Item2; d.Top = historyItem.Item3; }
-                        if (historyItem.Item1 is NetworkLabel l) { l.Left = historyItem.Item2; l.Top = historyItem.Item3; }
-                    }
-                });
+                        double oldLeft = Canvas.GetLeft(el);
+                        double oldTop = Canvas.GetTop(el);
 
-                _currentState?.HasUnsavedChanges = true;
-                e.Handled = true;
+                        // Save state before move
+                        moveHistory.Add(new Tuple<object, double, double>(el.Tag, oldLeft, oldTop));
+
+                        double newLeft = oldLeft + dx;
+                        double newTop = oldTop + dy;
+
+                        EnforceBounds(el, ref newLeft, ref newTop);
+
+                        Canvas.SetLeft(el, newLeft);
+                        Canvas.SetTop(el, newTop);
+                        UpdateModelPosition(el, newLeft, newTop);
+                    }
+
+                    // UNDO HISTORY: How to reverse a move
+                    _undoStack.Push(() =>
+                    {
+                        foreach (var historyItem in moveHistory)
+                        {
+                            if (historyItem.Item1 is NetworkDevice d) { d.Left = historyItem.Item2; d.Top = historyItem.Item3; }
+                            if (historyItem.Item1 is NetworkLabel l) { l.Left = historyItem.Item2; l.Top = historyItem.Item3; }
+                        }
+                    });
+
+                    _currentState?.HasUnsavedChanges = true;
+                    e.Handled = true;
+                }
             }
 
             // --- ALIGNMENT SHORTCUTS (Alt + Keys) ---

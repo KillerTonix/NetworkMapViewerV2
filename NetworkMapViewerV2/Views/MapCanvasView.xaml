@@ -3,14 +3,14 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Focusable="True" 
              PreviewKeyDown="UserControl_PreviewKeyDown">
-    <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden">
+    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
         <Canvas x:Name="DrawingCanvas" 
+                Width="1920" Height="965"
                 Background="Transparent" 
                 ClipToBounds="True"
                 UseLayoutRounding="True"
                 SnapsToDevicePixels="True"
-                RenderOptions.BitmapScalingMode="NearestNeighbor"
-                            
+                RenderOptions.BitmapScalingMode="NearestNeighbor"                            
                 ContextMenuOpening="DrawingCanvas_ContextMenuOpening">
         </Canvas>
     </ScrollViewer>
