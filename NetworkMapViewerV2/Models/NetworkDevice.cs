@@ -1,11 +1,10 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
 
 namespace NetworkMapViewerV2.Models
 {
-    public partial class NetworkDevice : ObservableObject, INotifyPropertyChanged
+    // Inherits from ObservableObject (which handles INotifyPropertyChanged natively)
+    public partial class NetworkDevice : ObservableObject
     {
         [ObservableProperty] private int _deviceId;
         [ObservableProperty] private int _mapId;
@@ -22,33 +21,29 @@ namespace NetworkMapViewerV2.Models
 
         public int FailedPingCount { get; set; } = 0;
 
-        private bool _isOnline = true; // Assume online until proven otherwise
+        // THE FIX: Use standard property syntax, but power it with SetProperty!
+        private bool _isOnline = true;
+
         public bool IsOnline
         {
             get => _isOnline;
             set
             {
-                if (_isOnline != value)
+                bool oldValue = _isOnline; // Snapshot the state before changing it
+
+                // SetProperty automatically updates _isOnline AND fires the UI refresh event!
+                // It returns 'true' only if the value actually changed.
+                if (SetProperty(ref _isOnline, value))
                 {
-                    bool wentDown = _isOnline == true && value == false;
-                    bool wokeUp = _isOnline == false && value == true;
+                    bool wentDown = oldValue == true && value == false;
+                    bool wokeUp = oldValue == false && value == true;
 
-                    _isOnline = value;
-                    OnPropertyChanged();
-
-                    // FIRE THE NOTIFICATION CHECK!
                     if (wentDown || wokeUp)
                     {
                         Services.NotificationEngine.ProcessStateChange(this, wentDown, wokeUp);
                     }
                 }
             }
-        }
-
-        public event PropertyChangedEventHandler PropertyChanged;
-        protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
 }

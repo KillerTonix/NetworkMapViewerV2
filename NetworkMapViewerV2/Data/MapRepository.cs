@@ -8,9 +8,9 @@ namespace NetworkMapViewerV2.Data
 {
     public class MapRepository
     {
-        private static AppSettings settings = SettingsService.Load();
+        private static readonly AppSettings settings = SettingsService.Load();
 
-        private static string DbPath = settings.DatabasePath ?? "";
+        private static readonly string DbPath = settings.DatabaseServer ?? "";
 
         public List<MapTabState> GetAvailableMaps()
         {

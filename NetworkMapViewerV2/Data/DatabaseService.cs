@@ -1,4 +1,5 @@
 ﻿using Microsoft.Data.SqlClient;
+using NetworkMapViewerV2.Helpers.Passwords;
 using NetworkMapViewerV2.Models;
 using NetworkMapViewerV2.Services;
 using System.IO;
@@ -8,13 +9,13 @@ namespace NetworkMapViewerV2.Data
     public static class DatabaseService
     {
         private static AppSettings settings = SettingsService.Load();
+        private static string decryptedPassword = SecureSettingsHelper.UnprotectPassword(settings.DatabasePassword) ?? "";
 
         // DbPath is no longer needed for SQL Server initialization, but we keep IconsPath
         private static string IconsPath = Path.Combine(settings.DeviceIconsPath ?? "", "ON");
 
         // Make sure "NetMapVwr" database is created on the server first!
-        public static string ConnectionString => @"Server=localhost\SQLEXPRESS;Database=NetMapVwr;Trusted_Connection=True;TrustServerCertificate=True;";
-
+        public static string ConnectionString => @$"Server={settings.DatabaseServer};Database={settings.DatabaseName};User Id={settings.DatabaseUser};Password={decryptedPassword};TrustServerCertificate=True;";
         public static void InitializeDatabase()
         {
             using var connection = new SqlConnection(ConnectionString);

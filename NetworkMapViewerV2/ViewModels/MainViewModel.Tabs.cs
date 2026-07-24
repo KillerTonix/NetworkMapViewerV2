@@ -3,8 +3,6 @@ using CommunityToolkit.Mvvm.Input;
 using NetworkMapViewerV2.Models;
 using NetworkMapViewerV2.Services;
 using System.Collections.ObjectModel;
-using System.Windows;
-using System.Windows.Controls;
 
 namespace NetworkMapViewerV2.ViewModels
 {

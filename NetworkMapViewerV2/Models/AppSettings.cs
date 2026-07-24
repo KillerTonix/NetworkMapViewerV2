@@ -2,7 +2,9 @@
 {
     public class AppSettings
     {
-        public string? DatabasePath { get; set; }
+        public string? DatabaseServer { get; set; }
+        public string? DatabaseName { get; set; }
+        public string? DatabaseUser { get; set; }
         public string? DeviceIconsPath { get; set; }
         public string? HintImagesPath { get; set; }
         public string? ScriptsPath { get; set; }
@@ -16,6 +18,7 @@
 
         public bool DeepperSearchMode { get; set; } = false;
 
+        public string? DatabasePassword { get; set; }
         public string? PrinterPassword { get; set; }
         public string? GrandstreamPassword { get; set; }
         public string? VNCPassword { get; set; }

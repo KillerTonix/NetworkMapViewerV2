@@ -39,35 +39,40 @@ namespace NetworkMapViewerV2.ViewModels
 
         private static async Task RecalculatePingsAsync(IEnumerable<NetworkDevice> devices)
         {
-            // ==========================================
-            // THE SAFEGUARD: Only allow 2000 pings at a time
-            // to prevent the memory/network avalanche!
-            // ==========================================
-            using var semaphore = new SemaphoreSlim(2000);
+            // Lowered to 100 to prevent Windows socket exhaustion and false-offline results
+            using var semaphore = new SemaphoreSlim(100);
             var pingTasks = new List<Task>();
 
             foreach (var device in devices)
             {
-                if (string.IsNullOrWhiteSpace(device.Address)) continue;
+                if (string.IsNullOrWhiteSpace(device.Address) || device.Address == "0.0.0.0") continue;
 
                 pingTasks.Add(Task.Run(async () =>
                 {
-                    await semaphore.WaitAsync(); // Wait in line if 20 are already running
+                    await semaphore.WaitAsync();
                     try
                     {
                         using var ping = new System.Net.NetworkInformation.Ping();
-                        var reply = await ping.SendPingAsync(device.Address, 2000); // Strict 2-second timeout
+                        var reply = await ping.SendPingAsync(device.Address, 2000);
 
-                        // Changing this property instantly triggers your PingStatusImageConverter!
-                        device.IsOnline = (reply.Status == System.Net.NetworkInformation.IPStatus.Success);
+                        bool isNowOnline = (reply.Status == System.Net.NetworkInformation.IPStatus.Success);
+
+                        // THE FIX: Push the result directly to the WPF UI thread
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            device.IsOnline = isNowOnline;
+                        });
                     }
                     catch
                     {
-                        device.IsOnline = false;
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            device.IsOnline = false;
+                        });
                     }
                     finally
                     {
-                        semaphore.Release(); // Let the next ping in line start
+                        semaphore.Release();
                     }
                 }));
             }

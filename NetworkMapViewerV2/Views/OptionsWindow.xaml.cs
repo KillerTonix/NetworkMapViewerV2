@@ -18,7 +18,7 @@ namespace NetworkMapViewerV2.Views
         public ObservableCollection<NotificationRule> ActiveUI_Rules { get; set; } = [];
         public bool Saved { get; private set; }
         private static AppSettings settings = SettingsService.Load();
-        private static readonly string DbPath = settings.DatabasePath ?? "";
+        private static readonly string DbPath = settings.DatabaseServer ?? "";
         public OptionsWindow(int tabIndex = 0)
         {
             InitializeComponent();
@@ -36,7 +36,9 @@ namespace NetworkMapViewerV2.Views
             DeeperSearchRB.IsChecked = _settings.DeepperSearchMode;
 
             // --- LOAD PATH SETTINGS ---
-            DatabasePathTextBox.Text = _settings.DatabasePath;
+            DatabaseServerTextBox.Text = _settings.DatabaseServer;
+            DatabaseNameTextBox.Text = _settings.DatabaseName;
+            DatabaseUserTextBox.Text = _settings.DatabaseUser;
             DeviceIconsPathTextBox.Text = _settings.DeviceIconsPath;
             HintImagesPathTextBox.Text = _settings.HintImagesPath;
             ScriptsPathTextBox.Text = _settings.ScriptsPath;
@@ -44,6 +46,7 @@ namespace NetworkMapViewerV2.Views
             // --- LOAD PASSWORD SETTINGS ---
             if (!(DbPath == null || DbPath == ""))
             {
+                DatabasePasswordTextBox.Text = "******";
                 PrinterPasswordTextBox.Text = "******";
                 GrandstreamPasswordTextBox.Text = "******";
                 VncPasswordTextBox.Text = "******";
@@ -311,12 +314,16 @@ namespace NetworkMapViewerV2.Views
             _settings.DeepperSearchMode = DeeperSearchRB.IsChecked == true;
 
             // Save Path settings
-            _settings.DatabasePath = DatabasePathTextBox.Text.Trim();
+            _settings.DatabaseServer = DatabaseServerTextBox.Text.Trim();
+            _settings.DatabaseName = DatabaseNameTextBox.Text.Trim();
+            _settings.DatabaseUser = DatabaseUserTextBox.Text.Trim();
             _settings.DeviceIconsPath = DeviceIconsPathTextBox.Text.Trim();
             _settings.HintImagesPath = HintImagesPathTextBox.Text.Trim();
             _settings.ScriptsPath = ScriptsPathTextBox.Text.Trim();
 
 
+            if (DatabasePasswordTextBox.Text != "******")
+                _settings.DatabasePassword = SecureSettingsHelper.ProtectPassword(DatabasePasswordTextBox.Text.Trim());
             if (PrinterPasswordTextBox.Text != "******")
                 _settings.PrinterPassword = SecureSettingsHelper.ProtectPassword(PrinterPasswordTextBox.Text.Trim());
             if (GrandstreamPasswordTextBox.Text != "******")

@@ -27,12 +27,33 @@ namespace NetworkMapViewerV2.Services
 
                     while (!token.IsCancellationRequested)
                     {
-                        var tasks = new List<Task>();
-                        using var throttler = new SemaphoreSlim(20); // Keep the Traffic Cop!
+                        // 1. THE CRITICAL FIX: Safely snapshot the devices list on the UI thread!
+                        // This completely prevents "Collection was modified" crashes.
+                        List<NetworkDevice> safeDevicesSnapshot = [];
+                        var app = Application.Current;
 
-                        foreach (var device in devicesToPing)
+                        if (app != null && app.Dispatcher != null && !app.Dispatcher.HasShutdownStarted)
                         {
-                            if (string.IsNullOrWhiteSpace(device.Address)) continue;
+                            await app.Dispatcher.InvokeAsync(() =>
+                            {
+                                // Freezes a copy of the list for this specific ping cycle
+                                safeDevicesSnapshot = devicesToPing.ToList();
+                            });
+                        }
+
+                        if (safeDevicesSnapshot.Count == 0)
+                        {
+                            await Task.Delay(2000, token);
+                            continue; // Skip this cycle if the map is empty
+                        }
+
+                        var tasks = new List<Task>();
+                        using var throttler = new SemaphoreSlim(20);
+
+                        // 2. Iterate over the SAFE snapshot, not the live UI collection!
+                        foreach (var device in safeDevicesSnapshot)
+                        {
+                            if (string.IsNullOrWhiteSpace(device.Address) || device.Address == "0.0.0.0") continue;
 
                             tasks.Add(Task.Run(async () =>
                             {
@@ -41,20 +62,14 @@ namespace NetworkMapViewerV2.Services
                                 {
                                     bool isUp = await PingHostAsync(device.Address);
 
-                                    if (!token.IsCancellationRequested)
+                                    if (!token.IsCancellationRequested && app != null && !app.Dispatcher.HasShutdownStarted)
                                     {
-                                        var app = Application.Current;
-                                        if (app != null && app.Dispatcher != null && !app.Dispatcher.HasShutdownStarted)
+                                        await app.Dispatcher.InvokeAsync(() =>
                                         {
-                                            await app.Dispatcher.InvokeAsync(() =>
-                                            {
-                                                // Updates the background DB object (Triggers your Notification)
-                                                device.IsOnline = isUp;
-
-                                                // 2. CRITICAL: Broadcasts the result to the UI!
-                                                onPingResult?.Invoke(device.Address, isUp);
-                                            });
-                                        }
+                                            // 3. Trigger the UI change safely
+                                            device.IsOnline = isUp;
+                                            onPingResult?.Invoke(device.Address, isUp);
+                                        });
                                     }
                                 }
                                 catch { }
@@ -63,12 +78,13 @@ namespace NetworkMapViewerV2.Services
                         }
 
                         await Task.WhenAll(tasks);
+
                         var settings = SettingsService.Load();
                         int delayMs = (settings.PingPeriodSeconds > 0 ? settings.PingPeriodSeconds : 4) * 1000;
                         await Task.Delay(delayMs, token);
                     }
                 }
-                catch { }
+                catch { } // Silently exit if cancellation is requested
             }, token);
         }
 
