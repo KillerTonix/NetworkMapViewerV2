@@ -67,6 +67,7 @@ namespace NetworkMapViewerV2.ViewModels
                     else if (result == MessageBoxResult.Yes)
                     {
                         SaveMap();
+                        ReloadMap();
                     }
                     else if (result == MessageBoxResult.No)
                     {

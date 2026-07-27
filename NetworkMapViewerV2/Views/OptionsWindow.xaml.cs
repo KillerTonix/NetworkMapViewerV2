@@ -288,9 +288,23 @@ namespace NetworkMapViewerV2.Views
                 var result = MessageBox.Show($"Are you sure you want to delete the '{selected.GroupName}' type?\n\nDevices currently using this type will fall back to default icons.", "Confirm Delete", MessageBoxButton.YesNo, MessageBoxImage.Warning);
                 if (result == MessageBoxResult.Yes)
                 {
-                    var repo = new Data.MapRepository();
-                    repo.DeleteDeviceGroup(selected.GroupId); // Delete from SQLite
-                    DeviceGroups.Remove(selected);            // Remove from UI
+                    try
+                    {
+                        var repo = new Data.MapRepository();
+                        repo.DeleteDeviceGroup(selected.GroupId); // Delete from SQLite
+                        DeviceGroups.Remove(selected);            // Remove from UI
+                    }
+                    catch (Exception ex)
+                    {
+                        if (ex.Message.Contains("permission was denied"))
+                        {
+                            MessageBox.Show($"Failed to delete device group:\nYou don't have permission to modify the database.", "Database Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                        }
+                        else
+                        {
+                            MessageBox.Show($"Failed to delete device group:\n{ex.Message}", "Database Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                        }
+                    }
                 }
             }
         }
@@ -404,7 +418,7 @@ namespace NetworkMapViewerV2.Views
                     // 1. Remove from the Observable Collection
                     ActiveUI_Rules.Remove(selectedRule);
 
-                  
+
                     var settings = SettingsService.Load();
                     settings.ENS_Rules = [.. ActiveUI_Rules];
                     SettingsService.Save(settings);

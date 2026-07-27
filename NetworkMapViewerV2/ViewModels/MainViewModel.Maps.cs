@@ -107,7 +107,14 @@ namespace NetworkMapViewerV2.ViewModels
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Failed to create map in database:\n{ex.Message}", "Database Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    if (ex.Message.Contains("permission was denied"))
+                    {
+                        MessageBox.Show($"Failed to create map in database::\nYou don't have permission to modify the database.", "Database Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                    else
+                    {
+                        MessageBox.Show($"Failed to create map in database:\n{ex.Message}", "Database Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
                 }
             }
         }
@@ -153,7 +160,7 @@ namespace NetworkMapViewerV2.ViewModels
         }
                 
 
-        // ─── PURE SQLITE RELOAD ──────────────────────────────
+        // ─── PURE SQL RELOAD ──────────────────────────────
         [RelayCommand]
         private async Task ReloadMap() // Notice the change to async Task!
         {
@@ -161,11 +168,7 @@ namespace NetworkMapViewerV2.ViewModels
             if (state != null && state.MapId > 0)
             {
                 var repo = new Data.MapRepository();
-
-                // 1. Fetch the fresh data from SQLite quietly in the background
                 var freshData = repo.LoadMap(state.MapId);
-
-                // 2. Clear the old items and add the new ones directly to the EXISTING tab
                 state.Devices.Clear();
                 foreach (var device in freshData.Devices)
                 {
@@ -180,11 +183,13 @@ namespace NetworkMapViewerV2.ViewModels
 
                 state.HasUnsavedChanges = false;
 
+                SelectedTab = null;
+                SelectedTab = state;
+
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
                 GC.Collect();
 
-                // 3. FIRE THE SAFE PING RECALCULATION
                 await RecalculatePingsAsync(state.Devices);
             }
         }
@@ -207,7 +212,16 @@ namespace NetworkMapViewerV2.ViewModels
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to save to database:\n{ex.Message}", "Save Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                if (ex.Message.Contains("permission was denied"))
+                {
+                    MessageBox.Show($"Failed to save to database:\nYou don't have permission to modify the database.", "Save Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                else
+                {
+                    MessageBox.Show($"Failed to save to database:\n{ex.Message}", "Save Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                SelectedTab.HasUnsavedChanges = false;
+                ReloadMap();
             }
         }
                

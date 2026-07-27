@@ -3,6 +3,7 @@ using NetworkMapViewerV2.Models;
 using NetworkMapViewerV2.Services;
 using System.Collections.ObjectModel;
 using System.Text.Json;
+using System.Windows;
 
 namespace NetworkMapViewerV2.Data
 {
@@ -49,17 +50,32 @@ namespace NetworkMapViewerV2.Data
 
         public void DeleteMap(int mapId)
         {
-            if (mapId <= 0) return;
+            try
+            {
+                if (mapId <= 0) return;
 
-            using var connection = GetOpenConnection(); // Ensure this returns a SqlConnection now!
+                using var connection = GetOpenConnection(); // Ensure this returns a SqlConnection now!
 
-            // 2. Change SqliteCommand to SqlCommand
-            using var cmd = new SqlCommand("DELETE FROM Maps WHERE MapId = @MapId", connection);
+                // 2. Change SqliteCommand to SqlCommand
+                using var cmd = new SqlCommand("DELETE FROM Maps WHERE MapId = @MapId", connection);
 
-            cmd.Parameters.AddWithValue("@MapId", mapId);
-            cmd.ExecuteNonQuery();
+                cmd.Parameters.AddWithValue("@MapId", mapId);
+                cmd.ExecuteNonQuery();
 
-            InsertAuditLog("DELETE", "Maps", mapId, "Entire map deleted.");
+                InsertAuditLog("DELETE", "Maps", mapId, "Entire map deleted.");
+
+            }
+            catch (Exception ex)
+            {
+                if (ex.Message.Contains("permission was denied"))
+                {
+                    MessageBox.Show($"Failed to delete map:\nYou don't have permission to modify the database.", "Database Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                else
+                {
+                    MessageBox.Show($"Failed to delete map:\n{ex.Message}", "Database Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
         }
 
         public MapTabState LoadMap(int mapId)
@@ -214,21 +230,34 @@ namespace NetworkMapViewerV2.Data
             UPDATE Devices SET GroupId=@GroupId, [Left]=@Left, [Top]=@Top, Address=@Address, 
             TitleJson=@TitleJson, HintsJson=@HintsJson, HintImagePath=@HintImagePath, TargetMapId=@TargetMapId 
             WHERE DeviceId=@DeviceId;";
+                try
+                {
+                    using var cmd = new SqlCommand(sql, connection, transaction);
+                    cmd.Parameters.AddWithValue("@DeviceId", device.DeviceId);
+                    cmd.Parameters.AddWithValue("@GroupId", device.GroupId <= 0 ? 1 : device.GroupId);
+                    cmd.Parameters.AddWithValue("@Left", device.Left);
+                    cmd.Parameters.AddWithValue("@Top", device.Top);
+                    cmd.Parameters.AddWithValue("@Address", device.Address ?? "");
+                    cmd.Parameters.AddWithValue("@TitleJson", titlesJson);
+                    cmd.Parameters.AddWithValue("@HintsJson", hintsJson);
+                    cmd.Parameters.AddWithValue("@HintImagePath", device.HintImagePath ?? "");
+                    cmd.Parameters.AddWithValue("@TargetMapId", device.TargetMapId.HasValue ? (object)device.TargetMapId.Value : DBNull.Value);
 
-                using var cmd = new SqlCommand(sql, connection, transaction);
-                cmd.Parameters.AddWithValue("@DeviceId", device.DeviceId);
-                cmd.Parameters.AddWithValue("@GroupId", device.GroupId <= 0 ? 1 : device.GroupId);
-                cmd.Parameters.AddWithValue("@Left", device.Left);
-                cmd.Parameters.AddWithValue("@Top", device.Top);
-                cmd.Parameters.AddWithValue("@Address", device.Address ?? "");
-                cmd.Parameters.AddWithValue("@TitleJson", titlesJson);
-                cmd.Parameters.AddWithValue("@HintsJson", hintsJson);
-                cmd.Parameters.AddWithValue("@HintImagePath", device.HintImagePath ?? "");
-                cmd.Parameters.AddWithValue("@TargetMapId", device.TargetMapId.HasValue ? (object)device.TargetMapId.Value : DBNull.Value);
+                    cmd.ExecuteNonQuery();
 
-                cmd.ExecuteNonQuery();
-
-                InsertAuditLogInternal("UPDATE", "Devices", device.DeviceId, $"Device IP: {device.Address ?? ""}; Changed: {string.Join(", ", changedFields)}", connection, transaction);
+                    InsertAuditLogInternal("UPDATE", "Devices", device.DeviceId, $"Device IP: {device.Address ?? ""}; Changed: {string.Join(", ", changedFields)}", connection, transaction);
+                }
+                catch (Exception ex)
+                {
+                    if (ex.Message.Contains("permission was denied"))
+                    {
+                        MessageBox.Show($"Failed to update device:\nYou don't have permission to modify the database.", "Database Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                    else
+                    {
+                        MessageBox.Show($"Failed to update device:\n{ex.Message}", "Database Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                }
             }
         }
 
@@ -291,12 +320,26 @@ namespace NetworkMapViewerV2.Data
                 Foreground = @Foreground, TextJson = @TextJson
             WHERE LabelId = @LabelId";
 
-                using var cmd = new SqlCommand(sql, connection, transaction);
-                cmd.Parameters.AddWithValue("@LabelId", label.LabelId);
-                AddLabelParameters(cmd, label, textJson);
-                cmd.ExecuteNonQuery();
+                try
+                {
+                    using var cmd = new SqlCommand(sql, connection, transaction);
+                    cmd.Parameters.AddWithValue("@LabelId", label.LabelId);
+                    AddLabelParameters(cmd, label, textJson);
+                    cmd.ExecuteNonQuery();
 
-                InsertAuditLogInternal("UPDATE", "Labels", label.LabelId, $"Changed: {string.Join(", ", changedFields)}", connection, transaction);
+                    InsertAuditLogInternal("UPDATE", "Labels", label.LabelId, $"Changed: {string.Join(", ", changedFields)}", connection, transaction);
+                }
+                catch (Exception ex)
+                {
+                    if (ex.Message.Contains("permission was denied"))
+                    {
+                        MessageBox.Show($"Failed to update label:\nYou don't have permission to modify the database.", "Database Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                    else
+                    {
+                        MessageBox.Show($"Failed to update label:\n{ex.Message}", "Database Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                }
             }
         }
 
@@ -322,26 +365,58 @@ namespace NetworkMapViewerV2.Data
 
         // ─── DELETE OPERATIONS ──────────────────────────────────────────
 
-        public void DeleteDevice(int deviceId)
+        public bool DeleteDevice(int deviceId)
         {
-            if (deviceId <= 0) return;
-            using var connection = GetOpenConnection();
-            using var cmd = new SqlCommand("DELETE FROM Devices WHERE DeviceId = @DeviceId", connection);
-            cmd.Parameters.AddWithValue("@DeviceId", deviceId);
-            cmd.ExecuteNonQuery();
+            try
+            {
+                if (deviceId <= 0) return true; // Treat as success so the UI still removes unsaved elements!
+                using var connection = GetOpenConnection();
+                using var cmd = new SqlCommand("DELETE FROM Devices WHERE DeviceId = @DeviceId", connection);
+                cmd.Parameters.AddWithValue("@DeviceId", deviceId);
+                cmd.ExecuteNonQuery();
 
-            InsertAuditLog("DELETE", "Devices", deviceId, "Device removed from map.");
+                InsertAuditLog("DELETE", "Devices", deviceId, "Device removed from map.");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                if (ex.Message.Contains("permission was denied"))
+                {
+                    MessageBox.Show($"Failed to delete device:\nYou don't have permission to modify the database.", "Database Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                else
+                {
+                    MessageBox.Show($"Failed to delete device:\n{ex.Message}", "Database Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                return false;
+            }
         }
 
-        public void DeleteLabel(int labelId)
+        public bool DeleteLabel(int labelId)
         {
-            if (labelId <= 0) return;
-            using var connection = GetOpenConnection();
-            using var cmd = new SqlCommand("DELETE FROM Labels WHERE LabelId = @LabelId", connection);
-            cmd.Parameters.AddWithValue("@LabelId", labelId);
-            cmd.ExecuteNonQuery();
+            try
+            {
+                if (labelId <= 0) return true;
+                using var connection = GetOpenConnection();
+                using var cmd = new SqlCommand("DELETE FROM Labels WHERE LabelId = @LabelId", connection);
+                cmd.Parameters.AddWithValue("@LabelId", labelId);
+                cmd.ExecuteNonQuery();
 
-            InsertAuditLog("DELETE", "Labels", labelId, "Label removed from map.");
+                InsertAuditLog("DELETE", "Labels", labelId, "Label removed from map.");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                if (ex.Message.Contains("permission was denied"))
+                {
+                    MessageBox.Show($"Failed to delete Label:\nYou don't have permission to modify the database.", "Database Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                else
+                {
+                    MessageBox.Show($"Failed to delete Label:\n{ex.Message}", "Database Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                return false;
+            }
         }
 
         // ─── SEARCH OPERATIONS ──────────────────────────────────────────
@@ -560,33 +635,6 @@ namespace NetworkMapViewerV2.Data
             return logs;
         }
 
-        // --- The Public Methods your ViewModel will call ---
-
-        public void SaveMapBatch(IEnumerable<NetworkDevice> devices, IEnumerable<NetworkLabel> labels)
-        {
-            using var connection = GetOpenConnection();
-            using var transaction = connection.BeginTransaction();
-
-            try
-            {
-                foreach (var device in devices)
-                {
-                    UpdateDeviceInternal(device, connection, transaction);
-                }
-
-                foreach (var label in labels)
-                {
-                    UpdateLabelInternal(label, connection, transaction);
-                }
-
-                transaction.Commit();
-            }
-            catch
-            {
-                transaction.Rollback();
-                throw;
-            }
-        }
 
         public void UpdateDevice(NetworkDevice device)
         {
@@ -612,29 +660,6 @@ namespace NetworkMapViewerV2.Data
             catch { transaction.Rollback(); throw; }
         }
 
-        public List<NetworkDevice> GetAllDevices()
-        {
-            var allDevices = new List<NetworkDevice>();
 
-            using var connection = GetOpenConnection();
-            string sql = "SELECT * FROM Devices";
-
-            using var cmd = new SqlCommand(sql, connection);
-            using var reader = cmd.ExecuteReader();
-
-            while (reader.Read())
-            {
-                allDevices.Add(new NetworkDevice
-                {
-                    GroupId = Convert.ToInt32(reader["GroupId"]),
-                    DeviceId = Convert.ToInt32(reader["DeviceId"]),
-                    MapId = Convert.ToInt32(reader["MapId"]),
-                    Address = reader["Address"].ToString() ?? "",
-                    Titles = JsonSerializer.Deserialize<ObservableCollection<string>>(reader["TitleJson"].ToString() ?? "[]") ?? []
-                });
-            }
-
-            return allDevices;
-        }
     }
 }

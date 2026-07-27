@@ -1550,33 +1550,57 @@ namespace NetworkMapViewerV2.Views
                     // Capture items for Undo before removing them
                     var deletedDevices = new List<NetworkDevice>();
                     var deletedLabels = new List<NetworkLabel>();
+                    bool encounteredError = false;
 
                     foreach (var el in _selectedElements)
                     {
                         if (el.Tag is NetworkDevice d)
                         {
-                            deletedDevices.Add(d);
-                            _currentState?.Devices.Remove(d);
-                            if (d.DeviceId > 0) repo.DeleteDevice(d.DeviceId);
+                            // Wait for the DB to confirm the deletion
+                            bool success = (d.DeviceId > 0) ? repo.DeleteDevice(d.DeviceId) : true;
+
+                            if (success)
+                            {
+                                deletedDevices.Add(d);
+                                _currentState?.Devices.Remove(d);
+                            }
+                            else
+                            {
+                                encounteredError = true;
+                                break; // Stop processing further deletions if permissions are denied
+                            }
                         }
                         else if (el.Tag is NetworkLabel l)
                         {
-                            deletedLabels.Add(l);
-                            _currentState?.Labels.Remove(l);
-                            if (l.LabelId > 0) repo.DeleteLabel(l.LabelId);
+                            bool success = (l.LabelId > 0) ? repo.DeleteLabel(l.LabelId) : true;
+
+                            if (success)
+                            {
+                                deletedLabels.Add(l);
+                                _currentState?.Labels.Remove(l);
+                            }
+                            else
+                            {
+                                encounteredError = true;
+                                break;
+                            }
                         }
                     }
 
-                    // UNDO HISTORY: How to reverse a Delete
-                    _undoStack.Push(() =>
+                    // UNDO HISTORY: Only push if we actually deleted something!
+                    if (deletedDevices.Count > 0 || deletedLabels.Count > 0)
                     {
-                        // We set ID to 0 so when you hit "Save", the DB recreates them seamlessly
-                        foreach (var d in deletedDevices) { d.DeviceId = 0; _currentState.Devices.Add(d); }
-                        foreach (var l in deletedLabels) { l.LabelId = 0; _currentState.Labels.Add(l); }
-                    });
+                        _undoStack.Push(() =>
+                        {
+                            foreach (var d in deletedDevices) { d.DeviceId = 0; _currentState.Devices.Add(d); }
+                            foreach (var l in deletedLabels) { l.LabelId = 0; _currentState.Labels.Add(l); }
+                        });
 
+                        _currentState.HasUnsavedChanges = true;
+                    }
+
+                    // Always clear the selection box, even if an error happened
                     _selectedElements.Clear();
-                    _currentState?.HasUnsavedChanges = true;
                     DrawMap(_currentState);
                 }
                 e.Handled = true;

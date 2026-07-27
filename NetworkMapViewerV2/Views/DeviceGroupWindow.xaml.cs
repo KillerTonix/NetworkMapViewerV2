@@ -73,7 +73,14 @@ namespace NetworkMapViewerV2.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to save device group:\n{ex.Message}", "Database Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                if (ex.Message.Contains("permission was denied"))
+                {
+                    MessageBox.Show($"Failed to save device group:\nYou don't have permission to modify the database.", "Database Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                else
+                {
+                    MessageBox.Show($"Failed to save device group:\n{ex.Message}", "Database Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
             }
         }
 
