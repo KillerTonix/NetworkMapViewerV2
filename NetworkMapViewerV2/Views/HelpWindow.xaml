@@ -4,7 +4,6 @@
         Title="Hotkeys &amp; About" Height="600" Width="600"
         WindowStartupLocation="CenterScreen" ResizeMode="NoResize" WindowStyle="ToolWindow"
         Background="#1E1E1E" Foreground="White">
-
     <Grid>
         <TabControl x:Name="TabControlObject" Background="#2D2D30" BorderThickness="0" Foreground="White">
 
@@ -71,16 +70,23 @@
 
             <!-- ABOUT TAB -->
             <TabItem Header="ℹ️ About">
-                <StackPanel Margin="20" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <StackPanel Margin="10" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <!-- Header -->
                     <TextBlock Text="Network Map Viewer" FontSize="28" Foreground="#E0E0E0" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,0,0,5"/>
                     <TextBlock Text="Version 2.0" FontSize="14" Foreground="#888888" HorizontalAlignment="Center" Margin="0,0,0,25"/>
 
-                    <Border Background="#3F3F46" CornerRadius="8" Padding="15" Margin="0,0,0,20">
+                    <!-- Developer Tag -->
+                    <Border Background="#3F3F46" CornerRadius="8" Padding="15" Margin="0,0,0,25">
                         <TextBlock Text="Developed by: Artur Tonoyan" FontSize="15" FontWeight="Medium" Foreground="#569CD6" HorizontalAlignment="Center"/>
                     </Border>
 
-                    <TextBlock Text="A professional WPF administration tool for mapping IT infrastructure, featuring live WMI/PsExec hardware scanning and active directory integration." 
-                               TextWrapping="Wrap" TextAlignment="Center" FontSize="13" Foreground="#AAAAAA" MaxWidth="380" LineHeight="20"/>
+                    <!-- Project History -->
+                    <TextBlock Text="The logical continuation and spiritual successor to Friendly Pinger." 
+                   TextWrapping="Wrap" TextAlignment="Center" FontSize="14" Foreground="#E0E0E0" FontWeight="SemiBold" MaxWidth="450" Margin="0,0,0,10"/>
+
+                    <!-- Feature Description -->
+                    <TextBlock Text="NMV takes IT infrastructure mapping to the next level with a completely rebuilt WPF architecture. It features robust MS SQL database integration for enterprise scale, alongside multi-threaded background scanning, live WMI/PsExec hardware polling, and advanced Active Directory integration." 
+                   TextWrapping="Wrap" TextAlignment="Center" FontSize="13" Foreground="#AAAAAA" MaxWidth="450" LineHeight="20"/>
                 </StackPanel>
             </TabItem>
 

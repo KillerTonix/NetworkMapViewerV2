@@ -221,7 +221,6 @@ namespace NetworkMapViewerV2.ViewModels
                     MessageBox.Show($"Failed to save to database:\n{ex.Message}", "Save Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
                 SelectedTab.HasUnsavedChanges = false;
-                ReloadMap();
             }
         }
                

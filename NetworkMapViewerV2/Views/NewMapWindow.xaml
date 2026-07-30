@@ -21,8 +21,7 @@
 
         <!-- Map Type Input -->
         <TextBlock Grid.Row="2" Text="Select map type:" Foreground="#E0E0E0" FontSize="14" Margin="0,15,0,8"/>
-        <ComboBox x:Name="cmbMapType" Grid.Row="3" FontSize="14" Padding="5" 
-                  Background="#2D2D30" Foreground="White" BorderBrush="#3F3F46" SelectedIndex="0">
+        <ComboBox x:Name="cmbMapType" Grid.Row="3" FontSize="14" Padding="5" Foreground="Black" BorderBrush="#3F3F46" SelectedIndex="0">
             <ComboBoxItem Content="Head Office"/>
             <ComboBoxItem Content="Branch"/>
         </ComboBox>
