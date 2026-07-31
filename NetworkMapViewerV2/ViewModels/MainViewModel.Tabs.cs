@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using NetworkMapViewerV2.Models;
 using NetworkMapViewerV2.Services;
 using System.Collections.ObjectModel;
+using System.Windows;
 
 namespace NetworkMapViewerV2.ViewModels
 {
@@ -63,7 +64,18 @@ namespace NetworkMapViewerV2.ViewModels
             // Closes whatever tab is currently selected when the user hits Ctrl+W
             if (SelectedTab != null)
             {
-                CloseTab(SelectedTab);
+                if (IsEditingEnabled)
+                {
+                    var result = MessageBox.Show("You have unsaved changes. Are you sure you want to close this tab?", "Unsaved Changes", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                    if (result == MessageBoxResult.Yes)
+                    {
+                        CloseTab(SelectedTab);
+                    }
+                }
+                else
+                {
+                    CloseTab(SelectedTab);
+                }
             }
         }
 

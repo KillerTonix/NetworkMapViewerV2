@@ -1,5 +1,6 @@
 ﻿using NetworkMapViewerV2.Data;
 using NetworkMapViewerV2.Models;
+using System.Collections.Concurrent;
 using System.Net.NetworkInformation;
 using System.Windows;
 
@@ -138,6 +139,76 @@ namespace NetworkMapViewerV2.Services
             // 4. If we reach this line, it failed all 3 attempts.
             // It is officially offline.
             return false;
+        }
+
+
+
+
+        // 1. Rename this so it's clear it just generates the mathematical addresses
+        public static List<string> GenerateMathematicalIps(string cidr)
+        {
+            var usableIps = new List<string>();
+            var parts = cidr.Split('/');
+
+            if (parts.Length != 2 || !System.Net.IPAddress.TryParse(parts[0], out var baseIp) || !int.TryParse(parts[1], out int maskBits))
+                return usableIps;
+
+            byte[] ipBytes = baseIp.GetAddressBytes();
+            uint ip = (uint)((ipBytes[0] << 24) | (ipBytes[1] << 16) | (ipBytes[2] << 8) | ipBytes[3]);
+            uint mask = 0xffffffff << (32 - maskBits);
+
+            uint network = ip & mask;
+            uint broadcast = network | ~mask;
+
+            // This bitwise loop ensures that if you scan a wide /22 range, 
+            // you correctly get all the intermediate .0 and .255 addresses!
+            for (uint i = network + 2; i < broadcast; i++)
+            {
+                byte[] bytes = [(byte)(i >> 24), (byte)(i >> 16), (byte)(i >> 8), (byte)i];
+                usableIps.Add(new System.Net.IPAddress(bytes).ToString());
+            }
+
+            return usableIps;
+        }
+
+        // 2. THIS is the method you actually call to get your final list of online devices!
+        public static async Task<List<string>> GetNewlyDiscoveredOnlineIpsAsync(string cidr, HashSet<string> existingIps)
+        {
+            // Step A: Get all possible mathematical IPs (e.g., 254)
+            var allPossibleIps = GenerateMathematicalIps(cidr);
+
+            // Step B: Filter out the ones already on your map (e.g., leaves 213)
+            var ipsToScan = allPossibleIps.Where(ip => !existingIps.Contains(ip)).ToList();
+
+            var onlineIps = new ConcurrentBag<string>();
+            using var semaphore = new SemaphoreSlim(100);
+            var tasks = new List<Task>();
+
+            // Step C: Ping the remaining 213 addresses concurrently
+            foreach (var ip in ipsToScan)
+            {
+                tasks.Add(Task.Run(async () =>
+                {
+                    await semaphore.WaitAsync();
+                    try
+                    {
+                        // If it replies, it gets added to the final list!
+                        if (await PingHostAsync(ip, maxAttempts: 1))
+                        {
+                            onlineIps.Add(ip);
+                        }
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
+                }));
+            }
+
+            await Task.WhenAll(tasks);
+
+            // Returns ONLY the addresses that are alive and not on the map yet
+            return [.. onlineIps.OrderBy(ip => Version.Parse(ip))];
         }
     }
 }

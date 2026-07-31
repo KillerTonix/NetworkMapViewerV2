@@ -28,9 +28,9 @@ namespace NetworkMapViewerV2.Views
             // Add the PowerShell scripts from the folder
             if (Directory.Exists(scriptsDirectory))
             {
-                availableScanners.Add("SystemInfo Linux.ps1");
-                availableScanners.Add("SystemInfo Non Domain.ps1");
-                availableScanners.Add("SystemInfo.ps1");
+                availableScanners.Add("Linux");
+                availableScanners.Add("Windows Non Domain Joined");
+                availableScanners.Add("Windows Domain Joined");
             }
 
             cmbScripts.ItemsSource = availableScanners;
@@ -42,7 +42,13 @@ namespace NetworkMapViewerV2.Views
             if (cmbGroups.SelectedValue != null && cmbScripts.SelectedItem != null)
             {
                 SelectedGroupId = (int)cmbGroups.SelectedValue;
-                SelectedScript = cmbScripts.SelectedItem.ToString() ?? "";
+                SelectedScript = cmbScripts.SelectedItem.ToString() switch
+                {
+                    "Linux" => "SystemInfo Linux.ps1",
+                    "Windows Non Domain Joined" => "SystemInfo Non Domain.ps1",
+                    "Windows Domain Joined" => "SystemInfo.ps1",
+                    _ => "",
+                };               
                 this.DialogResult = true;
                 this.Close();
             }

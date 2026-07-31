@@ -82,7 +82,7 @@ namespace NetworkMapViewerV2.ViewModels
         }
 
         [RelayCommand]
-        private async Task UpdateGroupData()
+        public async Task UpdateGroupData()
         {
             var tab = SelectedTab;
             if (tab == null || tab.Devices.Count == 0) return;
@@ -105,7 +105,6 @@ namespace NetworkMapViewerV2.ViewModels
                         break;
                     default:
                         continue; // Skip any other group IDs
-
                 }
             }
 

@@ -3,6 +3,8 @@ using NetworkMapViewerV2.Helpers.Alignment;
 using NetworkMapViewerV2.Helpers.LocalFetcher;
 using NetworkMapViewerV2.Models;
 using NetworkMapViewerV2.ViewModels;
+using System.Collections.Concurrent;
+using System.Data;
 using System.IO;
 using System.Text.RegularExpressions;
 using System.Windows;
@@ -1105,11 +1107,13 @@ namespace NetworkMapViewerV2.Views
             _lastRightClickPosition = Mouse.GetPosition(DrawingCanvas);
 
             // Dynamically build the menu!
-            var menu = new ContextMenu();     
+            var menu = new ContextMenu();
+
+            var miDiscover = new MenuItem { Icon = "🔍", Header = "Auto-Discover Devices...", FontWeight = FontWeights.Bold };
+            miDiscover.Click += async (s, args) => await RunAutoDiscoveryAsync();
 
             var miUpdateDevices = new MenuItem { Icon = "🔄", Header = "Update All Devices..." };
-            //miUpdateDevices.Click += MainViewModel.UpdateGroupData();
-
+            miUpdateDevices.Command = GlobalViewModel.UpdateGroupDataCommand;
 
             var miAddDevice = new MenuItem { Icon = "🖥️", Header = "Add Device Here...", FontWeight = FontWeights.Bold };
 
@@ -1198,7 +1202,12 @@ namespace NetworkMapViewerV2.Views
                     menu.Items.Add(miAutoAlign);
                 }
             }
-          
+
+            if (_currentState.MapType == "branch")
+            {
+                menu.Items.Add(miDiscover);
+                menu.Items.Add(new Separator());
+            }
             menu.Items.Add(miUpdateDevices);
             menu.Items.Add(new Separator());
             menu.Items.Add(miAddDevice);
@@ -1383,7 +1392,7 @@ namespace NetworkMapViewerV2.Views
             }
         }
 
-      
+
 
         private void BatchAdd_Click(object sender, RoutedEventArgs e)
         {
@@ -2013,6 +2022,120 @@ namespace NetworkMapViewerV2.Views
                 GlobalViewModel?.HasUnsavedChanges = true;
 
                 DrawMap(_currentState);
+            }
+        }
+
+
+        private async Task RunAutoDiscoveryAsync()
+        {
+            if (_currentState == null) return;
+
+            // 1. Set a safe fallback just in case the map is completely empty
+            string defaultCidr = "192.168.102.0/24";
+
+            // 2. Grab the first valid IP from the map's current devices
+            var referenceDevice = _currentState.Devices.FirstOrDefault(d =>
+                !string.IsNullOrWhiteSpace(d.Address) &&
+                d.Address != "0.0.0.0" &&
+                System.Net.IPAddress.TryParse(d.Address, out _));
+
+            // 3. If we found a device, calculate the base network
+            if (referenceDevice != null)
+            {
+                var parts = referenceDevice.Address.Split('.');
+                if (parts.Length == 4)
+                {
+                    // Replaces the last octet with .0/24 (e.g., 192.168.50.45 becomes 192.168.50.0/24)
+                    defaultCidr = $"{parts[0]}.{parts[1]}.{parts[2]}.0/24";
+                }
+            }
+
+            // 4. Show the InputBox with the dynamically calculated default!
+            string cidrInput = Microsoft.VisualBasic.Interaction.InputBox(
+                "Enter the CIDR network range to scan (e.g., 192.168.102.0/24 or 192.168.110.0/24):",
+                "Auto-Discovery",
+                defaultCidr);
+
+            if (string.IsNullOrWhiteSpace(cidrInput)) return;
+
+            var allTargetIps = Services.PingService.GenerateMathematicalIps(cidrInput);
+            if (allTargetIps.Count == 0)
+            {
+                MessageBox.Show("Invalid CIDR format.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            // 2. Strip out IPs that are ALREADY on the current map
+            var existingIps = _currentState.Devices
+                .Where(d => !string.IsNullOrWhiteSpace(d.Address))
+                .Select(d => d.Address)
+                .ToHashSet();
+
+            var ipsToScan = await Services.PingService.GetNewlyDiscoveredOnlineIpsAsync(cidrInput, existingIps);
+
+            if (ipsToScan.Count == 0)
+            {
+                MessageBox.Show("All IPs in this range are already on the map!", "Finished", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            // 3. Multithreaded Ping Sweep
+            var foundIps = new ConcurrentBag<string>();
+            using var semaphore = new SemaphoreSlim(100); // 100 concurrent pings for rapid sweeping
+            var tasks = new List<Task>();
+
+            // Optional: Show a loading overlay here so the user knows it's scanning
+
+            foreach (var ip in ipsToScan)
+            {
+                tasks.Add(Task.Run(async () =>
+                {
+                    await semaphore.WaitAsync();
+                    try
+                    {
+                        foundIps.Add(ip);
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
+                }));
+            }
+
+            await Task.WhenAll(tasks);
+            var sortedResults = foundIps.OrderBy(ip => Version.Parse(ip)).ToList();
+            // 4. Process Results
+            if (foundIps.IsEmpty)
+            {
+                MessageBox.Show("No new active devices found in that range.", "Discovery Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            else
+            {
+                var result = MessageBox.Show($"Found {foundIps.Count} new active devices. Do you want to add them to the map?", "Discovery Complete", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                if (result == MessageBoxResult.Yes)
+                {
+                    foreach (var ip in sortedResults)
+                    {
+                        if (foundIps.Contains(ip))
+                        {
+                            var newDevice = new NetworkDevice
+                            {
+                                MapId = _currentState.MapId,
+                                Address = ip,
+                                Left = 50, // Default position; you might want to adjust this
+                                Top = 50,  // Default position; you might want to adjust this
+                                GroupId = 1 // Default group; you might want to adjust this
+                            };
+                            newDevice.Titles.Add(ip); // Add the IP as the title for visibility
+                            _currentState.Devices.Add(newDevice);
+
+                            _currentState?.HasUnsavedChanges = true;
+                            DrawMap(_currentState);
+                        }
+                    }
+                }
+
             }
         }
     }
