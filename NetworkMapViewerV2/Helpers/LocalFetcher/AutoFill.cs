@@ -33,9 +33,9 @@ namespace NetworkMapViewerV2.Helpers.LocalFetcher
                 return;
             }
 
+            var oldHintText = device.Hints.ToList();
             try
-            {
-                var oldHintText = device.Hints.ToList();
+            {                
                 device.Hints.Clear();
                 device.Hints.Add("<b>STATUS:</b> Scanning WMI via PowerShell...");
 
@@ -135,10 +135,11 @@ namespace NetworkMapViewerV2.Helpers.LocalFetcher
 
                 if (string.IsNullOrWhiteSpace(output))
                 {
-                    // Optional: Comment this MessageBox out if you don't want popups during batch scans!
-                    MessageBox.Show("Both WMI and PsExec failed to return data.", "Scan Failed", MessageBoxButton.OK, MessageBoxImage.Error);
                     device.Hints.Clear();
-                    device.Hints.Add("<b>STATUS:</b> Scan Failed");
+                    foreach (var oldLine in oldHintText) device.Hints.Add(oldLine);
+                    vm?.SelectedTab?.TriggerRedraw?.Invoke();
+
+                    MessageBox.Show("Both WMI and PsExec failed to return data.", "Scan Failed", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
                 else
                 {
@@ -155,6 +156,10 @@ namespace NetworkMapViewerV2.Helpers.LocalFetcher
             }
             catch (Exception ex)
             {
+                device.Hints.Clear();
+                foreach (var oldLine in oldHintText) device.Hints.Add(oldLine);
+                vm?.SelectedTab?.TriggerRedraw?.Invoke();
+
                 MessageBox.Show($"Failed to execute scripts:\n{ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -164,6 +169,7 @@ namespace NetworkMapViewerV2.Helpers.LocalFetcher
         public static async Task RunPrinterAutoFill(MainViewModel? GlobalViewModel, NetworkDevice device)
         {
             if (string.IsNullOrWhiteSpace(device.Address) || device.Address == "0.0.0.0") return;
+            var oldHintText = device.Hints.ToList();
 
             device.Hints.Clear();
             device.Hints.Add("<b>STATUS:</b> Scraping HP Web Interface...");
@@ -177,6 +183,9 @@ namespace NetworkMapViewerV2.Helpers.LocalFetcher
 
             if (results.TryGetValue("ERROR", out string? value))
             {
+                device.Hints.Clear();
+                foreach (var oldLine in oldHintText) device.Hints.Add(oldLine);
+                GlobalViewModel?.SelectedTab?.TriggerRedraw?.Invoke();
                 MessageBox.Show($"Web Scraper failed:\n{value}", "Scan Failed", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -206,6 +215,7 @@ namespace NetworkMapViewerV2.Helpers.LocalFetcher
         public static async Task RunGrandstreamAutoFill(MainViewModel? GlobalViewModel, NetworkDevice device)
         {
             if (string.IsNullOrWhiteSpace(device.Address) || device.Address == "0.0.0.0") return;
+            var oldHintText = device.Hints.ToList();
 
             device.Hints.Clear();
             device.Hints.Add("<b>STATUS:</b> Scraping Grandstream Web Interface...");
