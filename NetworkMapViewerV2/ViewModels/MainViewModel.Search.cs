@@ -45,17 +45,29 @@ namespace NetworkMapViewerV2.ViewModels
                 var repo = new Data.MapRepository();
                 var currentSettings = SettingsService.Load();
 
-                _globalSearchResults = repo.SearchDevices(query, currentSettings.DeepperSearchMode);
+                var rawResults = repo.SearchDevices(query, currentSettings.DeepperSearchMode, currentSettings.EqualitySearchMode);
 
-                if (_globalSearchResults.Count == 0)
+                if (rawResults.Count == 0)
                 {
                     MessageBox.Show($"No devices found matching '{query}'.", "Search", MessageBoxButton.OK, MessageBoxImage.Information);
+                    _globalSearchResults?.Clear();
                     return;
                 }
+
+                // Get the ID of the currently opened map (safely fallback to -1 if no map is open)
+                int currentMapId = SelectedTab?.MapId ?? -1;
+
+                // THE FIX: Sort the results so the current map is prioritized!
+                // OrderByDescending on a boolean puts 'true' before 'false'.
+                // ThenBy groups the remaining results neatly by their respective Map IDs.
+                _globalSearchResults = rawResults
+                    .OrderByDescending(r => r.MapId == currentMapId)
+                    .ThenBy(r => r.MapId)
+                    .ToList();
             }
 
             // --- PHASE 2: CYCLE THROUGH RESULTS ---
-            if (_globalSearchResults.Count > 0)
+            if (_globalSearchResults != null && _globalSearchResults.Count > 0)
             {
                 _currentSearchIndex++;
                 if (_currentSearchIndex >= _globalSearchResults.Count) _currentSearchIndex = 0;
@@ -66,7 +78,7 @@ namespace NetworkMapViewerV2.ViewModels
                 OpenMapFromDatabase(target.MapId);
 
                 // 2. Fire the animation signal immediately!
-                // (We set it to 0 first to guarantee the PropertyChanged event fires, even if you are searching for the same device twice)
+                // (We set it to 0 first to guarantee the PropertyChanged event fires)
                 HighlightedDeviceId = 0;
                 HighlightedDeviceId = target.DeviceId;
             }

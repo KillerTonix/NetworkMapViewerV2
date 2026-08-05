@@ -254,6 +254,8 @@
                         <Label Content="Used search depth..." />
                         <RadioButton x:Name="HeadlinesSearchRB" Margin="10" Content="Use headlines only mode" IsChecked="True"/>
                         <RadioButton x:Name="DeeperSearchRB" Margin="10" Content="Use the deeper search mode"/>
+                        <Label Content="Search mode..." Margin="0,10,0,0" />
+                        <CheckBox x:Name="EqualityModeCheckBox" Margin="10" Content="Equality mode(whole words only)"/>
                     </StackPanel>
                 </Border>
             </TabItem>

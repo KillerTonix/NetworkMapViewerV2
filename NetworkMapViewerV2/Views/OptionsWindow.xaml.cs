@@ -34,6 +34,7 @@ namespace NetworkMapViewerV2.Views
 
             // --- LOAD SEARCH SETTINGS ---
             DeeperSearchRB.IsChecked = _settings.DeepperSearchMode;
+            EqualityModeCheckBox.IsChecked = _settings.EqualitySearchMode;
 
             // --- LOAD PATH SETTINGS ---
             DatabaseServerTextBox.Text = _settings.DatabaseServer;
@@ -326,6 +327,7 @@ namespace NetworkMapViewerV2.Views
 
             // Save Search settings
             _settings.DeepperSearchMode = DeeperSearchRB.IsChecked == true;
+            _settings.EqualitySearchMode = EqualityModeCheckBox.IsChecked == true;
 
             // Save Path settings
             _settings.DatabaseServer = DatabaseServerTextBox.Text.Trim();

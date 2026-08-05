@@ -17,6 +17,7 @@
         public int PingPeriodSeconds { get; set; } = 5;
 
         public bool DeepperSearchMode { get; set; } = false;
+        public bool EqualitySearchMode { get; set; } = false;
 
         public string? DatabasePassword { get; set; }
         public string? PrinterPassword { get; set; }

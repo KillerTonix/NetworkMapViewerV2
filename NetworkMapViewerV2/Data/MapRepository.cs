@@ -421,14 +421,13 @@ namespace NetworkMapViewerV2.Data
 
         // ─── SEARCH OPERATIONS ──────────────────────────────────────────
 
-        public List<GlobalSearchResult> SearchDevices(string query, bool deepSearch)
+        public List<GlobalSearchResult> SearchDevices(string query, bool deepSearch, bool equalitySearch)
         {
             var results = new List<GlobalSearchResult>();
             if (string.IsNullOrWhiteSpace(query)) return results;
 
             using var connection = GetOpenConnection();
-
-            // MS SQL doesn't use INSTR. We use standard LIKE clauses instead.
+                            
             string sql = deepSearch
                 ? @"SELECT MapId, DeviceId FROM Devices 
                     WHERE TitleJson LIKE '%' + @Query + '%' 
@@ -437,7 +436,22 @@ namespace NetworkMapViewerV2.Data
                 : @"SELECT MapId, DeviceId FROM Devices 
                     WHERE TitleJson LIKE '%' + @Query + '%'";
 
-            using var cmd = new SqlCommand(sql, connection);
+            if (equalitySearch)
+            {
+                // OVERRIDE the broad search with a strict "Whole Word" boundary search.
+                // We append spaces to the column (' ' + TitleJson + ' ') to ensure the first and last words always have a boundary.
+                // [^a-zA-Z0-9] means "not a letter or number" (e.g., space, quote, or bracket).
+
+                sql = deepSearch
+                    ? @"SELECT MapId, DeviceId FROM Devices 
+                        WHERE (JSON_VALUE(TitleJson, '$[2]') = @Query OR JSON_VALUE(TitleJson, '$[2]') LIKE @Query + ' %')
+                           OR Address = @Query
+                           OR ' ' + HintsJson + ' ' LIKE '%[^a-zA-Z0-9]' + @Query + '[^a-zA-Z0-9]%'"
+                    : @"SELECT MapId, DeviceId FROM Devices 
+                        WHERE (JSON_VALUE(TitleJson, '$[2]') = @Query OR JSON_VALUE(TitleJson, '$[2]') LIKE @Query + ' %')";
+            }
+
+                using var cmd = new SqlCommand(sql, connection);
             cmd.Parameters.AddWithValue("@Query", query); // MS SQL LIKE is case-insensitive by default!
 
             using var reader = cmd.ExecuteReader();
