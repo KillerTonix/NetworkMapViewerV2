@@ -1201,9 +1201,9 @@ namespace NetworkMapViewerV2.Views
                     miAutoAlign.Click += (sender, args) => AutoAlignSelectedPairs();
                     menu.Items.Add(miAutoAlign);
                 }
-            }
+            }    
 
-            if (_currentState.MapType == "branch")
+            if (string.Equals(_currentState.MapType, "Branch", StringComparison.OrdinalIgnoreCase))
             {
                 menu.Items.Add(miDiscover);
                 menu.Items.Add(new Separator());

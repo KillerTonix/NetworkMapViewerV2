@@ -85,11 +85,20 @@ namespace NetworkMapViewerV2.Data
             using var connection = GetOpenConnection();
 
             // 1. Get Map Name
-            using (var cmd = new SqlCommand("SELECT MapName FROM Maps WHERE MapId = @MapId", connection))
+            using (var cmd = new SqlCommand("SELECT MapId, MapName, MapType FROM Maps WHERE MapId = @MapId", connection))
             {
                 cmd.Parameters.AddWithValue("@MapId", mapId);
-                var nameResult = cmd.ExecuteScalar();
-                if (nameResult != null) state.MapName = nameResult.ToString() ?? "Unknown Map";
+                using var reader = cmd.ExecuteReader();
+                if (reader.Read())
+                {
+                    state.MapId = reader.GetInt32(0);
+                    state.MapName = reader.GetString(1);
+
+                    // 2. Ensure the reader actually assigns the MapType to the loaded map
+                    state.MapType = reader.IsDBNull(2) ? "Head Office" : reader.GetString(2);
+                }
+
+                reader.Close(); // Close the reader before moving on to load devices/labels
             }
 
             // 2. Get Devices
@@ -283,7 +292,7 @@ namespace NetworkMapViewerV2.Data
                 List<string> changedFields = [];
 
                 // Wrapped Left and Top in brackets
-                string checkSql = "SELECT [Left], [Top], Width, Height, TextJson FROM Labels WHERE LabelId = @LabelId";
+                string checkSql = @"SELECT [Left], [Top], Width, Height, TextJson, Background, Foreground, FontSize, FontFamily, FontWeight, FontStyle FROM Labels WHERE LabelId = @LabelId";
                 using (var checkCmd = new SqlCommand(checkSql, connection, transaction))
                 {
                     checkCmd.Parameters.AddWithValue("@LabelId", label.LabelId);
@@ -296,10 +305,23 @@ namespace NetworkMapViewerV2.Data
                         double dbWidth = reader.GetDouble(2);
                         double dbHeight = reader.GetDouble(3);
                         string dbTextJson = reader.IsDBNull(4) ? "" : reader.GetString(4);
+                        string dbBackground = reader.IsDBNull(5) ? "Transparent" : reader.GetString(5);
+                        string dbForeground = reader.IsDBNull(6) ? "#000000" : reader.GetString(6);
+                        double dbFontSize = reader.IsDBNull(7) ? 12.0 : reader.GetDouble(7);
+                        string dbFontFamily = reader.IsDBNull(8) ? "Segoe UI" : reader.GetString(8);
+                        string dbFontWeight = reader.IsDBNull(9) ? "Normal" : reader.GetString(9);
+                        string dbFontStyle = reader.IsDBNull(10) ? "Normal" : reader.GetString(10);
 
                         if (Math.Abs(dbLeft - label.Left) > 0.01 || Math.Abs(dbTop - label.Top) > 0.01) { hasChanges = true; changedFields.Add("Position"); }
                         if (Math.Abs(dbWidth - label.Width) > 0.01 || Math.Abs(dbHeight - label.Height) > 0.01) { hasChanges = true; changedFields.Add("Size"); }
                         if (dbTextJson != textJson) { hasChanges = true; changedFields.Add("Text"); }
+                        if (dbBackground != (label.Background ?? "Transparent") || dbForeground != (label.Foreground ?? "#000000") ||
+                         Math.Abs(dbFontSize - label.FontSize) > 0.01 || dbFontFamily != (label.FontFamily ?? "Segoe UI") ||
+                         dbFontWeight != (label.FontWeight ?? "Normal") || dbFontStyle != (label.FontStyle ?? "Normal"))
+                        {
+                            hasChanges = true;
+                            changedFields.Add("Formatting");
+                        }
                     }
                     else
                     {
@@ -427,7 +449,7 @@ namespace NetworkMapViewerV2.Data
             if (string.IsNullOrWhiteSpace(query)) return results;
 
             using var connection = GetOpenConnection();
-                            
+
             string sql = deepSearch
                 ? @"SELECT MapId, DeviceId FROM Devices 
                     WHERE TitleJson LIKE '%' + @Query + '%' 
@@ -451,7 +473,7 @@ namespace NetworkMapViewerV2.Data
                         WHERE (JSON_VALUE(TitleJson, '$[2]') = @Query OR JSON_VALUE(TitleJson, '$[2]') LIKE @Query + ' %')";
             }
 
-                using var cmd = new SqlCommand(sql, connection);
+            using var cmd = new SqlCommand(sql, connection);
             cmd.Parameters.AddWithValue("@Query", query); // MS SQL LIKE is case-insensitive by default!
 
             using var reader = cmd.ExecuteReader();
