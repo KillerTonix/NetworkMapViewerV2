@@ -20,12 +20,13 @@
                 </Style>
             </DataGrid.Resources>
             <DataGrid.Columns>
-                <DataGridTextColumn Header="Time" Binding="{Binding Timestamp}" Width="140"/>
-                <DataGridTextColumn Header="User" Binding="{Binding Username}" Width="80"/>
+                <DataGridTextColumn Header="Time" Binding="{Binding TimeStamp}" Width="140"/>
+                <DataGridTextColumn Header="Map Name" Binding="{Binding MapName}" Width="150" FontWeight="SemiBold"/>
+                <DataGridTextColumn Header="User" Binding="{Binding UserName}" Width="80"/>
                 <DataGridTextColumn Header="Action" Binding="{Binding ActionType}" Width="80"/>
-                <DataGridTextColumn Header="Table" Binding="{Binding TableName}" Width="80"/>
-                <DataGridTextColumn Header="ID" Binding="{Binding RecordId}" Width="50"/>
-                <DataGridTextColumn Header="Details" Binding="{Binding Details}" Width="*"/>
+                <DataGridTextColumn Header="Target" Binding="{Binding Target}" Width="80"/>
+                <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="50" Visibility="Collapsed"/>
+                <DataGridTextColumn Header="Detailed Changes" Binding="{Binding Details}" Width="*"/>
             </DataGrid.Columns>
         </DataGrid>
     </Grid>

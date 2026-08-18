@@ -10,7 +10,6 @@ namespace NetworkMapViewerV2.Data
     public class MapRepository
     {
         private static readonly AppSettings settings = SettingsService.Load();
-
         private static readonly string DbPath = settings.DatabaseServer ?? "";
 
         public List<MapTabState> GetAvailableMaps()
@@ -35,15 +34,14 @@ namespace NetworkMapViewerV2.Data
         public int CreateNewMap(string mapName, string mapType)
         {
             using var connection = GetOpenConnection();
-            // Changed last_insert_rowid() to SCOPE_IDENTITY()
             string sql = "INSERT INTO Maps (MapName, MapType) VALUES (@MapName, @MapType); SELECT SCOPE_IDENTITY();";
             using var cmd = new SqlCommand(sql, connection);
 
             cmd.Parameters.AddWithValue("@MapName", mapName);
             cmd.Parameters.AddWithValue("@MapType", mapType);
 
-            // Log this critical update action for accountability!
-            InsertAuditLog("INSERT", "Maps", 0, $"Created new map: {mapName} : {mapType}");
+            // CHANGED: Fixed arguments to match the new schema
+            InsertAuditLog("INSERT", "Maps", $"Created new map: {mapType}", mapName);
 
             return Convert.ToInt32(cmd.ExecuteScalar());
         }
@@ -54,16 +52,23 @@ namespace NetworkMapViewerV2.Data
             {
                 if (mapId <= 0) return;
 
-                using var connection = GetOpenConnection(); // Ensure this returns a SqlConnection now!
+                using var connection = GetOpenConnection();
 
-                // 2. Change SqliteCommand to SqlCommand
+                // Look up the Map Name first so the Audit Log knows what was deleted!
+                string mapName = "Unknown Map";
+                using (var nameCmd = new SqlCommand("SELECT MapName FROM Maps WHERE MapId = @MapId", connection))
+                {
+                    nameCmd.Parameters.AddWithValue("@MapId", mapId);
+                    var result = nameCmd.ExecuteScalar();
+                    if (result != null) mapName = result.ToString() ?? "Unknown Map";
+                }
+
                 using var cmd = new SqlCommand("DELETE FROM Maps WHERE MapId = @MapId", connection);
-
                 cmd.Parameters.AddWithValue("@MapId", mapId);
                 cmd.ExecuteNonQuery();
 
-                InsertAuditLog("DELETE", "Maps", mapId, "Entire map deleted.");
-
+                // CHANGED: Fixed arguments to match the new schema
+                InsertAuditLog("DELETE", "Maps", "Entire map deleted.", mapName);
             }
             catch (Exception ex)
             {
@@ -93,12 +98,9 @@ namespace NetworkMapViewerV2.Data
                 {
                     state.MapId = reader.GetInt32(0);
                     state.MapName = reader.GetString(1);
-
-                    // 2. Ensure the reader actually assigns the MapType to the loaded map
                     state.MapType = reader.IsDBNull(2) ? "Head Office" : reader.GetString(2);
                 }
-
-                reader.Close(); // Close the reader before moving on to load devices/labels
+                reader.Close();
             }
 
             // 2. Get Devices
@@ -121,7 +123,6 @@ namespace NetworkMapViewerV2.Data
                         Address = reader["Address"].ToString() ?? "",
                         HintImagePath = reader["HintImagePath"].ToString() ?? "",
                         TargetMapId = reader["TargetMapId"] != DBNull.Value ? Convert.ToInt32(reader["TargetMapId"]) : (int?)null,
-                        // Deserialize JSON back into C# ObservableCollections
                         Titles = JsonSerializer.Deserialize<ObservableCollection<string>>(titlesJson) ?? [],
                         Hints = JsonSerializer.Deserialize<ObservableCollection<string>>(hintsJson) ?? []
                     });
@@ -155,8 +156,6 @@ namespace NetworkMapViewerV2.Data
                         FontStyle = reader["FontStyle"].ToString() ?? "Normal",
                         FontWeight = reader["FontWeight"].ToString() ?? "Normal",
                         Foreground = reader["Foreground"].ToString() ?? "#000000",
-
-                        // Deserialize JSON Text lines
                         TextLines = JsonSerializer.Deserialize<ObservableCollection<string>>(textJson) ?? []
                     });
                 }
@@ -167,14 +166,14 @@ namespace NetworkMapViewerV2.Data
 
         // ─── UPSERT (UPDATE OR INSERT) OPERATIONS ───────────────────────
 
-        private void UpdateDeviceInternal(NetworkDevice device, SqlConnection connection, SqlTransaction transaction)
+        private void UpdateDeviceInternal(NetworkDevice device, SqlConnection connection, SqlTransaction transaction, string mapName)
         {
             string titlesJson = JsonSerializer.Serialize(device.Titles);
             string hintsJson = JsonSerializer.Serialize(device.Hints);
+            List<string> changedFields = [];
 
             if (device.DeviceId == 0) // INSERT
             {
-                // Wrapped Left and Top in brackets
                 string sql = @"
             INSERT INTO Devices (MapId, GroupId, [Left], [Top], Address, TitleJson, HintsJson, HintImagePath, TargetMapId) 
             VALUES (@MapId, @GroupId, @Left, @Top, @Address, @TitleJson, @HintsJson, @HintImagePath, @TargetMapId);
@@ -192,14 +191,14 @@ namespace NetworkMapViewerV2.Data
                 cmd.Parameters.AddWithValue("@TargetMapId", device.TargetMapId.HasValue ? (object)device.TargetMapId.Value : DBNull.Value);
 
                 device.DeviceId = Convert.ToInt32(cmd.ExecuteScalar());
-                InsertAuditLogInternal("INSERT", "Devices", device.DeviceId, $"Added new device on map", connection, transaction);
+
+                // CHANGED: Fixed arguments to match the new schema
+                InsertAuditLogInternal("INSERT", "Devices", $"Added new device (IP: {device.Address})", mapName, connection, transaction);
             }
             else // UPDATE
             {
                 bool hasChanges = false;
-                List<string> changedFields = [];
 
-                // Wrapped Left and Top in brackets
                 string checkSql = "SELECT GroupId, [Left], [Top], Address, TitleJson, HintsJson, HintImagePath, TargetMapId FROM Devices WHERE DeviceId = @DeviceId";
                 using (var checkCmd = new SqlCommand(checkSql, connection, transaction))
                 {
@@ -219,7 +218,7 @@ namespace NetworkMapViewerV2.Data
 
                         if (dbGroupId != (device.GroupId <= 0 ? 1 : device.GroupId)) { hasChanges = true; changedFields.Add("Type"); }
                         if (Math.Abs(dbLeft - device.Left) > 0.01 || Math.Abs(dbTop - device.Top) > 0.01) { hasChanges = true; changedFields.Add("Position"); }
-                        if (dbAddress != (device.Address ?? "")) { hasChanges = true; changedFields.Add("IP"); }
+                        if (dbAddress != (device.Address ?? "")) { hasChanges = true; changedFields.Add($"IP: {dbAddress} -> {device.Address}"); }
                         if (dbTitleJson != titlesJson) { hasChanges = true; changedFields.Add("Titles"); }
                         if (dbHintsJson != hintsJson) { hasChanges = true; changedFields.Add("Hints"); }
                         if (dbImagePath != (device.HintImagePath ?? "")) { hasChanges = true; changedFields.Add("Image"); }
@@ -234,7 +233,6 @@ namespace NetworkMapViewerV2.Data
 
                 if (!hasChanges) return;
 
-                // Wrapped Left and Top in brackets
                 string sql = @"
             UPDATE Devices SET GroupId=@GroupId, [Left]=@Left, [Top]=@Top, Address=@Address, 
             TitleJson=@TitleJson, HintsJson=@HintsJson, HintImagePath=@HintImagePath, TargetMapId=@TargetMapId 
@@ -254,7 +252,8 @@ namespace NetworkMapViewerV2.Data
 
                     cmd.ExecuteNonQuery();
 
-                    InsertAuditLogInternal("UPDATE", "Devices", device.DeviceId, $"Device IP: {device.Address ?? ""}; Changed: {string.Join(", ", changedFields)}", connection, transaction);
+                    // CHANGED: Fixed arguments to match the new schema
+                    InsertAuditLogInternal("UPDATE", "Devices", $"Device IP: {device.Address ?? ""}; Changed: {string.Join(", ", changedFields)}", mapName, connection, transaction);
                 }
                 catch (Exception ex)
                 {
@@ -270,13 +269,12 @@ namespace NetworkMapViewerV2.Data
             }
         }
 
-        private void UpdateLabelInternal(NetworkLabel label, SqlConnection connection, SqlTransaction transaction)
+        private void UpdateLabelInternal(NetworkLabel label, SqlConnection connection, SqlTransaction transaction, string mapName)
         {
             string textJson = JsonSerializer.Serialize(label.TextLines);
 
             if (label.LabelId == 0) // INSERT
             {
-                // Wrapped Left and Top in brackets
                 string sql = @"
             INSERT INTO Labels (MapId, [Left], [Top], Width, Height, Background, BorderBrush, BorderThickness, HorizontalAlignment, VerticalAlignment, FontFamily, FontSize, FontStyle, FontWeight, Foreground, TextJson) 
             VALUES (@MapId, @Left, @Top, @Width, @Height, @Background, @BorderBrush, @BorderThickness, @HorizontalAlignment, @VerticalAlignment, @FontFamily, @FontSize, @FontStyle, @FontWeight, @Foreground, @TextJson);
@@ -285,13 +283,15 @@ namespace NetworkMapViewerV2.Data
                 using var cmd = new SqlCommand(sql, connection, transaction);
                 AddLabelParameters(cmd, label, textJson);
                 label.LabelId = Convert.ToInt32(cmd.ExecuteScalar());
+
+                // CHANGED: Added missing INSERT audit log here
+                InsertAuditLogInternal("INSERT", "Labels", "Added new label", mapName, connection, transaction);
             }
             else // UPDATE
             {
                 bool hasChanges = false;
                 List<string> changedFields = [];
 
-                // Wrapped Left and Top in brackets
                 string checkSql = @"SELECT [Left], [Top], Width, Height, TextJson, Background, Foreground, FontSize, FontFamily, FontWeight, FontStyle FROM Labels WHERE LabelId = @LabelId";
                 using (var checkCmd = new SqlCommand(checkSql, connection, transaction))
                 {
@@ -312,15 +312,25 @@ namespace NetworkMapViewerV2.Data
                         string dbFontWeight = reader.IsDBNull(9) ? "Normal" : reader.GetString(9);
                         string dbFontStyle = reader.IsDBNull(10) ? "Normal" : reader.GetString(10);
 
-                        if (Math.Abs(dbLeft - label.Left) > 0.01 || Math.Abs(dbTop - label.Top) > 0.01) { hasChanges = true; changedFields.Add("Position"); }
-                        if (Math.Abs(dbWidth - label.Width) > 0.01 || Math.Abs(dbHeight - label.Height) > 0.01) { hasChanges = true; changedFields.Add("Size"); }
-                        if (dbTextJson != textJson) { hasChanges = true; changedFields.Add("Text"); }
-                        if (dbBackground != (label.Background ?? "Transparent") || dbForeground != (label.Foreground ?? "#000000") ||
-                         Math.Abs(dbFontSize - label.FontSize) > 0.01 || dbFontFamily != (label.FontFamily ?? "Segoe UI") ||
-                         dbFontWeight != (label.FontWeight ?? "Normal") || dbFontStyle != (label.FontStyle ?? "Normal"))
+                        if (Math.Abs(dbLeft - label.Left) > 0.01) { hasChanges = true; changedFields.Add($"Left: {Math.Round(dbLeft, 1)} -> {Math.Round(label.Left, 1)}"); }
+                        if (Math.Abs(dbTop - label.Top) > 0.01) { hasChanges = true; changedFields.Add($"Top: {Math.Round(dbTop, 1)} -> {Math.Round(label.Top, 1)}"); }
+                        if (Math.Abs(dbWidth - label.Width) > 0.01) { hasChanges = true; changedFields.Add($"Width: {Math.Round(dbWidth, 1)} -> {Math.Round(label.Width, 1)}"); }
+                        if (dbTextJson != textJson) { hasChanges = true; changedFields.Add($"Text Updated"); }
+
+                        if (dbBackground != (label.Background ?? "Transparent"))
                         {
                             hasChanges = true;
-                            changedFields.Add("Formatting");
+                            changedFields.Add($"Bg: {dbBackground} -> {label.Background}");
+                        }
+                        if (dbForeground != (label.Foreground ?? "#000000"))
+                        {
+                            hasChanges = true;
+                            changedFields.Add($"Fg: {dbForeground} -> {label.Foreground}");
+                        }
+                        if (Math.Abs(dbFontSize - label.FontSize) > 0.01)
+                        {
+                            hasChanges = true;
+                            changedFields.Add($"Font Size: {dbFontSize} -> {label.FontSize}");
                         }
                     }
                     else
@@ -332,7 +342,6 @@ namespace NetworkMapViewerV2.Data
 
                 if (!hasChanges) return;
 
-                // Wrapped Left and Top in brackets
                 string sql = @"
             UPDATE Labels SET 
                 [Left] = @Left, [Top] = @Top, Width = @Width, Height = @Height, 
@@ -349,7 +358,8 @@ namespace NetworkMapViewerV2.Data
                     AddLabelParameters(cmd, label, textJson);
                     cmd.ExecuteNonQuery();
 
-                    InsertAuditLogInternal("UPDATE", "Labels", label.LabelId, $"Changed: {string.Join(", ", changedFields)}", connection, transaction);
+                    // CHANGED: Fixed arguments to match the new schema
+                    InsertAuditLogInternal("UPDATE", "Labels", $"Changed: {string.Join(", ", changedFields)}", mapName, connection, transaction);
                 }
                 catch (Exception ex)
                 {
@@ -391,13 +401,14 @@ namespace NetworkMapViewerV2.Data
         {
             try
             {
-                if (deviceId <= 0) return true; // Treat as success so the UI still removes unsaved elements!
+                if (deviceId <= 0) return true;
                 using var connection = GetOpenConnection();
                 using var cmd = new SqlCommand("DELETE FROM Devices WHERE DeviceId = @DeviceId", connection);
                 cmd.Parameters.AddWithValue("@DeviceId", deviceId);
                 cmd.ExecuteNonQuery();
 
-                InsertAuditLog("DELETE", "Devices", deviceId, "Device removed from map.");
+                // CHANGED: Fixed arguments to match the new schema
+                InsertAuditLog("DELETE", "Devices", "Device removed from map.", null);
                 return true;
             }
             catch (Exception ex)
@@ -424,7 +435,8 @@ namespace NetworkMapViewerV2.Data
                 cmd.Parameters.AddWithValue("@LabelId", labelId);
                 cmd.ExecuteNonQuery();
 
-                InsertAuditLog("DELETE", "Labels", labelId, "Label removed from map.");
+                // CHANGED: Fixed arguments to match the new schema
+                InsertAuditLog("DELETE", "Labels", "Label removed from map.", null);
                 return true;
             }
             catch (Exception ex)
@@ -460,10 +472,6 @@ namespace NetworkMapViewerV2.Data
 
             if (equalitySearch)
             {
-                // OVERRIDE the broad search with a strict "Whole Word" boundary search.
-                // We append spaces to the column (' ' + TitleJson + ' ') to ensure the first and last words always have a boundary.
-                // [^a-zA-Z0-9] means "not a letter or number" (e.g., space, quote, or bracket).
-
                 sql = deepSearch
                     ? @"SELECT MapId, DeviceId FROM Devices 
                         WHERE (JSON_VALUE(TitleJson, '$[2]') = @Query OR JSON_VALUE(TitleJson, '$[2]') LIKE @Query + ' %')
@@ -474,7 +482,7 @@ namespace NetworkMapViewerV2.Data
             }
 
             using var cmd = new SqlCommand(sql, connection);
-            cmd.Parameters.AddWithValue("@Query", query); // MS SQL LIKE is case-insensitive by default!
+            cmd.Parameters.AddWithValue("@Query", query);
 
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
@@ -511,7 +519,6 @@ namespace NetworkMapViewerV2.Data
         {
             var connection = new SqlConnection(DatabaseService.ConnectionString);
             connection.Open();
-            // PRAGMA foreign_keys = ON; removed. SQL Server natively enforces Foreign Keys!
             return connection;
         }
 
@@ -529,23 +536,56 @@ namespace NetworkMapViewerV2.Data
                 using var cmd = new SqlCommand(sql, connection);
                 AddGroupParameters(cmd, group);
                 group.GroupId = Convert.ToInt32(cmd.ExecuteScalar());
+
+                // CHANGED: Added missing INSERT log 
+                InsertAuditLogInternal("INSERT", "Groups", $"Created new group: {group.GroupName}", null, connection, null);
             }
             else // EXISTING GROUP
             {
-                string sql = @"
-                    UPDATE Groups SET 
-                        GroupName = @GroupName, IconPath = @IconPath, 
-                        IsMapLink = @IsMapLink
-                    WHERE GroupId = @GroupId";
+                // CHANGED: Added dynamic diffing logic just like Labels and Devices!
+                bool hasChanges = false;
+                List<string> changedFields = [];
 
-                using var cmd = new SqlCommand(sql, connection);
-                cmd.Parameters.AddWithValue("@GroupId", group.GroupId);
-                cmd.Parameters.AddWithValue("@GroupName", group.GroupName ?? "New Group");
-                cmd.Parameters.AddWithValue("@IconPath", group.IconPath ?? "");
-                cmd.Parameters.AddWithValue("@IsMapLink", group.IsMapLink ? 1 : 0);
-                cmd.ExecuteNonQuery();
+                string checkSql = "SELECT GroupName, IconPath, IsMapLink FROM Groups WHERE GroupId = @GroupId";
+                using (var checkCmd = new SqlCommand(checkSql, connection))
+                {
+                    checkCmd.Parameters.AddWithValue("@GroupId", group.GroupId);
+                    using var reader = checkCmd.ExecuteReader();
 
-                InsertAuditLogInternal("UPDATE", "Groups", group.GroupId, $"Updated group name: {group.GroupName}", connection, null);
+                    if (reader.Read())
+                    {
+                        string dbGroupName = reader.IsDBNull(0) ? "" : reader.GetString(0);
+                        string dbIconPath = reader.IsDBNull(1) ? "" : reader.GetString(1);
+                        bool dbIsMapLink = !reader.IsDBNull(2) && reader.GetBoolean(2);
+
+                        if (dbGroupName != (group.GroupName ?? "")) { hasChanges = true; changedFields.Add($"Name: {dbGroupName} -> {group.GroupName}"); }
+                        if (dbIconPath != (group.IconPath ?? "")) { hasChanges = true; changedFields.Add("Icon"); }
+                        if (dbIsMapLink != group.IsMapLink) { hasChanges = true; changedFields.Add($"IsMapLink: {dbIsMapLink} -> {group.IsMapLink}"); }
+                    }
+                    else
+                    {
+                        hasChanges = true;
+                        changedFields.Add("Forced Update");
+                    }
+                }
+
+                if (hasChanges)
+                {
+                    string sql = @"
+                        UPDATE Groups SET 
+                            GroupName = @GroupName, IconPath = @IconPath, 
+                            IsMapLink = @IsMapLink
+                        WHERE GroupId = @GroupId";
+
+                    using var cmd = new SqlCommand(sql, connection);
+                    cmd.Parameters.AddWithValue("@GroupId", group.GroupId);
+                    cmd.Parameters.AddWithValue("@GroupName", group.GroupName ?? "New Group");
+                    cmd.Parameters.AddWithValue("@IconPath", group.IconPath ?? "");
+                    cmd.Parameters.AddWithValue("@IsMapLink", group.IsMapLink ? 1 : 0);
+                    cmd.ExecuteNonQuery();
+
+                    InsertAuditLogInternal("UPDATE", "Groups", $"Changed: {string.Join(", ", changedFields)}", null, connection, null);
+                }
             }
 
             SettingsService.UpdateGroupDefaultCommand(group.GroupId, group.DefaultCommand ?? "Ping");
@@ -586,8 +626,6 @@ namespace NetworkMapViewerV2.Data
                     GroupName = reader.GetString(1),
                     IconPath = reader.IsDBNull(2) ? "" : reader.GetString(2),
                     DefaultCommand = finalCommand,
-
-                    // Changed GetInt32(4) == 1 to GetBoolean(4)
                     IsMapLink = !reader.IsDBNull(4) && reader.GetBoolean(4)
                 });
             }
@@ -601,43 +639,46 @@ namespace NetworkMapViewerV2.Data
             cmd.Parameters.AddWithValue("@GroupId", groupId);
             cmd.ExecuteNonQuery();
 
-            InsertAuditLog("DELETE", "Groups", groupId, "Device group removed.");
+            // CHANGED: Fixed arguments to match the new schema
+            InsertAuditLog("DELETE", "Groups", "Device group removed.", null);
         }
 
         // --- 1. WRITE TO LOG ---
-        public void InsertAuditLog(string actionType, string tableName, int recordId, string details = "")
+
+        // CHANGED: Completely updated signature and parameters to match the new AuditLogs table!
+        public void InsertAuditLog(string actionType, string target, string details, string mapName = null)
         {
             using var connection = GetOpenConnection();
 
             string sql = @"
-                INSERT INTO AuditLogs (Timestamp, Username, ActionType, TableName, RecordId, Details) 
-                VALUES (@Timestamp, @Username, @ActionType, @TableName, @RecordId, @Details)";
+                INSERT INTO AuditLogs (TimeStamp, mapName, userName, ActionType, Target, Details) 
+                VALUES (@TimeStamp, @mapName, @userName, @ActionType, @Target, @Details)";
 
             using var cmd = new SqlCommand(sql, connection);
 
-            // Replaced string conversion with direct DateTime parsing (standard for MS SQL)
-            cmd.Parameters.AddWithValue("@Timestamp", DateTime.Now);
-            cmd.Parameters.AddWithValue("@Username", Environment.UserName);
+            cmd.Parameters.AddWithValue("@TimeStamp", DateTime.Now);
+            cmd.Parameters.AddWithValue("@mapName", string.IsNullOrWhiteSpace(mapName) ? DBNull.Value : mapName);
+            cmd.Parameters.AddWithValue("@userName", Environment.UserName);
             cmd.Parameters.AddWithValue("@ActionType", actionType);
-            cmd.Parameters.AddWithValue("@TableName", tableName);
-            cmd.Parameters.AddWithValue("@RecordId", recordId);
+            cmd.Parameters.AddWithValue("@Target", target);
             cmd.Parameters.AddWithValue("@Details", details);
 
             cmd.ExecuteNonQuery();
         }
 
-        private void InsertAuditLogInternal(string actionType, string tableName, int recordId, string details, SqlConnection connection, SqlTransaction transaction)
+        private void InsertAuditLogInternal(string actionType, string target, string details, string mapName, SqlConnection connection, SqlTransaction transaction)
         {
             string sql = @"
-        INSERT INTO AuditLogs (Timestamp, Username, ActionType, TableName, RecordId, Details) 
-        VALUES (@Timestamp, @Username, @ActionType, @TableName, @RecordId, @Details)";
+        INSERT INTO AuditLogs (TimeStamp, mapName, userName, ActionType, Target, Details) 
+        VALUES (@TimeStamp, @mapName, @userName, @ActionType, @Target, @Details)";
 
             using var cmd = new SqlCommand(sql, connection, transaction);
-            cmd.Parameters.AddWithValue("@Timestamp", DateTime.Now);
-            cmd.Parameters.AddWithValue("@Username", Environment.UserName);
+
+            cmd.Parameters.AddWithValue("@TimeStamp", DateTime.Now);
+            cmd.Parameters.AddWithValue("@mapName", string.IsNullOrWhiteSpace(mapName) ? DBNull.Value : mapName);
+            cmd.Parameters.AddWithValue("@userName", Environment.UserName);
             cmd.Parameters.AddWithValue("@ActionType", actionType);
-            cmd.Parameters.AddWithValue("@TableName", tableName);
-            cmd.Parameters.AddWithValue("@RecordId", recordId);
+            cmd.Parameters.AddWithValue("@Target", target);
             cmd.Parameters.AddWithValue("@Details", details);
 
             cmd.ExecuteNonQuery();
@@ -649,7 +690,17 @@ namespace NetworkMapViewerV2.Data
             var logs = new List<AuditLog>();
             using var connection = GetOpenConnection();
 
-            string sql = "SELECT * FROM AuditLogs ORDER BY LogId DESC";
+            string sql = @"
+        SELECT TOP (1000) 
+            [id], 
+            [TimeStamp], 
+            [mapName], 
+            [userName], 
+            [ActionType], 
+            [Target], 
+            [Details]
+        FROM [AuditLogs]
+        ORDER BY [TimeStamp] DESC";
 
             using var cmd = new SqlCommand(sql, connection);
             using var reader = cmd.ExecuteReader();
@@ -658,44 +709,41 @@ namespace NetworkMapViewerV2.Data
             {
                 logs.Add(new AuditLog
                 {
-                    LogId = reader.GetInt32(0),
-                    // Converted to safely read native DATETIME back to a string
-                    Timestamp = Convert.ToDateTime(reader["Timestamp"]).ToString("yyyy-MM-dd HH:mm:ss"),
-                    Username = reader.GetString(2),
-                    ActionType = reader.GetString(3),
-                    TableName = reader.GetString(4),
-                    RecordId = reader.GetInt32(5),
+                    Id = reader.GetInt32(0),
+                    TimeStamp = Convert.ToDateTime(reader.GetDateTime(1)).ToString("yyyy-MM-dd HH:mm:ss"),
+                    MapName = reader.IsDBNull(2) ? "Unknown Map" : reader.GetString(2),
+                    UserName = reader.IsDBNull(3) ? "System" : reader.GetString(3),
+                    ActionType = reader.IsDBNull(4) ? "" : reader.GetString(4),
+                    Target = reader.IsDBNull(5) ? "" : reader.GetString(5),
                     Details = reader.IsDBNull(6) ? "" : reader.GetString(6)
                 });
             }
+
             return logs;
         }
 
-
-        public void UpdateDevice(NetworkDevice device)
+        public void UpdateDevice(NetworkDevice device, string mapName)
         {
             using var connection = GetOpenConnection();
             using var transaction = connection.BeginTransaction();
             try
             {
-                UpdateDeviceInternal(device, connection, transaction);
+                UpdateDeviceInternal(device, connection, transaction, mapName);
                 transaction.Commit();
             }
             catch { transaction.Rollback(); throw; }
         }
 
-        public void UpdateLabel(NetworkLabel label)
+        public void UpdateLabel(NetworkLabel label, string mapName)
         {
             using var connection = GetOpenConnection();
             using var transaction = connection.BeginTransaction();
             try
             {
-                UpdateLabelInternal(label, connection, transaction);
+                UpdateLabelInternal(label, connection, transaction, mapName);
                 transaction.Commit();
             }
             catch { transaction.Rollback(); throw; }
         }
-
-
     }
 }

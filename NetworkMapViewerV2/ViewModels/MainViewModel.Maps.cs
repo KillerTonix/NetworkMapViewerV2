@@ -205,8 +205,8 @@ namespace NetworkMapViewerV2.ViewModels
                 var repo = new Data.MapRepository();
 
                 // Save all devices and labels in memory to the database
-                foreach (var device in SelectedTab.Devices) repo.UpdateDevice(device);
-                foreach (var label in SelectedTab.Labels) repo.UpdateLabel(label);
+                foreach (var device in SelectedTab.Devices) repo.UpdateDevice(device, SelectedTab.MapName);
+                foreach (var label in SelectedTab.Labels) repo.UpdateLabel(label, SelectedTab.MapName);
 
                 SelectedTab.HasUnsavedChanges = false;
             }
