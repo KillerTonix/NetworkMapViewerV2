@@ -73,7 +73,8 @@
                 <StackPanel Margin="10" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <!-- Header -->
                     <TextBlock Text="Network Map Viewer" FontSize="28" Foreground="#E0E0E0" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,0,0,5"/>
-                    <TextBlock Text="Version 2.0" FontSize="14" Foreground="#888888" HorizontalAlignment="Center" Margin="0,0,0,25"/>
+                    <TextBlock Text="Version 2.0" FontSize="14" Foreground="#888888" HorizontalAlignment="Center" Margin="0,0,0,0"/>
+                    <TextBlock x:Name="txtBuildDate" Text="Build Date: " FontSize="14" Foreground="#888888" HorizontalAlignment="Center" Margin="0,0,0,25"/>
 
                     <!-- Developer Tag -->
                     <Border Background="#3F3F46" CornerRadius="8" Padding="15" Margin="0,0,0,25">

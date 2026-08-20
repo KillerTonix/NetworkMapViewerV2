@@ -1,0 +1,32 @@
+﻿using System.Windows;
+
+namespace NetworkMapViewerV2.Views
+{
+    public partial class InputDialog : Window
+    {
+        public string ResponseText { get; private set; } = "";
+
+        public InputDialog(string prompt, string title, string defaultResponse = "")
+        {
+            InitializeComponent();
+            Title = title;
+            PromptText.Text = prompt;
+            InputTextBox.Text = defaultResponse;
+
+            // Highlight the text so the user can just start typing to replace it
+            InputTextBox.SelectAll();
+            InputTextBox.Focus();
+        }
+
+        private void OkButton_Click(object sender, RoutedEventArgs e)
+        {
+            ResponseText = InputTextBox.Text;
+            DialogResult = true;
+        }
+
+        private void CancelButton_Click(object sender, RoutedEventArgs e)
+        {
+            DialogResult = false;
+        }
+    }
+}

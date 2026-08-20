@@ -23,6 +23,13 @@ namespace NetworkMapViewerV2.Views
 
             // 3. Bind the DataContext so the XAML can see the list
             this.DataContext = this;
+
+            var buildDateAttribute = System.Reflection.Assembly.GetExecutingAssembly().GetCustomAttributes(typeof(System.Reflection.AssemblyMetadataAttribute), false)
+            .Cast<System.Reflection.AssemblyMetadataAttribute>().FirstOrDefault(attr => attr.Key == "BuildDate");
+
+            string buildDate = buildDateAttribute?.Value ?? "Unknown";
+
+            txtBuildDate.Text = $"Build Date: {buildDate}";
         }
 
         // Live Search Filter Logic

@@ -49,7 +49,7 @@ namespace NetworkMapViewerV2.Services
                         }
 
                         var tasks = new List<Task>();
-                        using var throttler = new SemaphoreSlim(20);
+                        using var throttler = new SemaphoreSlim(50);
 
                         // 2. Iterate over the SAFE snapshot, not the live UI collection!
                         foreach (var device in safeDevicesSnapshot)

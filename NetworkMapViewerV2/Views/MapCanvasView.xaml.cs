@@ -2036,7 +2036,7 @@ namespace NetworkMapViewerV2.Views
             // 2. Grab the first valid IP from the map's current devices
             var referenceDevice = _currentState.Devices.FirstOrDefault(d =>
                 !string.IsNullOrWhiteSpace(d.Address) &&
-                d.Address != "0.0.0.0" &&
+                d.Address.StartsWith("192.168.") && d.Address.EndsWith("101") &&
                 System.Net.IPAddress.TryParse(d.Address, out _));
 
             // 3. If we found a device, calculate the base network
@@ -2050,11 +2050,21 @@ namespace NetworkMapViewerV2.Views
                 }
             }
 
-            // 4. Show the InputBox with the dynamically calculated default!
-            string cidrInput = Microsoft.VisualBasic.Interaction.InputBox(
+            // 4. Show the native WPF InputDialog with the dynamically calculated default!
+            var inputDialog = new InputDialog(
                 "Enter the CIDR network range to scan (e.g., 192.168.102.0/24 or 192.168.110.0/24):",
                 "Auto-Discovery",
                 defaultCidr);
+
+            // Center it over the main window
+            inputDialog.Owner = Window.GetWindow(this);
+
+            if (inputDialog.ShowDialog() != true || string.IsNullOrWhiteSpace(inputDialog.ResponseText))
+            {
+                return; // User canceled or left it blank
+            }
+
+            string cidrInput = inputDialog.ResponseText.Trim();
 
             if (string.IsNullOrWhiteSpace(cidrInput)) return;
 
