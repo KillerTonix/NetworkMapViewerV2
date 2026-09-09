@@ -74,9 +74,14 @@ namespace NetworkMapViewerV2.Views
 
             if (confirm == MessageBoxResult.Yes)
             {
-                SelectedMapId = (int)lstMaps.SelectedValue;
-                ActionTaken = MapDialogAction.Delete;
-                this.DialogResult = true; // Closes the window
+                var confirm2 = MessageBox.Show("Are you COMPLETELY sure you want to permanently delete this map?\nAll devices and labels on this map will also be destroyed.",
+                                          "Confirm Deletion", MessageBoxButton.YesNo, MessageBoxImage.Error);
+                if (confirm2 == MessageBoxResult.Yes)
+                {
+                    SelectedMapId = (int)lstMaps.SelectedValue;
+                    ActionTaken = MapDialogAction.Delete;
+                    this.DialogResult = true; // Closes the window
+                }
             }
         }
 

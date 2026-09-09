@@ -24,31 +24,31 @@ namespace NetworkMapViewerV2.Views
     {
 
         // --- NEW: Interactivity State ---
-        private readonly List<FrameworkElement> _selectedElements = [];
+        internal readonly List<FrameworkElement> _selectedElements = [];
         public MapTabState _currentState = new(); // Keep track of the current map
         private readonly DropShadowEffect _selectionGlow = new() { Color = Colors.Cyan, BlurRadius = 20, ShadowDepth = 0 };
         private Brush? _gridBrush;
-        private readonly Brush _standardBrush = new SolidColorBrush(Color.FromRgb(105, 105, 105));
+        internal readonly Brush _standardBrush = new SolidColorBrush(Color.FromRgb(105, 105, 105));
 
-        private bool _isDragging = false;
-        private bool _wasAlreadySelected = false;
-        private Point _clickPosition;
-        private FrameworkElement? _draggedElement;
-        private int _originalZIndex;
-        private readonly Dictionary<FrameworkElement, Point> _dragStartPositions = [];
-        private Point _lastRightClickPosition;
+        internal bool _isDragging = false;
+        internal bool _wasAlreadySelected = false;
+        internal Point _clickPosition;
+        internal FrameworkElement? _draggedElement;
+        internal int _originalZIndex;
+        internal readonly Dictionary<FrameworkElement, Point> _dragStartPositions = [];
+        internal Point _lastRightClickPosition;
 
         // --- NEW: Marquee Selection & Clipboard State ---
-        private Point _selectionStartPoint;
-        private Rectangle? _selectionBox;
-        private bool _isMarqueeSelecting = false;
-        private Stack<Action> _undoStack = new Stack<Action>();
-        private readonly static List<NetworkDevice> _copiedDevices = [];
-        private readonly static List<NetworkLabel> _copiedLabels = [];
-        private static int _pasteOffsetMultiplier = 1; // Makes multiple pastes cascade nicely!
+        internal Point _selectionStartPoint;
+        internal Rectangle? _selectionBox;
+        internal bool _isMarqueeSelecting = false;
+        internal Stack<Action> _undoStack = new();
+        internal readonly static List<NetworkDevice> _copiedDevices = [];
+        internal readonly static List<NetworkLabel> _copiedLabels = [];
+        internal static int _pasteOffsetMultiplier = 1; // Makes multiple pastes cascade nicely!
 
         // Helper to get global state from our ViewModel
-        private static MainViewModel GlobalViewModel => (MainViewModel)Application.Current.MainWindow.DataContext;
+        internal static MainViewModel GlobalViewModel => (MainViewModel)Application.Current.MainWindow.DataContext;
 
         public MapCanvasView()
         {
@@ -241,7 +241,7 @@ namespace NetworkMapViewerV2.Views
             }
         }
 
-        public void DrawMap(MapTabState? state)
+        internal void DrawMap(MapTabState? state)
         {
             // 1. DESTROY ALL BINDINGS SO WPF CAN DELETE THE OLD UI ELEMENTS
             foreach (UIElement child in DrawingCanvas.Children)
@@ -655,7 +655,7 @@ namespace NetworkMapViewerV2.Views
             }
         }
 
-        public static void UpdateModelPosition(FrameworkElement el, double? left, double? top)
+        internal static void UpdateModelPosition(FrameworkElement el, double? left, double? top)
         {
             if (el.Tag is NetworkDevice device) { if (left.HasValue) device.Left = left.Value; if (top.HasValue) device.Top = top.Value; }
             else if (el.Tag is NetworkLabel label) { if (left.HasValue) label.Left = left.Value; if (top.HasValue) label.Top = top.Value; }
@@ -709,7 +709,7 @@ namespace NetworkMapViewerV2.Views
 
 
 
-        private void SelectElement(FrameworkElement? element, bool multiSelect)
+        internal void SelectElement(FrameworkElement? element, bool multiSelect)
         {
             // Clear old selection if we aren't holding CTRL
             if (!multiSelect)
@@ -1112,8 +1112,12 @@ namespace NetworkMapViewerV2.Views
             var miDiscover = new MenuItem { Icon = "🔍", Header = "Auto-Discover Devices...", FontWeight = FontWeights.Bold };
             miDiscover.Click += async (s, args) => await RunAutoDiscoveryAsync();
 
-            var miUpdateDevices = new MenuItem { Icon = "🔄", Header = "Update All Devices..." };
-            miUpdateDevices.Command = GlobalViewModel.UpdateGroupDataCommand;
+            var miUpdateDevices = new MenuItem
+            {
+                Icon = "🔄",
+                Header = "Update All Devices...",
+                Command = GlobalViewModel.UpdateGroupDataCommand
+            };
 
             var miAddDevice = new MenuItem { Icon = "🖥️", Header = "Add Device Here...", FontWeight = FontWeights.Bold };
 
@@ -1468,7 +1472,7 @@ namespace NetworkMapViewerV2.Views
         }
 
 
-        private void EnforceBounds(FrameworkElement el, ref double newLeft, ref double newTop)
+        internal void EnforceBounds(FrameworkElement el, ref double newLeft, ref double newTop)
         {
             // 1. Lock the Top/Left edges at 0
             if (newLeft < 0) newLeft = 0;
@@ -1496,347 +1500,11 @@ namespace NetworkMapViewerV2.Views
 
         private void UserControl_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            if (_currentState == null) return;
-
-            bool isCtrlDown = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
-            bool isShiftDown = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
-            bool isAltDown = Keyboard.Modifiers.HasFlag(ModifierKeys.Alt);
-
-            // --- UNDO LOGIC (Ctrl + Z) ---
-            if (isCtrlDown && e.Key == Key.Z && _currentState.IsEditingEnabled)
-            {
-                if (_undoStack.Count > 0)
-                {
-                    var undoAction = _undoStack.Pop();
-                    undoAction.Invoke(); // Executes the reverse action!
-
-                    _selectedElements.Clear();
-                    _currentState?.HasUnsavedChanges = true;
-                    DrawMap(_currentState);
-                }
-                e.Handled = true;
-                return;
-            }
-
-            // --- EDIT LOGIC (F2) ---
-            if (e.Key == Key.F2 && _selectedElements.Count == 1)
-            {
-                var el = _selectedElements[0];
-
-                if (el.Tag is NetworkDevice d)
-                {
-                    bool isEditeMode = true;
-                    if (!_currentState.IsEditingEnabled) isEditeMode = false;
-                    var dlg = new DevicePropertiesWindow(d, isEditeMode) { Owner = Window.GetWindow(this) };
-                    if (dlg.ShowDialog() == true)
-                    {
-                        _currentState?.HasUnsavedChanges = true;
-                        DrawMap(_currentState);
-                    }
-                }
-                else if (el.Tag is NetworkLabel l)
-                {
-                    var dlg = new LabelPropertiesWindow(l, true) { Owner = Window.GetWindow(this) };
-                    if (dlg.ShowDialog() == true)
-                    {
-                        _currentState?.HasUnsavedChanges = true;
-                        DrawMap(_currentState);
-                    }
-                }
-
-                e.Handled = true;
-                return;
-            }
-
-            // --- DELETION LOGIC (Delete) ---
-            if (e.Key == Key.Delete && _currentState.IsEditingEnabled && _selectedElements.Count > 0)
-            {
-                var result = MessageBox.Show($"Delete {_selectedElements.Count} selected item(s)?", "Confirm Delete", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-                if (result == MessageBoxResult.Yes)
-                {
-                    var repo = new Data.MapRepository();
-
-                    // Capture items for Undo before removing them
-                    var deletedDevices = new List<NetworkDevice>();
-                    var deletedLabels = new List<NetworkLabel>();
-                    bool encounteredError = false;
-
-                    foreach (var el in _selectedElements)
-                    {
-                        if (el.Tag is NetworkDevice d)
-                        {
-                            // Wait for the DB to confirm the deletion
-                            bool success = (d.DeviceId > 0) ? repo.DeleteDevice(d.DeviceId) : true;
-
-                            if (success)
-                            {
-                                deletedDevices.Add(d);
-                                _currentState?.Devices.Remove(d);
-                            }
-                            else
-                            {
-                                encounteredError = true;
-                                break; // Stop processing further deletions if permissions are denied
-                            }
-                        }
-                        else if (el.Tag is NetworkLabel l)
-                        {
-                            bool success = (l.LabelId > 0) ? repo.DeleteLabel(l.LabelId) : true;
-
-                            if (success)
-                            {
-                                deletedLabels.Add(l);
-                                _currentState?.Labels.Remove(l);
-                            }
-                            else
-                            {
-                                encounteredError = true;
-                                break;
-                            }
-                        }
-                    }
-
-                    // UNDO HISTORY: Only push if we actually deleted something!
-                    if (deletedDevices.Count > 0 || deletedLabels.Count > 0)
-                    {
-                        _undoStack.Push(() =>
-                        {
-                            foreach (var d in deletedDevices) { d.DeviceId = 0; _currentState.Devices.Add(d); }
-                            foreach (var l in deletedLabels) { l.LabelId = 0; _currentState.Labels.Add(l); }
-                        });
-
-                        _currentState.HasUnsavedChanges = true;
-                    }
-
-                    // Always clear the selection box, even if an error happened
-                    _selectedElements.Clear();
-                    DrawMap(_currentState);
-                }
-                e.Handled = true;
-                return;
-            }
-
-            // --- FIND AND REPLACE LOGIC (Ctrl + H) ---
-            if (isCtrlDown && e.Key == Key.H && _currentState.IsEditingEnabled)
-            {
-                ExecuteFindAndReplace();
-                e.Handled = true;
-                return;
-            }
-
-            // --- COPY LOGIC (Ctrl + C) ---
-            if (isCtrlDown && e.Key == Key.C && _currentState.IsEditingEnabled)
-            {
-                _copiedDevices.Clear();
-                _copiedLabels.Clear();
-                _pasteOffsetMultiplier = 1; // Reset offset
-
-                foreach (var el in _selectedElements)
-                {
-                    if (el.Tag is NetworkDevice d) _copiedDevices.Add(d);
-                    else if (el.Tag is NetworkLabel l) _copiedLabels.Add(l);
-                }
-                e.Handled = true;
-                return;
-            }
-
-            // --- CUT LOGIC (Ctrl + X) ---
-            if (isCtrlDown && e.Key == Key.X && _currentState.IsEditingEnabled)
-            {
-                _copiedDevices.Clear();
-                _copiedLabels.Clear();
-                _pasteOffsetMultiplier = 1;
-
-                var repo = new Data.MapRepository();
-                var cutDevices = new List<NetworkDevice>();
-                var cutLabels = new List<NetworkLabel>();
-
-                foreach (var el in _selectedElements)
-                {
-                    if (el.Tag is NetworkDevice d)
-                    {
-                        _copiedDevices.Add(d);
-                        cutDevices.Add(d);
-                        _currentState?.Devices.Remove(d);
-                        if (d.DeviceId > 0) repo.DeleteDevice(d.DeviceId);
-                    }
-                    else if (el.Tag is NetworkLabel l)
-                    {
-                        _copiedLabels.Add(l);
-                        cutLabels.Add(l);
-                        _currentState?.Labels.Remove(l);
-                        if (l.LabelId > 0) repo.DeleteLabel(l.LabelId);
-                    }
-                }
-
-                // UNDO HISTORY: How to reverse a Cut
-                _undoStack.Push(() =>
-                {
-                    foreach (var d in cutDevices) { d.DeviceId = 0; _currentState.Devices.Add(d); }
-                    foreach (var l in cutLabels) { l.LabelId = 0; _currentState.Labels.Add(l); }
-                });
-
-                _selectedElements.Clear();
-                _currentState?.HasUnsavedChanges = true;
-                DrawMap(_currentState);
-
-                e.Handled = true;
-                return;
-            }
-
-            // --- PASTE LOGIC (Ctrl + V / Ctrl + Shift + V) ---
-            if (isCtrlDown && e.Key == Key.V && _currentState.IsEditingEnabled)
-            {
-                double offset = isShiftDown ? 0 : 30 * _pasteOffsetMultiplier;
-                SelectElement(null, false); // Clear current selection
-
-                if (_copiedDevices.Count == 0 && _copiedLabels.Count == 0) return;
-
-                var newlyPastedDevices = new List<NetworkDevice>();
-                var newlyPastedLabels = new List<NetworkLabel>();
-
-                // Paste Devices
-                foreach (var d in _copiedDevices)
-                {
-                    var newDev = new NetworkDevice
-                    {
-                        MapId = _currentState.MapId,
-                        GroupId = d.GroupId,
-                        TargetMapId = d.TargetMapId,
-                        Address = d.Address,
-                        Left = d.Left + offset,
-                        Top = d.Top + offset,
-                        HintImagePath = d.HintImagePath
-                    };
-                    foreach (var t in d.Titles) newDev.Titles.Add(t);
-                    foreach (var h in d.Hints) newDev.Hints.Add(h);
-
-                    _currentState.Devices.Add(newDev);
-                    newlyPastedDevices.Add(newDev);
-                }
-
-                // Paste Labels
-                foreach (var l in _copiedLabels)
-                {
-                    var newLab = new NetworkLabel
-                    {
-                        MapId = _currentState.MapId,
-                        Left = l.Left + offset,
-                        Top = l.Top + offset,
-                        Width = l.Width,
-                        Height = l.Height,
-                        FontSize = l.FontSize,
-                        FontFamily = l.FontFamily,
-                        FontWeight = l.FontWeight,
-                        FontStyle = l.FontStyle,
-                        Background = l.Background,
-                        BorderBrush = l.BorderBrush,
-                        Foreground = l.Foreground,
-                        HorizontalAlignment = l.HorizontalAlignment,
-                        VerticalAlignment = l.VerticalAlignment
-                    };
-                    foreach (var t in l.TextLines) newLab.TextLines.Add(t);
-
-                    _currentState.Labels.Add(newLab);
-                    newlyPastedLabels.Add(newLab);
-                }
-
-                // UNDO HISTORY: How to reverse a Paste
-                _undoStack.Push(() =>
-                {
-                    var repo = new Data.MapRepository();
-                    foreach (var d in newlyPastedDevices) { _currentState.Devices.Remove(d); if (d.DeviceId > 0) repo.DeleteDevice(d.DeviceId); }
-                    foreach (var l in newlyPastedLabels) { _currentState.Labels.Remove(l); if (l.LabelId > 0) repo.DeleteLabel(l.LabelId); }
-                });
-
-                if (!isShiftDown) _pasteOffsetMultiplier++;
-
-                _currentState?.HasUnsavedChanges = true;
-                DrawMap(_currentState);
-
-                // --- NEW: AUTO-SELECT PASTED ITEMS ---
-                // Change "MapCanvas" to whatever x:Name is in your XAML file!
-                foreach (FrameworkElement child in DrawingCanvas.Children)
-                {
-                    if (child.Tag != null && (newlyPastedDevices.Contains(child.Tag) || newlyPastedLabels.Contains(child.Tag)))
-                    {
-                        SelectElement(child, true); // true = add to multi-select
-                    }
-                }
-
-                e.Handled = true;
-                return;
-            }
-
-            if (_currentState.IsEditingEnabled)
-            {
-                // --- ARROW KEY MOVEMENT LOGIC ---
-                double step = isShiftDown ? 10.0 : 1.0;
-                double dx = 0, dy = 0;
-
-                if (e.Key == Key.Left) dx = -step;
-                else if (e.Key == Key.Right) dx = step;
-                else if (e.Key == Key.Up) dy = -step;
-                else if (e.Key == Key.Down) dy = step;
-
-                if (dx != 0 || dy != 0)
-                {
-                    // Capture old positions for Undo
-                    var moveHistory = new List<Tuple<object, double, double>>();
-
-                    foreach (var el in _selectedElements)
-                    {
-                        double oldLeft = Canvas.GetLeft(el);
-                        double oldTop = Canvas.GetTop(el);
-
-                        // Save state before move
-                        moveHistory.Add(new Tuple<object, double, double>(el.Tag, oldLeft, oldTop));
-
-                        double newLeft = oldLeft + dx;
-                        double newTop = oldTop + dy;
-
-                        EnforceBounds(el, ref newLeft, ref newTop);
-
-                        Canvas.SetLeft(el, newLeft);
-                        Canvas.SetTop(el, newTop);
-                        UpdateModelPosition(el, newLeft, newTop);
-                    }
-
-                    // UNDO HISTORY: How to reverse a move
-                    _undoStack.Push(() =>
-                    {
-                        foreach (var historyItem in moveHistory)
-                        {
-                            if (historyItem.Item1 is NetworkDevice d) { d.Left = historyItem.Item2; d.Top = historyItem.Item3; }
-                            if (historyItem.Item1 is NetworkLabel l) { l.Left = historyItem.Item2; l.Top = historyItem.Item3; }
-                        }
-                    });
-
-                    _currentState?.HasUnsavedChanges = true;
-                    e.Handled = true;
-                }
-            }
-
-            // --- ALIGNMENT SHORTCUTS (Alt + Keys) ---
-            if (isAltDown && _selectedElements.Count > 1 && _currentState != null && _currentState.IsEditingEnabled)
-            {
-                Key actualKey = e.Key == Key.System ? e.SystemKey : e.Key;
-
-                switch (actualKey)
-                {
-                    case Key.Up: Align.AlignSelectedElements(_selectedElements, GlobalViewModel, this, AlignMode.Top); e.Handled = true; return;
-                    case Key.Down: Align.AlignSelectedElements(_selectedElements, GlobalViewModel, this, AlignMode.Bottom); e.Handled = true; return;
-                    case Key.Left: Align.AlignSelectedElements(_selectedElements, GlobalViewModel, this, AlignMode.Left); e.Handled = true; return;
-                    case Key.Right: Align.AlignSelectedElements(_selectedElements, GlobalViewModel, this, AlignMode.Right); e.Handled = true; return;
-                    case Key.S: Align.AlignSelectedElements(_selectedElements, GlobalViewModel, this, AlignMode.Middle); e.Handled = true; return;
-                    case Key.C: Align.AlignSelectedElements(_selectedElements, GlobalViewModel, this, AlignMode.Center); e.Handled = true; return;
-                    case Key.A: AutoAlignSelectedPairs(); e.Handled = true; return;
-                }
-            }
+            Services.MapKeyboardService.HandlePreviewKeyDown(e, this);
         }
 
 
-        private void AutoAlignSelectedPairs()
+        internal void AutoAlignSelectedPairs()
         {
             if (_currentState == null || !_currentState.IsEditingEnabled) return;
 
@@ -1925,7 +1593,7 @@ namespace NetworkMapViewerV2.Views
 
 
 
-        private void ExecuteFindAndReplace()
+        internal void ExecuteFindAndReplace()
         {
             if (_currentState == null || !_currentState.IsEditingEnabled) return;
 
@@ -2054,10 +1722,11 @@ namespace NetworkMapViewerV2.Views
             var inputDialog = new InputDialog(
                 "Enter the CIDR network range to scan (e.g., 192.168.102.0/24 or 192.168.110.0/24):",
                 "Auto-Discovery",
-                defaultCidr);
-
-            // Center it over the main window
-            inputDialog.Owner = Window.GetWindow(this);
+                defaultCidr)
+            {
+                // Center it over the main window
+                Owner = Window.GetWindow(this)
+            };
 
             if (inputDialog.ShowDialog() != true || string.IsNullOrWhiteSpace(inputDialog.ResponseText))
             {

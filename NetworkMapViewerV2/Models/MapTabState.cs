@@ -11,7 +11,8 @@ namespace NetworkMapViewerV2.Models
         public string MapType { get; set; } = "Head Office";
         public List<NetworkDevice> Devices { get; set; } = [];
         public List<NetworkLabel> Labels { get; set; } = [];
-
+        public List<int> PendingDeletedDeviceIds { get; set; } = [];
+        public List<int> PendingDeletedLabelIds { get; set; } = [];
         public Action? RequestGatherDevices;
         // ==========================================
         // --- NEW: UI STATE PROPERTIES ---
