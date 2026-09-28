@@ -19,7 +19,7 @@
 
             <TextBlock Text="🔎" FontSize="26" VerticalAlignment="Center" Margin="20,0,15,0" Foreground="#999999"/>
 
-            <TextBox x:Name="txtSpotlightSearch" Grid.Column="1" Background="Transparent" BorderThickness="0"
+            <TextBox x:Name="txtSpotlightSearch" Grid.Column="1" Background="Transparent" 
                      Foreground="White" FontSize="26" VerticalAlignment="Center" 
                      CaretBrush="White" Margin="0,0,20,0"/>
         </Grid>

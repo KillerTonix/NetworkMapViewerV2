@@ -205,9 +205,9 @@ namespace NetworkMapViewerV2.ViewModels
                 var repo = new Data.MapRepository();
 
                 // Delete any devices or labels that were marked for deletion
-                foreach (int deviceId in SelectedTab.PendingDeletedDeviceIds) { repo.DeleteDevice(deviceId); }
+                foreach (int deviceId in SelectedTab.PendingDeletedDeviceIds) { repo.DeleteDevice(deviceId, SelectedTab.MapName); }
                 SelectedTab.PendingDeletedDeviceIds.Clear(); // Empty the queue
-                foreach (int labelId in SelectedTab.PendingDeletedLabelIds) { repo.DeleteLabel(labelId); }
+                foreach (int labelId in SelectedTab.PendingDeletedLabelIds) { repo.DeleteLabel(labelId, SelectedTab.MapName); }
                 SelectedTab.PendingDeletedLabelIds.Clear(); // Empty the queue
 
                 // Save all devices and labels in memory to the database

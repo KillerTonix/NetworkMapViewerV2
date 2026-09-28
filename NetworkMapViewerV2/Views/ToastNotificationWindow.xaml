@@ -28,12 +28,12 @@
                 <TextBlock x:Name="txtTitle" Grid.Row="0" FontWeight="Bold" FontSize="16" Foreground="White" Margin="0,0,0,5" TextWrapping="Wrap"/>
 
                 <ScrollViewer Grid.Row="1" MaxHeight="320" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                    <TextBlock x:Name="txtMessage" FontSize="13" Foreground="#CCCCCC" TextWrapping="Wrap" Margin="0,0,5,0"/>
+                    <TextBlock x:Name="txtMessage" FontSize="13" Foreground="Black" TextWrapping="Wrap" Margin="0,0,5,0"/>
                 </ScrollViewer>
             </Grid>
 
             <Button Grid.Column="2" Content="✕" Width="25" Height="25" VerticalAlignment="Top" 
-            Background="Transparent" Foreground="Gray" BorderThickness="0" FontSize="14"
+            Background="Transparent" Foreground="Gray"  FontSize="14"
             Click="BtnClose_Click" Cursor="Hand" ToolTip="Dismiss"/>
         </Grid>
     </Border>

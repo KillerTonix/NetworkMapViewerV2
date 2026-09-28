@@ -4,7 +4,7 @@
         Title="Create New Device Type" Height="450" Width="400" 
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize" WindowStyle="ToolWindow">
 
-    <Grid Margin="15">
+    <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -18,10 +18,10 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <Label Grid.Row="0" Content="Device Type Name (e.g., Firewall):" FontWeight="Bold"/>
+        <Label Grid.Row="0" Content="Device Type Name (e.g., Firewall):" />
         <TextBox x:Name="txtName" Grid.Row="1" Height="25" Margin="0,0,0,15" Padding="2"/>
 
-        <Label Grid.Row="2" Content="Icon Image Path:" FontWeight="Bold"/>
+        <Label Grid.Row="2" Content="Icon Image Path:" />
         <Grid Grid.Row="3" Margin="0,0,0,15">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
@@ -31,7 +31,7 @@
             <Button x:Name="btnBrowse" Grid.Column="1" Content="Browse..." Click="BtnBrowse_Click"/>
         </Grid>
 
-        <Label Grid.Row="4" Content="Default Double-Click Command:" FontWeight="Bold"/>
+        <Label Grid.Row="4" Content="Default Double-Click Command:" />
         <ComboBox x:Name="cmbCommands" Grid.Row="5" Height="25" VerticalAlignment="Top" Margin="0,0,0,15" DisplayMemberPath="Name" SelectedValuePath="Name"/>
  
         <StackPanel Grid.Row="9" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">

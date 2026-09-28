@@ -4,11 +4,11 @@
         Title="Add Notification Rule" Height="270" Width="350"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
 
-    <StackPanel Margin="20">
-        <TextBlock Text="Target Devices:" FontWeight="Bold" Margin="0,0,0,5"/>
+    <StackPanel Margin="10">
+        <TextBlock Text="Target Devices:"  Margin="0,0,0,5"/>
         <ComboBox x:Name="cmbTargets" DisplayMemberPath="GroupName" SelectedValuePath="GroupId" Height="28" Margin="0,0,0,20"/>
 
-        <TextBlock Text="Triggers:" FontWeight="Bold" Margin="0,0,0,5"/>
+        <TextBlock Text="Triggers:"  Margin="0,0,0,5"/>
         <CheckBox x:Name="chkGoesDown" Content="When device goes down" IsChecked="True" Margin="0,0,0,8"/>
         <CheckBox x:Name="chkWakesUp" Content="When device wakes up" IsChecked="True" Margin="0,0,0,20"/>
 

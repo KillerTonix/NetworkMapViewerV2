@@ -397,7 +397,7 @@ namespace NetworkMapViewerV2.Data
 
         // ─── DELETE OPERATIONS ──────────────────────────────────────────
 
-        public bool DeleteDevice(int deviceId)
+        public bool DeleteDevice(int deviceId, string mapName)
         {
             try
             {
@@ -408,7 +408,7 @@ namespace NetworkMapViewerV2.Data
                 cmd.ExecuteNonQuery();
 
                 // CHANGED: Fixed arguments to match the new schema
-                InsertAuditLog("DELETE", "Devices", "Device removed from map.", null);
+                InsertAuditLog("DELETE", "Devices", "Device removed from map.", mapName);
                 return true;
             }
             catch (Exception ex)
@@ -425,7 +425,7 @@ namespace NetworkMapViewerV2.Data
             }
         }
 
-        public bool DeleteLabel(int labelId)
+        public bool DeleteLabel(int labelId, string mapName)
         {
             try
             {
@@ -436,7 +436,7 @@ namespace NetworkMapViewerV2.Data
                 cmd.ExecuteNonQuery();
 
                 // CHANGED: Fixed arguments to match the new schema
-                InsertAuditLog("DELETE", "Labels", "Label removed from map.", null);
+                InsertAuditLog("DELETE", "Labels", "Label removed from map.", mapName);
                 return true;
             }
             catch (Exception ex)
@@ -646,7 +646,7 @@ namespace NetworkMapViewerV2.Data
         // --- 1. WRITE TO LOG ---
 
         // CHANGED: Completely updated signature and parameters to match the new AuditLogs table!
-        public void InsertAuditLog(string actionType, string target, string details, string mapName = null)
+        public void InsertAuditLog(string actionType, string target, string details, string mapName)
         {
             using var connection = GetOpenConnection();
 

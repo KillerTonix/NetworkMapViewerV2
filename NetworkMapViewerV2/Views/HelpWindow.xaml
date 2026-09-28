@@ -58,7 +58,7 @@
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0" Text="{Binding KeyCombo}" Foreground="#569CD6" FontWeight="SemiBold"/>
-                                        <TextBlock Grid.Column="1" Text="{Binding Description}" Foreground="#CCCCCC" TextWrapping="Wrap"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding Description}" Foreground="White" TextWrapping="Wrap"/>
                                     </Grid>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
