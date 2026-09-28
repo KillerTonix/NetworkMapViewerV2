@@ -30,7 +30,7 @@
                                     </Style>
                                 </TextBlock.Style>
                             </TextBlock>
-                            <TextBox x:Name="txtSearch" Background="Transparent" Foreground="White" BorderThickness="0" FontSize="14" Padding="5" TextChanged="TxtSearch_TextChanged"/>
+                            <TextBox x:Name="txtSearch" Background="Transparent" Foreground="White"  FontSize="14" Padding="5" TextChanged="TxtSearch_TextChanged"/>
                         </Grid>
                     </Border>
 
