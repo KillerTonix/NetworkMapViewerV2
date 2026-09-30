@@ -67,20 +67,17 @@ namespace NetworkMapViewerV2.ViewModels
                     else if (result == MessageBoxResult.Yes)
                     {
                         SaveMap();
-                        ReloadMap();
+                        _ = ReloadMap();
                     }
                     else if (result == MessageBoxResult.No)
                     {
                         SelectedTab.HasUnsavedChanges = false;
-                        ReloadMap();
+                        _ = ReloadMap();
                     }
                 }
 
                 // We use a null check here just in case ReloadMap() completely destroyed and recreated the tab
-                if (SelectedTab != null)
-                {
-                    SelectedTab.IsEditingEnabled = false; // EXPLICITLY turn off
-                }
+                SelectedTab?.IsEditingEnabled = false; // EXPLICITLY turn off
             }
             else
             {
@@ -189,7 +186,7 @@ namespace NetworkMapViewerV2.ViewModels
                 var currentTab = SelectedTab;
                 if (currentTab != null)
                 {
-                    SelectedTab = null;
+                    SelectedTab = null!;
                     SelectedTab = currentTab;
                 }
 

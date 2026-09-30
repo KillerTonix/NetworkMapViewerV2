@@ -68,7 +68,7 @@ namespace NetworkMapViewerV2.Views
                 BtnBrowseImage.IsEnabled = true;
                 txtAddress.IsReadOnly = false;
                 cmbType.IsEnabled = true;
-                if (cmbTargetMap != null) cmbTargetMap.IsEnabled = true;
+                cmbTargetMap?.IsEnabled = true;
             }
             else
             {
@@ -79,7 +79,7 @@ namespace NetworkMapViewerV2.Views
                 BtnBrowseImage.IsEnabled = false;
                 txtAddress.IsReadOnly = true;
                 cmbType.IsEnabled = false;
-                if (cmbTargetMap != null) cmbTargetMap.IsEnabled = false;
+                cmbTargetMap?.IsEnabled = false;
                 this.Title += " {View Mode}";
             }
 
@@ -237,11 +237,11 @@ namespace NetworkMapViewerV2.Views
             this.DataContext = null;
 
             // 2. Explicitly wipe the ItemsSource for both ComboBoxes to break the memory locks
-            if (cmbType != null) cmbType.ItemsSource = null;
-            if (cmbTargetMap != null) cmbTargetMap.ItemsSource = null;
+            cmbType?.ItemsSource = null;
+            cmbTargetMap?.ItemsSource = null;
 
             // 3. Drop the reference to the device just to be perfectly safe
-            EditingDevice = null;
+            EditingDevice = null!;
 
             base.OnClosed(e);
         }

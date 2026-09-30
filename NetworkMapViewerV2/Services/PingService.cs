@@ -38,7 +38,7 @@ namespace NetworkMapViewerV2.Services
                             await app.Dispatcher.InvokeAsync(() =>
                             {
                                 // Freezes a copy of the list for this specific ping cycle
-                                safeDevicesSnapshot = devicesToPing.ToList();
+                                safeDevicesSnapshot = [.. devicesToPing];
                             });
                         }
 
@@ -63,7 +63,7 @@ namespace NetworkMapViewerV2.Services
                                 {
                                     bool isUp = await PingHostAsync(device.Address);
 
-                                    if (!token.IsCancellationRequested && app != null && !app.Dispatcher.HasShutdownStarted)
+                                    if (!token.IsCancellationRequested && app != null && !app.Dispatcher!.HasShutdownStarted)
                                     {
                                         await app.Dispatcher.InvokeAsync(() =>
                                         {
@@ -91,13 +91,10 @@ namespace NetworkMapViewerV2.Services
 
         public void StopPinging()
         {
-            if (_cts != null)
-            {
-                _cts.Cancel(); // Tell the loop to stop
-                // THE FIX: DO NOT call _cts.Dispose() here! 
-                // Let the garbage collector handle it, otherwise running tasks crash when checking IsCancellationRequested
-                _cts = null;
-            }
+            _cts?.Cancel(); // Tell the loop to stop
+                            // THE FIX: DO NOT call _cts.Dispose() here! 
+                            // Let the garbage collector handle it, otherwise running tasks crash when checking IsCancellationRequested
+            _cts = null;
         }
 
         public static async Task<bool> PingHostAsync(string ipAddress, int maxAttempts = 2)

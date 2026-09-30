@@ -38,7 +38,7 @@ namespace NetworkMapViewerV2.ViewModels
             // SAFETY CHECK: Never reload if they are actively editing or have unsaved changes!
             if (SelectedTab != null && !SelectedTab.IsEditingEnabled && !SelectedTab.HasUnsavedChanges)
             {
-                ReloadMap(); // Your existing method
+                _ = ReloadMap(); 
             }
         }        
     }

@@ -110,7 +110,7 @@ namespace NetworkMapViewerV2.ViewModels
 
             if (activeGroupsForDialog.Count == 0) return;
 
-            var dialog = new UpdateGroupDataWindow(activeGroupsForDialog, _appSettings.ScriptsPath)
+            var dialog = new UpdateGroupDataWindow(activeGroupsForDialog, _appSettings.ScriptsPath ?? string.Empty)
             {
                 Owner = Application.Current.MainWindow
             };

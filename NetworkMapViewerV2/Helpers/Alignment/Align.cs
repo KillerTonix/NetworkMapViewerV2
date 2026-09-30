@@ -36,7 +36,7 @@ namespace NetworkMapViewerV2.Helpers.Alignment
                     double visualLeft = currentLeft + fw.Margin.Left;
                     double visualTop = currentTop + fw.Margin.Top;
 
-                    Rect outer = new Rect(visualLeft, visualTop, fw.ActualWidth, fw.ActualHeight);
+                    Rect outer = new(visualLeft, visualTop, fw.ActualWidth, fw.ActualHeight);
                     outerBounds[fw] = outer;
 
                     if (outer.Left < outerMinX) outerMinX = outer.Left;
@@ -55,7 +55,7 @@ namespace NetworkMapViewerV2.Helpers.Alignment
 
                         // 3-pixel inset ONLY for the icons to ignore the cyan glow
                         double inset = (img != null) ? 3 : 0;
-                        Rect inner = new Rect(
+                        Rect inner = new(
                             topLeft.X + inset,
                             topLeft.Y + inset,
                             Math.Max(0, targetVisual.ActualWidth - (inset * 2)),
@@ -122,7 +122,7 @@ namespace NetworkMapViewerV2.Helpers.Alignment
                 }
             }
 
-            if (GlobalViewModel != null) if (mapCanvas._currentState != null) mapCanvas._currentState.HasUnsavedChanges = true;
+            if (GlobalViewModel != null) mapCanvas._currentState?.HasUnsavedChanges = true;
         }
 
         private static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
@@ -134,7 +134,7 @@ namespace NetworkMapViewerV2.Helpers.Alignment
                     return t;
                 else
                 {
-                    var childOfChild = FindVisualChild<T>(child);
+                    var childOfChild = FindVisualChild<T>(child!);
                     if (childOfChild != null)
                         return childOfChild;
                 }

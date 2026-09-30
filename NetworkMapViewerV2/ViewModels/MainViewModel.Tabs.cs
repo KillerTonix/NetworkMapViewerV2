@@ -52,7 +52,7 @@ namespace NetworkMapViewerV2.ViewModels
                 if (value.MapId > 0 && _appSettings?.LastOpenedMapId != value.MapId)
                 {
                     _appSettings?.LastOpenedMapId = value.MapId;
-                    SettingsService.Save(_appSettings);
+                    SettingsService.Save(_appSettings!);
                 }
             }
         }

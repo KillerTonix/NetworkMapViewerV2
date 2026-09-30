@@ -7,70 +7,276 @@
         xmlns:views="clr-namespace:NetworkMapViewerV2.Views"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
         mc:Ignorable="d"
-        Title="OptionsWindow" Height="580" Width="600">
-    <Grid>
+        Title="Options" Height="630" Width="820"
+        Background="#E2E8F0" TextElement.Foreground="#0F172A"
+        FontFamily="Segoe UI">
+
+    <Window.Resources>
+        <!-- Tab Control Custom Light Style -->
+        <Style TargetType="TabControl">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+        </Style>
+
+        <Style TargetType="TabItem">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="Normal"/>
+            <Setter Property="Foreground" Value="#334155"/>
+            <Setter Property="Padding" Value="5"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="Border" 
+                                Background="Transparent" 
+                                BorderThickness="0,0,0,2" 
+                                BorderBrush="Transparent" 
+                                Padding="{TemplateBinding Padding}" 
+                                Margin="0,0,6,0"
+                                Cursor="Hand">
+                            <ContentPresenter x:Name="ContentSite"
+                                              VerticalAlignment="Center"
+                                              HorizontalAlignment="Center"
+                                              ContentSource="Header"
+                                              RecognizesAccessKey="True"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="#CBD5E1"/>
+                                <Setter Property="Foreground" Value="#0F172A"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Border" Property="BorderBrush" Value="#2563EB"/>
+                                <Setter TargetName="Border" Property="BorderThickness" Value="0,0,0,3"/>
+                                <Setter TargetName="Border" Property="Background" Value="#FFFFFF"/>
+                                <Setter Property="Foreground" Value="#2563EB"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Modern High-Contrast TextBox Style -->
+        <Style TargetType="TextBox">
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Setter Property="BorderBrush" Value="#94A3B8"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="#0F172A"/>
+            <Setter Property="Padding" Value="6,4"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="border" 
+                                Background="{TemplateBinding Background}" 
+                                BorderBrush="{TemplateBinding BorderBrush}" 
+                                BorderThickness="{TemplateBinding BorderThickness}" 
+                                CornerRadius="6">
+                            <ScrollViewer x:Name="PART_ContentHost" Focusable="false" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="true">
+                                <Setter TargetName="border" Property="BorderBrush" Value="#475569"/>
+                            </Trigger>
+                            <Trigger Property="IsFocused" Value="true">
+                                <Setter TargetName="border" Property="BorderBrush" Value="#2563EB"/>
+                                <Setter TargetName="border" Property="BorderThickness" Value="1.5"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="false">
+                                <Setter TargetName="border" Property="Background" Value="#E2E8F0"/>
+                                <Setter Property="Foreground" Value="#64748B"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Modern High-Contrast ListBox Style -->
+        <Style TargetType="ListBox">
+            <Setter Property="Background" Value="#F8FAFC"/>
+            <Setter Property="BorderBrush" Value="#94A3B8"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="4"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBox">
+                        <Border x:Name="Bd" 
+                                Background="{TemplateBinding Background}" 
+                                BorderBrush="{TemplateBinding BorderBrush}" 
+                                BorderThickness="{TemplateBinding BorderThickness}" 
+                                CornerRadius="8">
+                            <ScrollViewer Focusable="false" Padding="{TemplateBinding Padding}">
+                                <ItemsPresenter SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                            </ScrollViewer>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ListBoxItem Style -->
+        <Style TargetType="ListBoxItem">
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="Margin" Value="0,1"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Bd" 
+                                Background="Transparent" 
+                                BorderThickness="0" 
+                                CornerRadius="6" 
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#E2E8F0"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#DBEAFE"/>
+                                <Setter Property="Foreground" Value="#1E40AF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Action Button Style (Tactile Gray) -->
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="#F1F5F9"/>
+            <Setter Property="BorderBrush" Value="#94A3B8"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="#1E293B"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border" 
+                                Background="{TemplateBinding Background}" 
+                                BorderBrush="{TemplateBinding BorderBrush}" 
+                                BorderThickness="{TemplateBinding BorderThickness}" 
+                                CornerRadius="6" 
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" 
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#E2E8F0"/>
+                                <Setter TargetName="border" Property="BorderBrush" Value="#64748B"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#CBD5E1"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="border" Property="Background" Value="#F1F5F9"/>
+                                <Setter TargetName="border" Property="BorderBrush" Value="#CBD5E1"/>
+                                <Setter Property="Foreground" Value="#94A3B8"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Section Card Container -->
+        <Style x:Key="SectionCard" TargetType="Border">
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Setter Property="BorderBrush" Value="#CBD5E1"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Padding" Value="18"/>
+            <Setter Property="Margin" Value="0,8,0,0"/>
+        </Style>
+
+        <!-- Custom ScrollBar Styling -->
+        <Style TargetType="ScrollViewer">
+            <Setter Property="Focusable" Value="False"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="15">
         <Grid.RowDefinitions>
-            <RowDefinition Height="480"/>
+            <!-- Main Content Area -->
             <RowDefinition Height="*"/>
+            <!-- Footer Action Buttons -->
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TabControl x:Name="SettingsTC" Grid.Row="0" Margin="10">
-            <TabItem Header="Commands">
-                <Border Margin="10" BorderThickness="1">
+        <!-- MAIN TABS -->
+        <TabControl x:Name="SettingsTC" Grid.Row="0">
+
+            <!-- 1. COMMANDS TAB -->
+            <TabItem Header="⚙️ Commands">
+                <Border Style="{StaticResource SectionCard}">
                     <Grid>
-                        <Label Content="External commands list:" VerticalAlignment="Top" />
-                        <Grid Margin="0,30,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Text="Manage External Commands" FontWeight="Bold" FontSize="15" Foreground="#0F172A" Margin="0,0,0,12"/>
+
+                        <Grid Grid.Row="1">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="100"/>
+                                <ColumnDefinition Width="130"/>
                             </Grid.ColumnDefinitions>
 
-                            <ListBox x:Name="CommandsListBox" Grid.Column="0" Margin="5" Padding="5" BorderThickness="1" BorderBrush="Black" >
+                            <ListBox x:Name="CommandsListBox" Grid.Column="0" Margin="0,0,12,0">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate>
                                         <StackPanel Orientation="Horizontal" Margin="2">
-                                            <TextBlock Text="{Binding Icon}" Margin="0,0,10,0" />
-                                            <TextBlock Text="{Binding Name}" />
+                                            <TextBlock Text="{Binding Icon}" FontSize="14" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="#0F172A" VerticalAlignment="Center"/>
                                         </StackPanel>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
                             </ListBox>
 
-                            <StackPanel Grid.Column="1" Orientation="Vertical" Margin="5">
-                                <Button Click="AddCommandButton_Click" Margin="0,0,0,5" HorizontalContentAlignment="Left" Width="90">
+                            <StackPanel Grid.Column="1" Orientation="Vertical">
+                                <Button Click="AddCommandButton_Click" Margin="0,0,0,6" HorizontalContentAlignment="Left">
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="➕" FontSize="16" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                                        <TextBlock Text="Add" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="5,0,0,0"/>
+                                        <TextBlock Text="➕" FontSize="14" VerticalAlignment="Center"/>
+                                        <TextBlock Text="Add" VerticalAlignment="Center" Margin="8,0,0,0"/>
                                     </StackPanel>
                                 </Button>
-                                <Button Click="AddCoppyCommandButton_Click" Margin="0,0,0,5" HorizontalContentAlignment="Left" Width="90">
+                                <Button Click="AddCoppyCommandButton_Click" Margin="0,0,0,6" HorizontalContentAlignment="Left">
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="📑" FontSize="16" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                                        <TextBlock Text="Add copy" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="5,0,0,0"/>
+                                        <TextBlock Text="📑" FontSize="14" VerticalAlignment="Center"/>
+                                        <TextBlock Text="Add Copy" VerticalAlignment="Center" Margin="8,0,0,0"/>
                                     </StackPanel>
                                 </Button>
-                                <Button Click="RemoveCommandButton_Click" HorizontalContentAlignment="Left" Width="90">
+                                <Button Click="RemoveCommandButton_Click" Margin="0,0,0,6" HorizontalContentAlignment="Left">
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="➖" FontSize="16" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                                        <TextBlock Text="Remove" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="5,0,0,0"/>
+                                        <TextBlock Text="➖" FontSize="14" VerticalAlignment="Center"/>
+                                        <TextBlock Text="Remove" VerticalAlignment="Center" Margin="8,0,0,0"/>
                                     </StackPanel>
                                 </Button>
-                                <Button Click="EditCommandButton_CLick" Margin="0,5,0,0" HorizontalContentAlignment="Left" Width="90">
+                                <Button Click="EditCommandButton_CLick" Margin="0,0,0,12" HorizontalContentAlignment="Left">
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="📝" FontSize="16" VerticalAlignment="Center" HorizontalAlignment="Left"/>
-                                        <TextBlock Text="Edit" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                        <TextBlock Text="✏️" FontSize="14" VerticalAlignment="Center"/>
+                                        <TextBlock Text="Edit" VerticalAlignment="Center" Margin="8,0,0,0"/>
                                     </StackPanel>
                                 </Button>
-                                <Button Click="MoveUpCommandButton_Click" Margin="0,5,0,0" HorizontalContentAlignment="Left">
+
+                                <Button Click="MoveUpCommandButton_Click" Margin="0,0,0,6" HorizontalContentAlignment="Left">
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="⬆️" FontSize="18" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="5,0,0,0"/>
-                                        <TextBlock Text="Move Up" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="5,0,0,0"/>
+                                        <TextBlock Text="⬆️" FontSize="14" VerticalAlignment="Center"/>
+                                        <TextBlock Text="Move Up" VerticalAlignment="Center" Margin="8,0,0,0"/>
                                     </StackPanel>
                                 </Button>
-                                <Button  Click="MoveDownCommandButton_Click" Margin="0,5,0,0" HorizontalContentAlignment="Left">
+                                <Button Click="MoveDownCommandButton_Click" HorizontalContentAlignment="Left">
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="⬇" FontSize="18" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="5,0,0,0"/>
-                                        <TextBlock Text="Move Down" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,5,0,0"/>
+                                        <TextBlock Text="⬇️" FontSize="14" VerticalAlignment="Center"/>
+                                        <TextBlock Text="Move Down" VerticalAlignment="Center" Margin="8,0,0,0"/>
                                     </StackPanel>
                                 </Button>
                             </StackPanel>
@@ -78,45 +284,53 @@
                     </Grid>
                 </Border>
             </TabItem>
-            <TabItem Header="Device Types">
-                <Border Margin="10" BorderThickness="1">
+
+            <!-- 2. DEVICE TYPES TAB -->
+            <TabItem Header="💻 Device Types">
+                <Border Style="{StaticResource SectionCard}">
                     <Grid>
-                        <Label Content="Manage Custom Device Types:" VerticalAlignment="Top" />
-                        <Grid Margin="0,30,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Text="Manage Custom Device Types" FontWeight="Bold" FontSize="15" Foreground="#0F172A" Margin="0,0,0,12"/>
+
+                        <Grid Grid.Row="1">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="100"/>
+                                <ColumnDefinition Width="130"/>
                             </Grid.ColumnDefinitions>
 
-                            <ListBox x:Name="DeviceGroupsListBox" Grid.Column="0" Margin="5" Padding="5" BorderThickness="1" BorderBrush="Black" >
+                            <ListBox x:Name="DeviceGroupsListBox" Grid.Column="0" Margin="0,0,12,0">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate>
                                         <StackPanel Orientation="Horizontal" Margin="2">
-                                            <TextBlock Text="🖥️" Margin="0,0,10,0" />
-                                            <TextBlock Text="{Binding GroupName}" FontWeight="Bold" Margin="0,0,10,0"/>
-                                            <TextBlock Text="{Binding DefaultCommand}" Foreground="Gray" FontStyle="Italic"/>
+                                            <TextBlock Text="🖥️" FontSize="14" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding GroupName}" FontWeight="Bold" Foreground="#0F172A" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding DefaultCommand}" Foreground="#475569" FontStyle="Italic" VerticalAlignment="Center"/>
                                         </StackPanel>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
                             </ListBox>
 
-                            <StackPanel Grid.Column="1" Orientation="Vertical" Margin="5">
-                                <Button Click="AddGroupButton_Click" Margin="0,0,0,5" HorizontalContentAlignment="Left" Width="90">
+                            <StackPanel Grid.Column="1" Orientation="Vertical">
+                                <Button Click="AddGroupButton_Click" Margin="0,0,0,6" HorizontalContentAlignment="Left">
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="➕" FontSize="16" VerticalAlignment="Center"/>
-                                        <TextBlock Text="Add" VerticalAlignment="Center" Margin="5,0,0,0"/>
+                                        <TextBlock Text="➕" FontSize="12" VerticalAlignment="Center"/>
+                                        <TextBlock Text="Add" VerticalAlignment="Center" Margin="8,0,0,0"/>
                                     </StackPanel>
                                 </Button>
-                                <Button Click="RemoveGroupButton_Click" Margin="0,0,0,5" HorizontalContentAlignment="Left" Width="90">
+                                <Button Click="RemoveGroupButton_Click" Margin="0,0,0,6" HorizontalContentAlignment="Left">
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="➖" FontSize="16" VerticalAlignment="Center"/>
-                                        <TextBlock Text="Remove" VerticalAlignment="Center" Margin="5,0,0,0"/>
+                                        <TextBlock Text="➖" FontSize="12" VerticalAlignment="Center"/>
+                                        <TextBlock Text="Remove" VerticalAlignment="Center" Margin="8,0,0,0"/>
                                     </StackPanel>
                                 </Button>
-                                <Button Click="EditGroupButton_Click" Margin="0,5,0,0" HorizontalContentAlignment="Left" Width="90">
+                                <Button Click="EditGroupButton_Click" HorizontalContentAlignment="Left">
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="📝" FontSize="16" VerticalAlignment="Center"/>
-                                        <TextBlock Text="Edit" VerticalAlignment="Center" Margin="5,0,0,0"/>
+                                        <TextBlock Text="✏️" FontSize="12" VerticalAlignment="Center"/>
+                                        <TextBlock Text="Edit" VerticalAlignment="Center" Margin="8,0,0,0"/>
                                     </StackPanel>
                                 </Button>
                             </StackPanel>
@@ -124,257 +338,321 @@
                     </Grid>
                 </Border>
             </TabItem>
-            <TabItem Header="Ping">
-                <Border Margin="10" >
+
+            <!-- 3. PING TAB -->
+            <TabItem Header="📡 Ping">
+                <Border Style="{StaticResource SectionCard}">
                     <StackPanel>
-                        <Label Content="Ping settings will be here..." />
-                        <CheckBox Margin="10" x:Name="AutostartPingChk" Content="Start pinging after launching the app"/>
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="5">
-                            <Label Content="Ping period (seconds):"/>
-                            <TextBox x:Name="PingPeriodTextBox" Width="50" Margin="5"/>
-                        </StackPanel>
+                        <TextBlock Text="Network Polling &amp; Monitoring" FontWeight="Bold" FontSize="15" Foreground="#0F172A" Margin="0,0,0,15"/>
+
+                        <CheckBox x:Name="AutostartPingChk" Content="Start pinging automatically after launching the app" FontSize="13" Foreground="#1E293B" Margin="0,0,0,15"/>
+
+                        <Border Background="#F1F5F9" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="8" Padding="12" HorizontalAlignment="Left">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="Ping period (seconds):" FontSize="13" Foreground="#1E293B" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <TextBox x:Name="PingPeriodTextBox" Width="60" TextAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
                 </Border>
             </TabItem>
-            <TabItem Header="Notification">
-                <TabControl Margin="10">
-                    <TabItem Header="General">
-                        <Grid Margin="15">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="100"/>
-                            </Grid.ColumnDefinitions>
 
-                            <ListBox x:Name="lstRules" BorderThickness="1" BorderBrush="Black">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <StackPanel Orientation="Horizontal" Margin="2">
-                                            <TextBlock Text="✔️" Foreground="LightGreen" Margin="0,0,10,0"/>
-                                            <TextBlock Text="{Binding TargetName}"/>
+            <!-- 4. NOTIFICATION TAB -->
+            <TabItem Header="🔔 Notification">
+                <TabControl Margin="0,8,0,0">
+
+                    <!-- Sub-Tab: General Rules -->
+                    <TabItem Header="Rules">
+                        <Border Style="{StaticResource SectionCard}" Margin="0,8,0,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="130"/>
+                                </Grid.ColumnDefinitions>
+
+                                <ListBox x:Name="lstRules" Grid.Column="0" Margin="0,0,12,0">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal" Margin="2">
+                                                <TextBlock Text="✔️" Foreground="#15803D" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding TargetName}" FontWeight="SemiBold" Foreground="#0F172A" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+
+                                <StackPanel Grid.Column="1" VerticalAlignment="Top">
+                                    <Button x:Name="AddNotifButton" Margin="0,0,0,6" HorizontalContentAlignment="Left" Click="AddNotifButton_Click">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="➕" FontSize="12" VerticalAlignment="Center"/>
+                                            <TextBlock Text="Add" VerticalAlignment="Center" Margin="8,0,0,0"/>
                                         </StackPanel>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
+                                    </Button>
 
-                            <StackPanel Grid.Column="1" VerticalAlignment="Top">
-                                <Button x:Name="AddNotifButton" Margin="0,0,0,5" HorizontalContentAlignment="Left" Width="90" Click="AddNotifButton_Click">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="➕" FontSize="16" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                                        <TextBlock Text="Add" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="5,0,0,0"/>
-                                    </StackPanel>
-                                </Button>
-
-                                <Button x:Name="RemoveNotifButton" HorizontalContentAlignment="Left" Width="90" Click="RemoveNotifButton_Click">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="➖" FontSize="16" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                                        <TextBlock Text="Remove" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="5,0,0,0"/>
-                                    </StackPanel>
-                                </Button>
-
-                            </StackPanel>
-                        </Grid>
-
+                                    <Button x:Name="RemoveNotifButton" HorizontalContentAlignment="Left" Click="RemoveNotifButton_Click">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="➖" FontSize="12" VerticalAlignment="Center"/>
+                                            <TextBlock Text="Remove" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
                     </TabItem>
-                    <TabItem Header="Options">
-                        <Grid Margin="15">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
 
-                            <Grid Grid.Row="0" Margin="0,0,0,10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="170"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <CheckBox x:Name="chkSaveToLog" Content="Save to log-file" VerticalAlignment="Center"/>
-                            </Grid>
+                    <!-- Sub-Tab: Options -->
+                    <TabItem Header="Audio &amp; Actions">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <Border Style="{StaticResource SectionCard}" Margin="0,8,0,0">
+                                <StackPanel>
+                                    <CheckBox x:Name="chkSaveToLog" Content="Save alerts to log-file" FontSize="13" Foreground="#1E293B" Margin="0,0,0,10"/>
+                                    <CheckBox x:Name="chkShowMessage" Content="Show pop-up alert message" FontSize="13" Foreground="#1E293B" Margin="0,0,0,18"/>
 
-                            <Grid Grid.Row="1" Margin="0,0,0,15">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="170"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <CheckBox x:Name="chkShowMessage" Content="Show message" VerticalAlignment="Center"/>
-                            </Grid>
+                                    <Border BorderBrush="#CBD5E1" BorderThickness="0,1,0,0" Padding="0,12,0,0">
+                                        <StackPanel>
+                                            <TextBlock Text="Sound Alerts" FontWeight="Bold" FontSize="14" Foreground="#0F172A" Margin="0,0,0,12"/>
 
-                            <GroupBox Grid.Row="2" Header="Play sound" Margin="0,0,0,15" Padding="10">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
+                                            <!-- Offline Sound -->
+                                            <Grid Margin="0,0,0,12">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="90"/>
+                                                    <ColumnDefinition Width="60"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
 
-                                    <Grid Grid.Row="0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="100"/>
-                                            <ColumnDefinition Width="55"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <CheckBox x:Name="EnableOfflineSoundChk" Content="Enable" VerticalAlignment="Center"/>
-                                        <Label Grid.Column="1" Content="Offline:" VerticalAlignment="Center"/>
+                                                <CheckBox x:Name="EnableOfflineSoundChk" Content="Enable" VerticalAlignment="Center" FontSize="12"/>
+                                                <TextBlock Grid.Column="1" Text="Offline:" VerticalAlignment="Center" FontSize="12" Foreground="#334155" FontWeight="SemiBold"/>
 
-                                        <TextBox x:Name="txtOfflineSoundPath" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,5,0" IsEnabled="{Binding IsChecked, ElementName=EnableOfflineSoundChk}"/>
+                                                <TextBox x:Name="txtOfflineSoundPath" Grid.Column="2" Margin="0,0,8,0" IsEnabled="{Binding IsChecked, ElementName=EnableOfflineSoundChk}"/>
 
-                                        <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
-                                            <Button Content="📂" Width="30" ToolTip="Browse..." Click="BtnBrowseOffline_Click" IsEnabled="{Binding IsChecked, ElementName=EnableOfflineSoundChk}"/>
-                                            <Button Content="▶️" Width="30" Margin="5,0,0,0" ToolTip="Test Sound" Click="BtnTestOffline_Click" IsEnabled="{Binding IsChecked, ElementName=EnableOfflineSoundChk}"/>
+                                                <StackPanel Grid.Column="3" Orientation="Horizontal">
+                                                    <Button Content="📂" Width="34" ToolTip="Browse..." Click="BtnBrowseOffline_Click" IsEnabled="{Binding IsChecked, ElementName=EnableOfflineSoundChk}"/>
+                                                    <Button Content="▶️" Width="34" Margin="4,0,0,0" ToolTip="Test Sound" Click="BtnTestOffline_Click" IsEnabled="{Binding IsChecked, ElementName=EnableOfflineSoundChk}"/>
+                                                </StackPanel>
+                                            </Grid>
+
+                                            <!-- Online Sound -->
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="90"/>
+                                                    <ColumnDefinition Width="60"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <CheckBox x:Name="EnableOnlineSoundChk" Content="Enable" VerticalAlignment="Center" FontSize="12"/>
+                                                <TextBlock Grid.Column="1" Text="Online:" VerticalAlignment="Center" FontSize="12" Foreground="#334155" FontWeight="SemiBold"/>
+
+                                                <TextBox x:Name="txtOnlineSoundPath" Grid.Column="2" Margin="0,0,8,0" IsEnabled="{Binding IsChecked, ElementName=EnableOnlineSoundChk}"/>
+
+                                                <StackPanel Grid.Column="3" Orientation="Horizontal">
+                                                    <Button Content="📂" Width="34" ToolTip="Browse..." Click="BtnBrowseOnline_Click" IsEnabled="{Binding IsChecked, ElementName=EnableOnlineSoundChk}"/>
+                                                    <Button Content="▶️" Width="34" Margin="4,0,0,0" ToolTip="Test Sound" Click="BtnTestOnline_Click" IsEnabled="{Binding IsChecked, ElementName=EnableOnlineSoundChk}"/>
+                                                </StackPanel>
+                                            </Grid>
                                         </StackPanel>
-                                    </Grid>
-
-                                    <Grid Grid.Row="1" Margin="0,10,0,0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="100"/>
-                                            <ColumnDefinition Width="55"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <CheckBox x:Name="EnableOnlineSoundChk" Content="Enable" VerticalAlignment="Center"/>
-                                        <Label Grid.Column="1" Content="Online:" VerticalAlignment="Center" />
-
-                                        <TextBox x:Name="txtOnlineSoundPath" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,5,0" IsEnabled="{Binding IsChecked, ElementName=EnableOnlineSoundChk}"/>
-
-                                        <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
-                                            <Button Content="📂" Width="30" ToolTip="Browse..." Click="BtnBrowseOnline_Click" IsEnabled="{Binding IsChecked, ElementName=EnableOnlineSoundChk}"/>
-                                            <Button Content="▶️" Width="30" Margin="5,0,0,0" ToolTip="Test Sound" Click="BtnTestOnline_Click" IsEnabled="{Binding IsChecked, ElementName=EnableOnlineSoundChk}"/>
-                                        </StackPanel>
-                                    </Grid>
-                                </Grid>
-                            </GroupBox>
-                        </Grid>
+                                    </Border>
+                                </StackPanel>
+                            </Border>
+                        </ScrollViewer>
                     </TabItem>
                 </TabControl>
             </TabItem>
-            <TabItem Header="Search">
-                <Border Margin="10" >
+
+            <!-- 5. SEARCH TAB -->
+            <TabItem Header="🔍 Search">
+                <Border Style="{StaticResource SectionCard}">
                     <StackPanel>
-                        <Label Content="Used search depth..." />
-                        <RadioButton x:Name="HeadlinesSearchRB" Margin="10" Content="Use headlines only mode" IsChecked="True"/>
-                        <RadioButton x:Name="DeeperSearchRB" Margin="10" Content="Use the deeper search mode"/>
-                        <Label Content="Search mode..." Margin="0,10,0,0" />
-                        <CheckBox x:Name="EqualityModeCheckBox" Margin="10" Content="Equality mode(whole words only)"/>
+                        <TextBlock Text="Search Depth Mode" FontWeight="Bold" FontSize="14" Foreground="#0F172A" Margin="0,0,0,8"/>
+                        <RadioButton x:Name="HeadlinesSearchRB" Content="Use headlines only mode" FontSize="13" Foreground="#1E293B" Margin="0,0,0,6" IsChecked="True"/>
+                        <RadioButton x:Name="DeeperSearchRB" Content="Use deeper search mode" FontSize="13" Foreground="#1E293B" Margin="0,0,0,18"/>
+
+                        <Border BorderBrush="#CBD5E1" BorderThickness="0,1,0,0" Padding="0,12,0,0">
+                            <StackPanel>
+                                <TextBlock Text="Search Filters" FontWeight="Bold" FontSize="14" Foreground="#0F172A" Margin="0,0,0,8"/>
+                                <CheckBox x:Name="EqualityModeCheckBox" Content="Exact equality mode (whole words only)" FontSize="13" Foreground="#1E293B"/>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
                 </Border>
             </TabItem>
-            <TabItem Header="DB and Paths">
-                <Border Margin="10" >
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-                        <GroupBox Grid.Row="0" Header="Database" Margin="10,10,10,10" >
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
-                                <Grid Grid.Row="0">
-                                    <Label Content="Set database server:" HorizontalAlignment="Left" />
-                                    <TextBox x:Name="DatabaseServerTextBox" Text="SQLEXPRESS" Margin="125,0,10,0" FontSize="12" VerticalContentAlignment="Center"/>
-                                </Grid>
-                                <Grid Grid.Row="1" Margin="0,10,0,10">
-                                    <Label Content="Set database name:" HorizontalAlignment="Left" />
-                                    <TextBox x:Name="DatabaseNameTextBox" Text="TestDB" Margin="125,0,10,0" FontSize="12" VerticalContentAlignment="Center"/>
-                                </Grid>
-                                <Grid Grid.Row="2">
-                                    <Label Content="Set database user:" HorizontalAlignment="Left" />
-                                    <TextBox x:Name="DatabaseUserTextBox" Text="TestUser" Margin="125,0,10,0" FontSize="12" VerticalContentAlignment="Center"/>
-                                </Grid>
+
+            <!-- 6. DB AND PATHS TAB -->
+            <TabItem Header="🗄️ DB &amp; Paths">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <Border Style="{StaticResource SectionCard}">
+                        <StackPanel>
+
+                            <!-- Database Settings -->
+                            <TextBlock Text="Database Configuration" FontWeight="Bold" FontSize="14" Foreground="#0F172A" Margin="0,0,0,10"/>
+
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="150"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Server Instance:" VerticalAlignment="Center" FontSize="12" Foreground="#334155" FontWeight="Medium"/>
+                                <TextBox x:Name="DatabaseServerTextBox" Grid.Column="1" Text="SQLEXPRESS"/>
                             </Grid>
-                        </GroupBox>                
-                        <GroupBox Grid.Row="1" Header="Device Icons" Margin="10,10,10,10" >
-                            <Grid>
-                                <Label Content="Set device icons path:" HorizontalAlignment="Left" />
-                                <TextBox x:Name="DeviceIconsPathTextBox" Text="C:\Path\To\DeviceIcons" Margin="125,0,10,0" FontSize="12" VerticalContentAlignment="Center"/>
+
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="150"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Database Name:" VerticalAlignment="Center" FontSize="12" Foreground="#334155" FontWeight="Medium"/>
+                                <TextBox x:Name="DatabaseNameTextBox" Grid.Column="1" Text="TestDB"/>
                             </Grid>
-                        </GroupBox>
-                        <GroupBox Grid.Row="2" Header="Hint Images" Margin="10,10,10,10" >
-                            <Grid>
-                                <Label Content="Set hint images path:" HorizontalAlignment="Left" />
-                                <TextBox x:Name="HintImagesPathTextBox" Text="C:\Path\To\HintImages" Margin="125,0,10,0" FontSize="12" VerticalContentAlignment="Center"/>
+
+                            <Grid Margin="0,0,0,16">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="150"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Database User:" VerticalAlignment="Center" FontSize="12" Foreground="#334155" FontWeight="Medium"/>
+                                <TextBox x:Name="DatabaseUserTextBox" Grid.Column="1" Text="TestUser"/>
                             </Grid>
-                        </GroupBox>
-                        <GroupBox Grid.Row="3" Header="Scripts" Margin="10,10,10,10" >
-                            <Grid>
-                                <Label Content="Set scripts path:" HorizontalAlignment="Left" />
-                                <TextBox x:Name="ScriptsPathTextBox" Text="C:\Path\To\Scripts" Margin="125,0,10,0" FontSize="12" VerticalContentAlignment="Center"/>
-                            </Grid>
-                        </GroupBox>
-                    </Grid>
-                </Border>
+
+                            <!-- Asset & Script Paths -->
+                            <Border BorderBrush="#CBD5E1" BorderThickness="0,1,0,0" Padding="0,12,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="Storage Paths" FontWeight="Bold" FontSize="14" Foreground="#0F172A" Margin="0,0,0,10"/>
+
+                                    <Grid Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="150"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Device Icons Path:" VerticalAlignment="Center" FontSize="12" Foreground="#334155" FontWeight="Medium"/>
+                                        <TextBox x:Name="DeviceIconsPathTextBox" Grid.Column="1" Text="C:\Path\To\DeviceIcons"/>
+                                    </Grid>
+
+                                    <Grid Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="150"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Hint Images Path:" VerticalAlignment="Center" FontSize="12" Foreground="#334155" FontWeight="Medium"/>
+                                        <TextBox x:Name="HintImagesPathTextBox" Grid.Column="1" Text="C:\Path\To\HintImages"/>
+                                    </Grid>
+
+                                    <Grid Margin="0,0,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="150"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Scripts Path:" VerticalAlignment="Center" FontSize="12" Foreground="#334155" FontWeight="Medium"/>
+                                        <TextBox x:Name="ScriptsPathTextBox" Grid.Column="1" Text="C:\Path\To\Scripts"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                        </StackPanel>
+                    </Border>
+                </ScrollViewer>
             </TabItem>
-            <TabItem Header="Passwords">
-                <Border Margin="10" >
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-                        <GroupBox Grid.Row="0" Header="DBPassword" Margin="10,10,10,0" >
-                            <Grid>
-                                <Label Content="Set database password:" HorizontalAlignment="Left" />
-                                <TextBox x:Name="DatabasePasswordTextBox" Text="" Margin="155,0,10,0" FontSize="12" VerticalContentAlignment="Center"/>
+
+            <!-- 7. PASSWORDS TAB -->
+            <TabItem Header="🔑 Passwords">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <Border Style="{StaticResource SectionCard}">
+                        <StackPanel>
+                            <TextBlock Text="Saved Passwords &amp; Credentials" FontWeight="Bold" FontSize="14" Foreground="#0F172A" Margin="0,0,0,12"/>
+
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="170"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Database Password:" VerticalAlignment="Center" FontSize="12" Foreground="#334155" FontWeight="Medium"/>
+                                <TextBox x:Name="DatabasePasswordTextBox" Grid.Column="1"/>
                             </Grid>
-                        </GroupBox>
-                        <GroupBox Grid.Row="1" Header="Printer" Margin="10,10,10,0" >
-                            <Grid>
-                                <Label Content="Set printer password:" HorizontalAlignment="Left" />
-                                <TextBox x:Name="PrinterPasswordTextBox" Text="" Margin="155,0,10,0" FontSize="12" VerticalContentAlignment="Center"/>
+
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="170"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Printer Password:" VerticalAlignment="Center" FontSize="12" Foreground="#334155" FontWeight="Medium"/>
+                                <TextBox x:Name="PrinterPasswordTextBox" Grid.Column="1"/>
                             </Grid>
-                        </GroupBox>
-                        <GroupBox Grid.Row="2" Header="Grandstream" Margin="10,10,10,0" >
-                            <Grid>
-                                <Label Content="Set grandstream password:" HorizontalAlignment="Left" />
-                                <TextBox x:Name="GrandstreamPasswordTextBox" Text="" Margin="155,0,10,0" FontSize="12" VerticalContentAlignment="Center"/>
+
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="170"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Grandstream Password:" VerticalAlignment="Center" FontSize="12" Foreground="#334155" FontWeight="Medium"/>
+                                <TextBox x:Name="GrandstreamPasswordTextBox" Grid.Column="1"/>
                             </Grid>
-                        </GroupBox>
-                        <GroupBox Grid.Row="3" Header="VNC" Margin="10,10,10,0" >
-                            <Grid>
-                                <Label Content="Set VNC password:" HorizontalAlignment="Left" />
-                                <TextBox x:Name="VncPasswordTextBox" Text="" Margin="155,0,10,0" FontSize="12" VerticalContentAlignment="Center"/>
+
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="170"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="VNC Password:" VerticalAlignment="Center" FontSize="12" Foreground="#334155" FontWeight="Medium"/>
+                                <TextBox x:Name="VncPasswordTextBox" Grid.Column="1"/>
                             </Grid>
-                        </GroupBox>
-                        <GroupBox Grid.Row="4" Header="SSH" Margin="10,10,10,0" >
-                            <Grid>
-                                <Label Content="Set SSH password:" HorizontalAlignment="Left" />
-                                <TextBox x:Name="SshPasswordTextBox" Text="" Margin="155,0,10,0" FontSize="12" VerticalContentAlignment="Center"/>
+
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="170"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="SSH Password:" VerticalAlignment="Center" FontSize="12" Foreground="#334155" FontWeight="Medium"/>
+                                <TextBox x:Name="SshPasswordTextBox" Grid.Column="1"/>
                             </Grid>
-                        </GroupBox>
-                        <GroupBox Grid.Row="5" Header="Managers" Margin="10,10,10,0" >
-                            <Grid>
-                                <Label Content="Set Managers PC password:" HorizontalAlignment="Left" />
-                                <TextBox x:Name="ManagersPcPasswordTextBox" Text="" Margin="155,0,10,0" FontSize="12" VerticalContentAlignment="Center"/>
+
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="170"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Managers PC Password:" VerticalAlignment="Center" FontSize="12" Foreground="#334155" FontWeight="Medium"/>
+                                <TextBox x:Name="ManagersPcPasswordTextBox" Grid.Column="1"/>
                             </Grid>
-                        </GroupBox>
-                        <GroupBox Grid.Row="6" Header="QMS" Margin="10,10,10,0" >
-                            <Grid>
-                                <Label Content="Set QMS password:" HorizontalAlignment="Left" />
-                                <TextBox x:Name="QmsPasswordTextBox" Text="" Margin="155,0,10,0" FontSize="12" VerticalContentAlignment="Center"/>
+
+                            <Grid Margin="0,0,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="170"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="QMS Password:" VerticalAlignment="Center" FontSize="12" Foreground="#334155" FontWeight="Medium"/>
+                                <TextBox x:Name="QmsPasswordTextBox" Grid.Column="1"/>
                             </Grid>
-                        </GroupBox>
-                    </Grid>
-                </Border>
+
+                        </StackPanel>
+                    </Border>
+                </ScrollViewer>
             </TabItem>
+
         </TabControl>
 
-        <Grid Grid.Column="0" Grid.Row="1" Grid.ColumnSpan="2">
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="5">
-                <Button Content="OK" Width="120" Margin="5,5,25,5" Click="OkButton_Click"/>
-                <Button Content="Cancel" Width="120" Margin="5" Click="CancelButton_Click"/>
+        <!-- FOOTER BUTTONS -->
+        <Border Grid.Row="1" BorderBrush="#CBD5E1" BorderThickness="0,1,0,0" Margin="0,12,0,0" Padding="0,12,0,0">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+
+                <!-- Primary OK Button -->
+                <Button Content="OK" Width="110" Margin="0,0,8,0" Click="OkButton_Click" 
+                        Background="#2563EB" Foreground="#FFFFFF" BorderBrush="#2563EB" IsDefault="True">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="#1D4ED8"/>
+                                    <Setter Property="BorderBrush" Value="#1D4ED8"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+
+                <!-- Secondary Cancel Button -->
+                <Button Content="Cancel" Width="110" Click="CancelButton_Click" IsCancel="True"/>
             </StackPanel>
-        </Grid>
+        </Border>
 
     </Grid>
 </Window>

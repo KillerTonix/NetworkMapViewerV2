@@ -181,71 +181,14 @@ namespace NetworkMapViewerV2.Views
 
         private static bool ShowCommandEditor(ExternalCommand cmd, string title)
         {
-            var dlg = new Window
+            // 1. Open the XAML window passing the command object and title
+            var window = new CommandEditorWindow(cmd, title)
             {
-                Title = title,
-                Width = 500,
-                Height = 300,
-                WindowStartupLocation = WindowStartupLocation.CenterScreen,
-                WindowStyle = WindowStyle.ToolWindow,
-                ResizeMode = ResizeMode.NoResize
+                Owner = Application.Current.MainWindow
             };
 
-            var grid = new Grid { Margin = new Thickness(15) };
-            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(110) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-
-            var lblName = new Label { Content = "Name:" }; Grid.SetRow(lblName, 0); Grid.SetColumn(lblName, 0);
-            var txtName = new TextBox { Text = cmd.Name, Margin = new Thickness(0, 2, 0, 5) }; Grid.SetRow(txtName, 0); Grid.SetColumn(txtName, 1);
-
-            var lblIcon = new Label { Content = "Icon (emoji):" }; Grid.SetRow(lblIcon, 1); Grid.SetColumn(lblIcon, 0);
-            var txtIcon = new TextBox { Text = cmd.Icon, Margin = new Thickness(0, 2, 0, 5), MaxWidth = 60, HorizontalAlignment = HorizontalAlignment.Left }; Grid.SetRow(txtIcon, 1); Grid.SetColumn(txtIcon, 1);
-
-            var lblExe = new Label { Content = "Executable Path:" }; Grid.SetRow(lblExe, 2); Grid.SetColumn(lblExe, 0);
-            var txtExe = new TextBox { Text = cmd.Path, Margin = new Thickness(0, 2, 0, 5) }; Grid.SetRow(txtExe, 2); Grid.SetColumn(txtExe, 1);
-
-            var lblArgs = new Label { Content = "Arguments:" }; Grid.SetRow(lblArgs, 3); Grid.SetColumn(lblArgs, 0);
-            var txtArgs = new TextBox { Text = cmd.Arguments, Margin = new Thickness(0, 2, 0, 5) }; Grid.SetRow(txtArgs, 3); Grid.SetColumn(txtArgs, 1);
-
-            var lblHint = new TextBlock { Text = "Use {Address} as placeholder for the device IP/hostname.", FontStyle = FontStyles.Italic, Foreground = System.Windows.Media.Brushes.Gray, Margin = new Thickness(0, 0, 0, 10) };
-            Grid.SetRow(lblHint, 4); Grid.SetColumn(lblHint, 0); Grid.SetColumnSpan(lblHint, 2);
-
-            var btnPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-            var btnOk = new Button { Content = "OK", Width = 80, Margin = new Thickness(0, 0, 10, 0), IsDefault = true };
-            var btnCancel = new Button { Content = "Cancel", Width = 80, IsCancel = true };
-            btnPanel.Children.Add(btnOk); btnPanel.Children.Add(btnCancel);
-            Grid.SetRow(btnPanel, 6); Grid.SetColumn(btnPanel, 0); Grid.SetColumnSpan(btnPanel, 2);
-
-            grid.Children.Add(lblName); grid.Children.Add(txtName);
-            grid.Children.Add(lblIcon); grid.Children.Add(txtIcon);
-            grid.Children.Add(lblExe); grid.Children.Add(txtExe);
-            grid.Children.Add(lblArgs); grid.Children.Add(txtArgs);
-            grid.Children.Add(lblHint);
-            grid.Children.Add(btnPanel);
-
-            dlg.Content = grid;
-
-            bool result = false;
-            btnOk.Click += (s, e) =>
-            {
-                cmd.Name = txtName.Text.Trim();
-                cmd.Icon = txtIcon.Text.Trim();
-                cmd.Path = txtExe.Text.Trim();
-                cmd.Arguments = txtArgs.Text.Trim();
-                result = true;
-                dlg.Close();
-            };
-            btnCancel.Click += (s, e) => dlg.Close();
-
-            dlg.ShowDialog();
-            return result;
+            // 2. Returns true if the user clicked OK (the command properties are updated inside the window)
+            return window.ShowDialog() == true;
         }
 
         // ─── DEVICE GROUPS CRUD ──────────────────────────────────────────

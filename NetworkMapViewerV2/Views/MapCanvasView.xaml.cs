@@ -201,7 +201,7 @@ namespace NetworkMapViewerV2.Views
             }
         }
 
-        private void GlobalViewModel_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        private void GlobalViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
             if (e.PropertyName == nameof(GlobalViewModel.IsGridVisible))
             {
@@ -1321,71 +1321,30 @@ namespace NetworkMapViewerV2.Views
 
         private void BatchAddLabels_Click(object sender, RoutedEventArgs e)
         {
-            var dlg = new Window { Title = "Batch Add Labels", Width = 300, Height = 420, WindowStyle = WindowStyle.ToolWindow, WindowStartupLocation = WindowStartupLocation.CenterOwner, Owner = Window.GetWindow(this) };
-            var sp = new StackPanel { Margin = new Thickness(15) };
-
-            sp.Children.Add(new TextBlock { Text = "Quantity to add:" });
-            var txtCount = new TextBox { Text = "5", Margin = new Thickness(0, 0, 0, 10) };
-            sp.Children.Add(txtCount);
-
-            sp.Children.Add(new TextBlock { Text = "Width:" });
-            var txtWidth = new TextBox { Text = "125", Margin = new Thickness(0, 0, 0, 10) };
-            sp.Children.Add(txtWidth);
-
-            sp.Children.Add(new TextBlock { Text = "Height:" });
-            var txtHeight = new TextBox { Text = "120", Margin = new Thickness(0, 0, 0, 10) };
-            sp.Children.Add(txtHeight);
-
-            sp.Children.Add(new TextBlock { Text = "Left (Start X):" });
-            // Default to the mouse click position instead of 0!
-            var txtLeft = new TextBox { Text = _lastRightClickPosition.X.ToString(), Margin = new Thickness(0, 0, 0, 10) };
-            sp.Children.Add(txtLeft);
-
-            sp.Children.Add(new TextBlock { Text = "Top (Start Y):" });
-            // Default to the mouse click position instead of 0!
-            var txtTop = new TextBox { Text = _lastRightClickPosition.Y.ToString(), Margin = new Thickness(0, 0, 0, 10) };
-            sp.Children.Add(txtTop);
-
-            sp.Children.Add(new TextBlock { Text = "Color:" });
-            var colorPicker = new Xceed.Wpf.Toolkit.ColorPicker { Margin = new Thickness(0, 0, 0, 10) };
-            sp.Children.Add(colorPicker);
-
-            sp.Children.Add(new TextBlock { Text = "Orientation:" });
-            var txtHorizontal = new RadioButton { Content = "Horizontally", Margin = new Thickness(0, 0, 0, 0) };
-            var txtVertical = new RadioButton { Content = "Vertically", IsChecked = true, Margin = new Thickness(0, 0, 0, 10) };
-            sp.Children.Add(txtHorizontal);
-            sp.Children.Add(txtVertical);
-
-            var btn = new Button { Content = "Spawn Labels", IsDefault = true, Padding = new Thickness(5) };
-            btn.Click += (s, ev) => { dlg.DialogResult = true; dlg.Close(); };
-            sp.Children.Add(btn);
-            dlg.Content = sp;
-
-            if (dlg.ShowDialog() == true && int.TryParse(txtCount.Text, out int count))
+            var window = new BatchAddLabelsWindow(_lastRightClickPosition.X, _lastRightClickPosition.Y)
             {
-                // 1. Properly parse ALL the text boxes
-                _ = double.TryParse(txtWidth.Text, out double w);
-                _ = double.TryParse(txtHeight.Text, out double h);
-                _ = double.TryParse(txtLeft.Text, out double baseLeft);
-                _ = double.TryParse(txtTop.Text, out double baseTop);
-                string selectedColor = colorPicker.SelectedColor?.ToString() ?? "Transparent";
-                for (int i = 0; i < count; i++)
+                Owner = Window.GetWindow(this)
+            };
+
+            if (window.ShowDialog() == true && _currentState != null)
+            {
+                for (int i = 0; i < window.Quantity; i++)
                 {
                     // 2. Calculate offsets. (Horizontal uses Width + 10 gap, Vertical uses 40 as requested)
-                    double leftOffset = txtHorizontal.IsChecked == true ? (i * w) : 0;
-                    double topOffset = txtVertical.IsChecked == true ? (i * 40) : 0;
+                    double leftOffset = window.IsHorizontal ? (i * window.Width) : 0;
+                    double topOffset = !window.IsHorizontal ? (i * window.Height) : 0;
 
                     var newLabel = new NetworkLabel
                     {
                         MapId = _currentState.MapId,
-                        Left = baseLeft + leftOffset, // Add the offset to the base position!
-                        Top = baseTop + topOffset,    // Add the offset to the base position!
-                        Width = w,                    // Use the parsed Width
-                        Height = h,                   // Use the parsed Height
+                        Left = window.StartLeft + leftOffset,
+                        Top = window.StartTop + topOffset,
+                        Width = window.LabelWidth,
+                        Height = window.LabelHeight,
                         FontSize = 12,
                         Foreground = "#FFFFFF",
-                        Background = selectedColor,
-                        BorderBrush = "#000000",
+                        Background = window.SelectedColorHex,
+                        BorderBrush = "#000000"
                     };
                     newLabel.TextLines.Add($"Label {i + 1}");
                     _currentState.Labels.Add(newLabel);
@@ -1404,42 +1363,24 @@ namespace NetworkMapViewerV2.Views
             var repo = new Data.MapRepository();
             var groups = repo.GetDeviceGroups();
 
-            var dlg = new Window { Title = "Batch Add", Width = 300, Height = 250, WindowStyle = WindowStyle.ToolWindow, WindowStartupLocation = WindowStartupLocation.CenterOwner, Owner = Window.GetWindow(this) };
-            var sp = new StackPanel { Margin = new Thickness(15) };
-
-            sp.Children.Add(new TextBlock { Text = "Device Type:" });
-            var cmb = new ComboBox { ItemsSource = groups, DisplayMemberPath = "DisplayName", SelectedValuePath = "GroupId", SelectedIndex = 0, Margin = new Thickness(0, 0, 0, 10) };
-            sp.Children.Add(cmb);
-
-            sp.Children.Add(new TextBlock { Text = "Quantity to add:" });
-            var txtCount = new TextBox { Text = "5", Margin = new Thickness(0, 0, 0, 10) };
-            sp.Children.Add(txtCount);
-
-            sp.Children.Add(new TextBlock { Text = "Orientation:" });
-            var txtHorizontal = new RadioButton { Content = "Horizontally", Margin = new Thickness(0, 0, 0, 0) };
-            var txtVertical = new RadioButton { Content = "Vertically", IsChecked = true, Margin = new Thickness(0, 0, 0, 10) };
-            sp.Children.Add(txtHorizontal);
-            sp.Children.Add(txtVertical);
-
-            var btn = new Button { Content = "Spawn Devices", IsDefault = true, Padding = new Thickness(5) };
-            btn.Click += (s, ev) => { dlg.DialogResult = true; dlg.Close(); };
-            sp.Children.Add(btn);
-            dlg.Content = sp;
-
-            if (dlg.ShowDialog() == true && int.TryParse(txtCount.Text, out int count) && cmb.SelectedValue != null)
+            var window = new BatchAddDevicesWindow(groups)
             {
-                int groupId = (int)cmb.SelectedValue;
-                for (int i = 0; i < count; i++)
+                Owner = Window.GetWindow(this)
+            };
+
+            if (window.ShowDialog() == true && _currentState != null)
+            {                
+                for (int i = 0; i < window.Quantity; i++)
                 {
                     // 2. Calculate offsets. (Horizontal uses Width + 10 gap, Vertical uses 40 as requested)
-                    double leftOffset = txtHorizontal.IsChecked == true ? (i * 125) : 0;
-                    double topOffset = txtVertical.IsChecked == true ? (i * 50) : 0;
+                    double leftOffset = window.IsHorizontal ? (i * 125.0) : 0;
+                    double topOffset = !window.IsHorizontal ? (i * 50.0) : 0;
 
                     var newDevice = new NetworkDevice
                     {
                         MapId = _currentState.MapId,
                         Address = "0.0.0.0",
-                        GroupId = groupId,
+                        GroupId = window.SelectedGroupId,
                         Left = _lastRightClickPosition.X + leftOffset,
                         Top = _lastRightClickPosition.Y + topOffset
                     };
@@ -1800,7 +1741,7 @@ namespace NetworkMapViewerV2.Views
                         {
                             var newDevice = new NetworkDevice
                             {
-                                MapId = _currentState.MapId,
+                                MapId = _currentState!.MapId,
                                 Address = ip,
                                 Left = 50, // Default position; you might want to adjust this
                                 Top = 50,  // Default position; you might want to adjust this

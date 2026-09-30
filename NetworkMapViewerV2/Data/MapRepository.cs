@@ -24,7 +24,7 @@ namespace NetworkMapViewerV2.Data
                 maps.Add(new MapTabState
                 {
                     MapId = reader.GetInt32(0),
-                    MapName = reader.GetString(1),
+                    MapName = reader.GetString(1) ?? "Unknown Map",
                     MapType = reader.IsDBNull(2) ? "Head Office" : reader.GetString(2)
                 });
             }
@@ -375,7 +375,7 @@ namespace NetworkMapViewerV2.Data
             }
         }
 
-        private void AddLabelParameters(SqlCommand cmd, NetworkLabel label, string textJson)
+        private static void AddLabelParameters(SqlCommand cmd, NetworkLabel label, string textJson)
         {
             cmd.Parameters.AddWithValue("@MapId", label.MapId);
             cmd.Parameters.AddWithValue("@Left", label.Left);
@@ -515,7 +515,7 @@ namespace NetworkMapViewerV2.Data
             return groups;
         }
 
-        private SqlConnection GetOpenConnection()
+        private static SqlConnection GetOpenConnection()
         {
             var connection = new SqlConnection(DatabaseService.ConnectionString);
             connection.Open();
@@ -591,7 +591,7 @@ namespace NetworkMapViewerV2.Data
             SettingsService.UpdateGroupDefaultCommand(group.GroupId, group.DefaultCommand ?? "Ping");
         }
 
-        private void AddGroupParameters(SqlCommand cmd, DeviceGroup group)
+        private static void AddGroupParameters(SqlCommand cmd, DeviceGroup group)
         {
             cmd.Parameters.AddWithValue("@GroupName", group.GroupName ?? "New Group");
             cmd.Parameters.AddWithValue("@IconPath", group.IconPath ?? "");
@@ -646,7 +646,7 @@ namespace NetworkMapViewerV2.Data
         // --- 1. WRITE TO LOG ---
 
         // CHANGED: Completely updated signature and parameters to match the new AuditLogs table!
-        public void InsertAuditLog(string actionType, string target, string details, string mapName)
+        public void InsertAuditLog(string actionType, string target, string details, string? mapName = null)
         {
             using var connection = GetOpenConnection();
 
@@ -666,7 +666,7 @@ namespace NetworkMapViewerV2.Data
             cmd.ExecuteNonQuery();
         }
 
-        private void InsertAuditLogInternal(string actionType, string target, string details, string mapName, SqlConnection connection, SqlTransaction transaction)
+        private void InsertAuditLogInternal(string actionType, string target, string details, string? mapName, SqlConnection connection, SqlTransaction? transaction = null)
         {
             string sql = @"
         INSERT INTO AuditLogs (TimeStamp, mapName, userName, ActionType, Target, Details) 

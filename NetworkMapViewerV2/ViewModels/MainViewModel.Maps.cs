@@ -145,7 +145,7 @@ namespace NetworkMapViewerV2.ViewModels
                         OpenTabs.Remove(tabToRemove);
                         if (SelectedTab == tabToRemove)
                         {
-                            SelectedTab = OpenTabs.FirstOrDefault();
+                            SelectedTab = OpenTabs.FirstOrDefault()!;
                         }
                     }
 
@@ -183,7 +183,7 @@ namespace NetworkMapViewerV2.ViewModels
 
                 state.HasUnsavedChanges = false;
 
-                SelectedTab = null;
+                SelectedTab = null!;
                 SelectedTab = state;
 
                 GC.Collect();

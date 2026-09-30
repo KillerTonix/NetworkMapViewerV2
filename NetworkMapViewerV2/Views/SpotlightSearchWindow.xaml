@@ -1,14 +1,14 @@
 ﻿<Window x:Class="NetworkMapViewerV2.Views.SpotlightSearchWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Quick Search" Height="100" Width="600"
+        Title="Quick Search" Height="100" Width="620"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         WindowStartupLocation="CenterScreen" Topmost="True" ShowInTaskbar="False">
 
-    <!-- The Drop Shadow Container -->
-    <Border Background="#2D2D30" CornerRadius="12" BorderBrush="#3F3F46" BorderThickness="1" Margin="15">
+    <!-- Modern High-Contrast Light Container -->
+    <Border Background="#FFFFFF" CornerRadius="16" BorderBrush="#CBD5E1" BorderThickness="1" Margin="15">
         <Border.Effect>
-            <DropShadowEffect BlurRadius="20" ShadowDepth="5" Opacity="0.6" Direction="270" />
+            <DropShadowEffect BlurRadius="24" ShadowDepth="6" Opacity="0.15" Color="#0F172A" Direction="270" />
         </Border.Effect>
 
         <Grid>
@@ -17,11 +17,11 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <TextBlock Text="🔎" FontSize="26" VerticalAlignment="Center" Margin="20,0,15,0" Foreground="#999999"/>
+            <TextBlock Text="🔎" FontSize="24" VerticalAlignment="Center" Margin="18,0,12,0" Foreground="#2563EB"/>
 
             <TextBox x:Name="txtSpotlightSearch" Grid.Column="1" Background="Transparent" 
-                     Foreground="White" FontSize="26" VerticalAlignment="Center" 
-                     CaretBrush="White" Margin="0,0,20,0"/>
+                     BorderThickness="0" Foreground="#0F172A" FontSize="22" FontWeight="SemiBold"
+                     VerticalAlignment="Center" CaretBrush="#2563EB" Margin="0,0,20,0"/>
         </Grid>
     </Border>
 </Window>
