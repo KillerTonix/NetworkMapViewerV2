@@ -22,8 +22,8 @@ namespace NetworkMapViewerV2.ViewModels
         [RelayCommand]
         public void ToggleSearch()
         {
-            IsSearchVisible = !IsSearchVisible;
-            if (!IsSearchVisible)
+            IsSearchVisible = true;
+            if (true)
             {
                 SearchQuery = "";
                 _globalSearchResults.Clear();

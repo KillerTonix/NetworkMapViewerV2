@@ -2,6 +2,8 @@
 using NetworkMapViewerV2.ViewModels;
 using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Interop;
 
 namespace NetworkMapViewerV2.Views
@@ -122,16 +124,15 @@ namespace NetworkMapViewerV2.Views
 
         private void TxtSearch_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
-            // If the search box just became visible...
-            if (txtSearch.IsVisible)
+            if (sender is TextBox textBox && textBox.IsVisible)
             {
-                // Wait for the UI to finish rendering it, then focus it!
-                Application.Current.Dispatcher.InvokeAsync(() =>
-                {
-                    txtSearch.Focus();
-                    txtSearch.SelectAll(); // Highlights any existing text so you can instantly overwrite it
-                }, System.Windows.Threading.DispatcherPriority.Input);
+                // Ensures both logical and keyboard focus
+                textBox.Focus();
+                Keyboard.Focus(textBox);
+
+                // Optional: Select all text so typing immediately overwrites previous search
+                textBox.SelectAll();
             }
-        }        
+        }
     }
 }

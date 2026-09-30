@@ -200,21 +200,110 @@
         </Border>
 
         <Border Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Bottom" 
-                Margin="20,20,20,0" Background="#F5F5F5" Padding="10,0,10,0" Height="50"
-                BorderBrush="#999999" BorderThickness="2" CornerRadius="5"
-                Visibility="{Binding IsSearchVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="Find " FontSize="18" VerticalAlignment="Center"/>
+        Margin="20,0,20,20" Background="#FFFFFF" Padding="14,6" Height="52"
+        BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="10"
+        Visibility="{Binding IsSearchVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
+           
+            <Border.Resources>
+                <!-- High Contrast TextBox Style -->
+                <Style TargetType="TextBox">
+                    <Setter Property="Background" Value="#FFFFFF"/>
+                    <Setter Property="BorderBrush" Value="#94A3B8"/>
+                    <Setter Property="BorderThickness" Value="1"/>
+                    <Setter Property="Foreground" Value="#0F172A"/>
+                    <Setter Property="Padding" Value="8,4"/>
+                    <Setter Property="FontSize" Value="14"/>
+                    <Setter Property="VerticalContentAlignment" Value="Center"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="TextBox">
+                                <Border x:Name="border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6">
+                                    <ScrollViewer x:Name="PART_ContentHost" Focusable="false"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsFocused" Value="true">
+                                        <Setter TargetName="border" Property="BorderBrush" Value="#2563EB"/>
+                                        <Setter TargetName="border" Property="BorderThickness" Value="1.5"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
 
-                <TextBox x:Name="txtSearch" Width="180" Padding="2" FontSize="18"  VerticalAlignment="Center" Height="30" Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}" IsVisibleChanged="TxtSearch_IsVisibleChanged">
+                <!-- Primary Action Button (Next) -->
+                <Style x:Key="PrimarySearchButton" TargetType="Button">
+                    <Setter Property="Background" Value="#2563EB"/>
+                    <Setter Property="BorderBrush" Value="#2563EB"/>
+                    <Setter Property="Foreground" Value="#FFFFFF"/>
+                    <Setter Property="FontSize" Value="13"/>
+                    <Setter Property="FontWeight" Value="Normal"/>
+                    <Setter Property="Cursor" Value="Hand"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="border" Property="Background" Value="#1D4ED8"/>
+                                        <Setter TargetName="border" Property="BorderBrush" Value="#1D4ED8"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+
+                <!-- Dismiss Button (Close) -->
+                <Style x:Key="CloseSearchButton" TargetType="Button">
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Setter Property="Foreground" Value="#64748B"/>
+                    <Setter Property="FontSize" Value="14"/>
+                    <Setter Property="FontWeight" Value="Bold"/>
+                    <Setter Property="Cursor" Value="Hand"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="border" Property="Background" Value="#F1F5F9"/>
+                                        <Setter Property="Foreground" Value="#0F172A"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </Border.Resources>
+
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <!-- Search Label & Icon -->
+                <TextBlock Text="🔍 Find:" FontSize="14" FontWeight="Normal" Foreground="#334155" VerticalAlignment="Center" Margin="0,0,10,0"/>
+
+                <!-- Search Input Field -->
+                <TextBox x:Name="txtSearch" Width="200" Height="32" VerticalAlignment="Center" 
+                 Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}" 
+                 IsVisibleChanged="TxtSearch_IsVisibleChanged">
                     <TextBox.InputBindings>
                         <KeyBinding Key="Enter" Command="{Binding PerformSearchCommand}" />
                         <KeyBinding Key="Escape" Command="{Binding ToggleSearchCommand}" />
                     </TextBox.InputBindings>
                 </TextBox>
 
-                <Button Content="Next" Command="{Binding PerformSearchCommand}" Width="100" FontSize="18" Margin="10,0,0,0" Padding="10,2"/>
-                <Button Content="❌" Command="{Binding ToggleSearchCommand}" Margin="10,0,0,0" Background="Transparent" BorderThickness="0" Cursor="Hand"/>
+                <!-- Next Search Result Button -->
+                <Button Content="Next" Command="{Binding PerformSearchCommand}" 
+                Width="85" Height="32" Margin="10,0,0,0" 
+                Style="{StaticResource PrimarySearchButton}"/>
+
+                <!-- Close Search Bar Button -->
+                <Button Content="✕" Command="{Binding ToggleSearchCommand}" 
+                Width="28" Height="28" Margin="8,0,0,0" 
+                Style="{StaticResource CloseSearchButton}" ToolTip="Close (Esc)"/>
             </StackPanel>
         </Border>
     </Grid>
