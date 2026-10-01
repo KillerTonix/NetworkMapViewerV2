@@ -2,6 +2,7 @@
 using CommunityToolkit.Mvvm.Input;
 using NetworkMapViewerV2.Models;
 using NetworkMapViewerV2.Services;
+using System.Linq;
 using System.Windows;
 
 namespace NetworkMapViewerV2.ViewModels
@@ -12,22 +13,43 @@ namespace NetworkMapViewerV2.ViewModels
         [ObservableProperty] private bool _isSearchVisible = false;
         [ObservableProperty] private string _searchQuery = "";
 
-        // This is the "Signal" we send to the UI to play the animation
+        // Signal to UI for animation trigger
         [ObservableProperty] private int _highlightedDeviceId = 0;
 
         private string _lastSearchQuery = "";
-        private int _currentSearchIndex = 0;
+        private int _currentSearchIndex = -1;
         private List<GlobalSearchResult> _globalSearchResults = [];
+
+        // Partial method automatically called by CommunityToolkit.Mvvm when SearchQuery changes
+        partial void OnSearchQueryChanged(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                ResetSearchState();
+            }
+        }
 
         [RelayCommand]
         public void ToggleSearch()
         {
             IsSearchVisible = true;
-            if (true)
-            {
-                SearchQuery = "";
-                _globalSearchResults.Clear();
-            }
+            SearchQuery = "";
+            ResetSearchState();
+        }
+
+        [RelayCommand]
+        public void ToggleSearchClose()
+        {
+            IsSearchVisible = false;
+            SearchQuery = "";
+            ResetSearchState();
+        }
+
+        private void ResetSearchState()
+        {
+            _lastSearchQuery = "";
+            _currentSearchIndex = -1;
+            _globalSearchResults.Clear();
         }
 
         [RelayCommand]
@@ -35,8 +57,7 @@ namespace NetworkMapViewerV2.ViewModels
         {
             string query = SearchQuery?.Trim().ToLower() ?? "";
             if (string.IsNullOrEmpty(query)) return;
-
-            // --- PHASE 1: SQLITE SEARCH ---
+                        
             if (query != _lastSearchQuery)
             {
                 _lastSearchQuery = query;
@@ -47,38 +68,35 @@ namespace NetworkMapViewerV2.ViewModels
 
                 var rawResults = repo.SearchDevices(query, currentSettings.DeepperSearchMode, currentSettings.EqualitySearchMode);
 
-                if (rawResults.Count == 0)
+                if (rawResults == null || rawResults.Count == 0)
                 {
                     MessageBox.Show($"No devices found matching '{query}'.", "Search", MessageBoxButton.OK, MessageBoxImage.Information);
-                    _globalSearchResults?.Clear();
+                    ResetSearchState();
                     return;
                 }
 
-                // Get the ID of the currently opened map (safely fallback to -1 if no map is open)
+                // Prioritize current map, then group remaining by Map ID
                 int currentMapId = SelectedTab?.MapId ?? -1;
-
-                // THE FIX: Sort the results so the current map is prioritized!
-                // OrderByDescending on a boolean puts 'true' before 'false'.
-                // ThenBy groups the remaining results neatly by their respective Map IDs.
-                _globalSearchResults = rawResults
+                _globalSearchResults = [.. rawResults
                     .OrderByDescending(r => r.MapId == currentMapId)
-                    .ThenBy(r => r.MapId)
-                    .ToList();
+                    .ThenBy(r => r.MapId)];
             }
 
             // --- PHASE 2: CYCLE THROUGH RESULTS ---
-            if (_globalSearchResults != null && _globalSearchResults.Count > 0)
+            if (_globalSearchResults.Count > 0)
             {
                 _currentSearchIndex++;
-                if (_currentSearchIndex >= _globalSearchResults.Count) _currentSearchIndex = 0;
+                if (_currentSearchIndex >= _globalSearchResults.Count)
+                {
+                    _currentSearchIndex = 0;
+                }
 
                 var target = _globalSearchResults[_currentSearchIndex];
 
-                // 1. Open the Map (or switch to it if it's already open)
+                // 1. Open or switch to map
                 OpenMapFromDatabase(target.MapId);
 
-                // 2. Fire the animation signal immediately!
-                // (We set it to 0 first to guarantee the PropertyChanged event fires)
+                // 2. Fire animation signal
                 HighlightedDeviceId = 0;
                 HighlightedDeviceId = target.DeviceId;
             }

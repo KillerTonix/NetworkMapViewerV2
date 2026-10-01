@@ -84,6 +84,11 @@ namespace NetworkMapViewerV2.ViewModels
         [RelayCommand]
         public async Task UpdateGroupData()
         {
+            if (IsEditingEnabled == false)
+            {
+                MessageBox.Show("Editing is disabled. Please enable editing to update group data.", "Editing Disabled", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
             var tab = SelectedTab;
             if (tab == null || tab.Devices.Count == 0) return;
 
@@ -177,5 +182,6 @@ namespace NetworkMapViewerV2.ViewModels
                 MessageBox.Show($"Update complete for {devicesToUpdate.Count} online devices.\nOffline devices were skipped.", "Finished", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
+
     }
 }

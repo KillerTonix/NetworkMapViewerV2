@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Threading;
 
 namespace NetworkMapViewerV2.Views
 {
@@ -21,8 +22,6 @@ namespace NetworkMapViewerV2.Views
 
         // Hotkey Constants
         private const int HOTKEY_ID = 9000;
-        private const uint MOD_NONE = 0x0000;
-        private const uint MOD_ALT = 0x0001;
         private const uint MOD_CONTROL = 0x0002;
         private const uint MOD_SHIFT = 0x0004;
         private const uint VK_SPACE = 0x20; // Spacebar
@@ -132,6 +131,47 @@ namespace NetworkMapViewerV2.Views
 
                 // Optional: Select all text so typing immediately overwrites previous search
                 textBox.SelectAll();
+            }
+        }
+
+        private void TxtSearch_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)
+            {
+                e.Handled = true; // Stops Enter from performing default WPF focus navigation
+
+                // 1. Run search command
+                if (DataContext is MainViewModel vm && vm.PerformSearchCommand.CanExecute(null))
+                {
+                    vm.PerformSearchCommand.Execute(null);
+                }
+
+                // 2. Explicitly return focus to txtSearch
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    txtSearch.Focus();
+                    Keyboard.Focus(txtSearch);
+
+                    // Optional: Choose text cursor behavior:
+                    txtSearch.SelectAll(); // Highlight text so typing replaces it
+                                           // OR:
+                                           // txtSearch.CaretIndex = txtSearch.Text.Length; // Place cursor at the end
+                }), DispatcherPriority.Input);
+            }
+            if (e.Key == Key.Escape)
+            {
+                e.Handled = true; // Stops Escape from performing default WPF focus navigation
+                // 1. Close the search box
+                if (DataContext is MainViewModel vm && vm.ToggleSearchCloseCommand.CanExecute(null))
+                {
+                    vm.ToggleSearchCloseCommand.Execute(null);
+                }
+                // 2. Explicitly return focus to the main window
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    this.Focus();
+                    Keyboard.Focus(this);
+                }), DispatcherPriority.Input);
             }
         }
     }

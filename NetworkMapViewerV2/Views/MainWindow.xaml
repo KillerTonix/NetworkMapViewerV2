@@ -32,6 +32,8 @@
         <KeyBinding Key="F1" Modifiers="Shift" Command="{Binding ToggleHotkeysCommand}" />
 
         <KeyBinding Key="U" Modifiers="Ctrl" Command="{Binding UpdateGroupDataCommand}" />
+  
+        
     </Window.InputBindings>
 
     <Window.Resources>
@@ -288,11 +290,8 @@
                 <!-- Search Input Field -->
                 <TextBox x:Name="txtSearch" Width="200" Height="32" VerticalAlignment="Center" 
                  Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}" 
-                 IsVisibleChanged="TxtSearch_IsVisibleChanged">
-                    <TextBox.InputBindings>
-                        <KeyBinding Key="Enter" Command="{Binding PerformSearchCommand}" />
-                        <KeyBinding Key="Escape" Command="{Binding ToggleSearchCommand}" />
-                    </TextBox.InputBindings>
+                 IsVisibleChanged="TxtSearch_IsVisibleChanged" PreviewKeyDown="TxtSearch_PreviewKeyDown">
+                   
                 </TextBox>
 
                 <!-- Next Search Result Button -->
@@ -301,7 +300,7 @@
                 Style="{StaticResource PrimarySearchButton}"/>
 
                 <!-- Close Search Bar Button -->
-                <Button Content="✕" Command="{Binding ToggleSearchCommand}" 
+                <Button Content="✕" Command="{Binding ToggleSearchCloseCommand}" 
                 Width="28" Height="28" Margin="8,0,0,0" 
                 Style="{StaticResource CloseSearchButton}" ToolTip="Close (Esc)"/>
             </StackPanel>

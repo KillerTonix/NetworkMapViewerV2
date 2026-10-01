@@ -599,6 +599,32 @@ namespace NetworkMapViewerV2.Data
             cmd.Parameters.AddWithValue("@IsMapLink", group.IsMapLink ? 1 : 0);
         }
 
+
+
+        public static List<NetworkDevice> GetAllDevices()
+        {
+            if (DbPath == null || DbPath == "")
+                return [];
+
+            var devices = new List<NetworkDevice>();
+            using var connection = GetOpenConnection();
+            using var cmd = new SqlCommand("SELECT DeviceId, Address FROM Devices", connection);            
+            using var reader = cmd.ExecuteReader();            
+            
+            while (reader.Read())
+            {
+                devices.Add(new NetworkDevice
+                {
+                    DeviceId = reader.GetInt32(0),
+                    Address = reader.GetString(1)
+                });
+            }
+
+            return devices;
+        }
+
+
+
         public List<DeviceGroup> GetAllDeviceGroups()
         {
             if (DbPath == null || DbPath == "")

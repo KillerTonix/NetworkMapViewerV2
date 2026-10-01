@@ -46,7 +46,7 @@
                         </MenuItem>
                     </ContextMenu>
                 </Setter.Value>
-            </Setter>            
+            </Setter>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TabItem">

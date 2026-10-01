@@ -1,4 +1,5 @@
-﻿using NetworkMapViewerV2.Helpers;
+﻿using CommunityToolkit.Mvvm.Input;
+using NetworkMapViewerV2.Helpers;
 using NetworkMapViewerV2.Helpers.Alignment;
 using NetworkMapViewerV2.Helpers.LocalFetcher;
 using NetworkMapViewerV2.Models;
@@ -1109,6 +1110,9 @@ namespace NetworkMapViewerV2.Views
             // Dynamically build the menu!
             var menu = new ContextMenu();
 
+            var miGetLastPC = new MenuItem { Icon = "🔍", Header = "Get Newly Added Computers...", FontWeight = FontWeights.Bold };
+            miGetLastPC.Click += async (s, args) => await GetNewlyAddedComputers();
+
             var miDiscover = new MenuItem { Icon = "🔍", Header = "Auto-Discover Devices...", FontWeight = FontWeights.Bold };
             miDiscover.Click += async (s, args) => await RunAutoDiscoveryAsync();
 
@@ -1212,6 +1216,9 @@ namespace NetworkMapViewerV2.Views
                 menu.Items.Add(miDiscover);
                 menu.Items.Add(new Separator());
             }
+            
+            menu.Items.Add(miGetLastPC);
+            menu.Items.Add(new Separator());
             menu.Items.Add(miUpdateDevices);
             menu.Items.Add(new Separator());
             menu.Items.Add(miAddDevice);
@@ -1633,6 +1640,62 @@ namespace NetworkMapViewerV2.Views
                 DrawMap(_currentState);
             }
         }
+
+                
+        public async Task GetNewlyAddedComputers()
+        {
+            if (_currentState == null || !_currentState.IsEditingEnabled) return;
+
+            // 1. Fetch recent AD computers via PowerShell
+            var fetcher = new ADComputer();
+            List<ADComputerInfo> adComputers = await fetcher.GetRecentADComputersAsync();
+
+            if (adComputers == null || adComputers.Count == 0)
+            {
+                MessageBox.Show("No new AD computers found in the last 15 days.", "Active Directory Sync", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            // 3. Show dialog
+            var importWin = new ImportADComputersWindow(adComputers)
+            {
+                Owner = Application.Current.MainWindow
+            };
+
+            if (importWin.ShowDialog() == true && importWin.SelectedComputers.Count != 0)
+            {
+                // 4. Position and spawn selected devices onto map canvas
+            
+                double startX = _lastRightClickPosition.X;
+                double startY = _lastRightClickPosition.Y;
+                double spacingX = 120;
+                int index = 0;
+
+                foreach (var computer in importWin.SelectedComputers)
+                {
+                    var newDevice = new NetworkDevice
+                    {
+                        MapId = _currentState.MapId,
+                        Address = computer.IPAddress,
+                        GroupId = 1, // Set to your default GroupId (e.g., Workstation ID)
+                        Left = startX + (index * spacingX),
+                        Top = startY
+                    };
+                    newDevice.Titles.Add($"%Address\n{computer.Name}"); // Add the IP as the title for visibility
+                    _currentState.Devices.Add(newDevice);
+                    DrawMap(_currentState);
+
+                    index++;
+                }
+
+                // 5. Persist map state
+                _currentState.HasUnsavedChanges = true;
+
+
+                MessageBox.Show($"Successfully added {importWin.SelectedComputers.Count} device(s) to the map.", "Import Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
 
 
         private async Task RunAutoDiscoveryAsync()

@@ -7,6 +7,12 @@
         FontFamily="Segoe UI">
 
     <Window.Resources>
+        <!-- System Selection Color Overrides -->
+        <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#93C5FD"/>
+        <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#1E3A8A"/>
+        <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="#BFDBFE"/>
+        <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}" Color="#1E3A8A"/>
+
         <!-- DataGrid Header Style -->
         <Style TargetType="DataGridColumnHeader">
             <Setter Property="Background" Value="#F1F5F9"/>
@@ -25,11 +31,12 @@
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter Property="Background" Value="#EFF6FF"/>
+                    <Setter Property="Foreground" Value="#0F172A"/>
                 </Trigger>
 
                 <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="#DBEAFE"/>
-                    <Setter Property="Foreground" Value="#1E40AF"/>
+                    <Setter Property="Background" Value="#93C5FD"/>
+                    <Setter Property="Foreground" Value="#1E3A8A"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -37,15 +44,27 @@
         <!-- DataGrid Cell Style -->
         <Style TargetType="DataGridCell">
             <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="DataGridCell">
-                        <Border Padding="{TemplateBinding Padding}" Background="Transparent">
+                        <Border Padding="{TemplateBinding Padding}" 
+                                Background="{TemplateBinding Background}"
+                                BorderThickness="0"
+                                SnapsToDevicePixels="True">
                             <ContentPresenter VerticalAlignment="Center"/>
                         </Border>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#93C5FD"/>
+                    <Setter Property="Foreground" Value="#1E3A8A"/>
+                </Trigger>
+            </Style.Triggers>
         </Style>
     </Window.Resources>
 
