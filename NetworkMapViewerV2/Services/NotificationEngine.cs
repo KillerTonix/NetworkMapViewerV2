@@ -6,7 +6,7 @@ namespace NetworkMapViewerV2.Services
 {
     public static class NotificationEngine
     {
-        // In reality, load this from your SQLite database!
+        // In reality, load this from your MSSQL database!
         public static List<NotificationRule> ActiveRules { get; set; } = [];
         private static List<string> _pendingAlerts = new();
         private static DispatcherTimer _toastTimer = new();

@@ -35,7 +35,7 @@ namespace NetworkMapViewerV2.Views
             // 1. Create ONE repository connection for the whole window
             var repo = new Data.MapRepository();
 
-            // 2. Fetch the device types dynamically from the SQLite Database!
+            // 2. Fetch the device types dynamically from the MSSQL Database!
             var deviceTypes = repo.GetAllDeviceGroups();
             cmbType.ItemsSource = deviceTypes;
 
@@ -163,10 +163,10 @@ namespace NetworkMapViewerV2.Views
             this.Close();
         }
 
-        // You can safely delete the "Browse Map" button from your XAML now since everything is in SQLite!
+        // You can safely delete the "Browse Map" button from your XAML now since everything is in MSSQL!
         private void BtnBrowseMap_Click(object sender, RoutedEventArgs e)
         {
-            MessageBox.Show("Map files are now stored entirely inside the SQLite Database. External .map linking is obsolete!", "Info", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show("Map files are now stored entirely inside the MSSQL Database. External .map linking is obsolete!", "Info", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private void CmbType_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)

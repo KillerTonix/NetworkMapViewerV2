@@ -62,7 +62,7 @@ namespace NetworkMapViewerV2.Views
             NewGroup.IconPath = txtIconPath.Text;
             NewGroup.DefaultCommand = cmbCommands.SelectedValue?.ToString() ?? "Ping";
 
-            // Save straight to SQLite!
+            // Save straight to MSSQL!
             try
             {
                 var repo = new Data.MapRepository();

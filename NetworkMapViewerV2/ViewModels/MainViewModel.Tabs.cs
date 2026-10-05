@@ -47,7 +47,7 @@ namespace NetworkMapViewerV2.ViewModels
                     PingService.StartPinging(value.Devices);
                     IsPinging = true;
                 }
-
+                              
                 // Save the SQLite MapId to settings
                 if (value.MapId > 0 && _appSettings?.LastOpenedMapId != value.MapId)
                 {

@@ -93,7 +93,7 @@ namespace NetworkMapViewerV2.ViewModels
 
                     // 3. Add to UI and select it
                     OpenTabs.Add(newTab);
-                    SelectedTab = newTab;
+                    SelectedTab = newTab;                    
 
                     // 4. Save as the last opened map
                     if (_appSettings != null)
@@ -246,7 +246,7 @@ namespace NetworkMapViewerV2.ViewModels
             try
             {
                 var repository = new Data.MapRepository();
-                var dbMapState = repository.LoadMap(mapId); // Loads entirely from SQLite!
+                var dbMapState = repository.LoadMap(mapId); // Loads entirely from MSSQL!
 
                 // FIX 1: Force the MapId to be correct just in case the repository forgot to set it!
                 dbMapState.MapId = mapId;

@@ -11,9 +11,20 @@ namespace NetworkMapViewerV2
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
+            try
+            {
+                // Test DB connection before opening main window
+                DatabaseService.InitializeDatabase();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Database is not accessible. Please check your connection or server settings.\n\nDetails: {ex.Message}", "Database Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
 
-            // Ensure the SQLite database exists before any windows open
-            DatabaseService.InitializeDatabase();
+                // Exit application cleanly without throwing an unhandled crash
+                Shutdown(-1);
+                return;
+            }
         }
         protected override void OnExit(ExitEventArgs e)
         {

@@ -235,7 +235,7 @@ namespace NetworkMapViewerV2.Views
                     try
                     {
                         var repo = new Data.MapRepository();
-                        repo.DeleteDeviceGroup(selected.GroupId); // Delete from SQLite
+                        repo.DeleteDeviceGroup(selected.GroupId); // Delete from MSSQL
                         DeviceGroups.Remove(selected);            // Remove from UI
                     }
                     catch (Exception ex)

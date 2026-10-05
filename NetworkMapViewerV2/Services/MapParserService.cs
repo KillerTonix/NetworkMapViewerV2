@@ -75,7 +75,7 @@ namespace NetworkMapViewerV2.Services
                             else if (key == "Image") currentDevice.ImagePath = value;
                             else if (key == "Group" && int.TryParse(value, out int groupVal)) currentDevice.Group = groupVal;
                             else if (key == "Hint") currentDevice.Hints.Add(CleanHtml(value));
-                            // Note: We skip 'ID=' here because V2 uses an auto-generated SQLite ID instead
+                            // Note: We skip 'ID=' here because V2 uses an auto-generated MSSQL ID instead
                         }
                         else if (currentSubSection == "Name" && key.StartsWith("Item"))
                         {

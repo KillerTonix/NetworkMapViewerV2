@@ -18,7 +18,7 @@ namespace NetworkMapViewerV2.ViewModels
             LoadMapDirectories();
             Application.Current.Dispatcher.InvokeAsync(() =>
             {
-                // Instantly load from SQLite on startup!
+                // Instantly load from MSSQL on startup!
                 if (_appSettings.LastOpenedMapId > 0)
                 {
                     OpenMapFromDatabase(_appSettings.LastOpenedMapId);

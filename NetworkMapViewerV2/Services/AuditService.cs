@@ -9,7 +9,7 @@ namespace NetworkMapViewerV2.Services
         /// <summary>
         /// Logs an action to the database. Can be used inside an existing transaction, or standalone.
         /// </summary>
-        // Changed SqliteTransaction to SqlTransaction
+        // Changed MSSQLTransaction to SqlTransaction
         public static void LogAction(string actionType, string tableName, int recordId, string details, SqlTransaction? transaction = null)
         {
             string insertSql = @"
@@ -20,13 +20,13 @@ namespace NetworkMapViewerV2.Services
             // Otherwise, open a quick new one just for this log.
             if (transaction != null)
             {
-                // Changed SqliteCommand to SqlCommand
+                // Changed MSSQLCommand to SqlCommand
                 using var cmd = new SqlCommand(insertSql, transaction.Connection, transaction);
                 ExecuteLogCommand(cmd, actionType, tableName, recordId, details);
             }
             else
             {
-                // Changed SqliteConnection to SqlConnection
+                // Changed MSSQLConnection to SqlConnection
                 using var connection = new SqlConnection(DatabaseService.ConnectionString);
                 connection.Open();
 
@@ -35,7 +35,7 @@ namespace NetworkMapViewerV2.Services
             }
         }
 
-        // Changed SqliteCommand to SqlCommand
+        // Changed MSSQLCommand to SqlCommand
         private static void ExecuteLogCommand(SqlCommand cmd, string actionType, string tableName, int recordId, string details)
         {
             // MS SQL natively handles C# DateTime objects, so no string conversion is needed
