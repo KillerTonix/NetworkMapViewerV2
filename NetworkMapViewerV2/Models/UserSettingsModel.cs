@@ -22,7 +22,5 @@
         public bool ENS_PlayOnlineSound { get; set; } = true;
         public string ENS_OnlineSoundFilePath { get; set; } = @"Sounds\Online.wav";
 
-        public Dictionary<string, string> CustomVariables { get; set; } = new(StringComparer.OrdinalIgnoreCase);
-
     }
 }

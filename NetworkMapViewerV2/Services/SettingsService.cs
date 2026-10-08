@@ -169,8 +169,6 @@ namespace NetworkMapViewerV2.Services
             target.ENS_OfflineSoundFilePath = source.ENS_OfflineSoundFilePath;
             target.ENS_PlayOnlineSound = source.ENS_PlayOnlineSound;
             target.ENS_OnlineSoundFilePath = source.ENS_OnlineSoundFilePath;
-
-            target.CustomVariables = source.CustomVariables ?? new(StringComparer.OrdinalIgnoreCase);
         }
 
         private static GlobalSettingsModel ExtractGlobalSettings(AppSettings source) => new()
@@ -207,9 +205,7 @@ namespace NetworkMapViewerV2.Services
             ENS_PlayOfflineSound = source.ENS_PlayOfflineSound,
             ENS_OfflineSoundFilePath = source.ENS_OfflineSoundFilePath,
             ENS_PlayOnlineSound = source.ENS_PlayOnlineSound,
-            ENS_OnlineSoundFilePath = source.ENS_OnlineSoundFilePath,
-
-            CustomVariables = source.CustomVariables ?? new(StringComparer.OrdinalIgnoreCase)
+            ENS_OnlineSoundFilePath = source.ENS_OnlineSoundFilePath
         };
 
         public static void UpdateGroupDefaultCommand(int groupId, string commandName)

@@ -35,13 +35,10 @@ namespace NetworkMapViewerV2.Helpers
                 string decryptedPasswordSSH = SecureSettingsHelper.UnprotectPassword(settings.SSHPassword) ?? "";
                 // Support both {Address} and %Address depending on how your commands were set up
                 string args = command.Arguments?.Replace("{Address}", address).Replace("%Address", address).Replace("{VNCPassword}", decryptedPasswordVNC).Replace("{SSHPassword}", decryptedPasswordSSH) ?? "";
-
-                settings.CustomVariables = settings.CustomVariables != null
-                    ? new Dictionary<string, string>(settings.CustomVariables, StringComparer.OrdinalIgnoreCase)
-                    : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                
+                var tempRunVariables = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
                 var matches = Regex.Matches(args, @"\{([a-zA-Z0-9_]+)\}");
-                bool settingsUpdated = false;
 
                 foreach (Match match in matches)
                 {
@@ -50,18 +47,15 @@ namespace NetworkMapViewerV2.Helpers
 
                     if (KnownBaseVariables.Contains(varName)) continue;
 
-                    settings.CustomVariables ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
                     // Check if variable value is already stored in user settings
-                    if (!settings.CustomVariables.TryGetValue(varName, out string? customValue) || string.IsNullOrWhiteSpace(customValue))
+                    if (!tempRunVariables.TryGetValue(varName, out string? customValue))
                     {
                         var inputDlg = new InputDialog($"Enter value for custom variable {{{varName}}}:", "Missing Argument");
 
                         if (inputDlg.ShowDialog() == true && !string.IsNullOrWhiteSpace(inputDlg.InputTextBox.Text))
                         {
                             customValue = inputDlg.InputTextBox.Text.Trim();
-                            settings.CustomVariables[varName] = customValue;
-                            settingsUpdated = true;
+                            tempRunVariables[varName] = customValue;
                         }
                         else
                         {
@@ -73,12 +67,7 @@ namespace NetworkMapViewerV2.Helpers
                     // Replace custom placeholder with resolved value
                     args = args.Replace(rawPlaceholder, customValue, StringComparison.OrdinalIgnoreCase);
                 }
-
-                // 4. Save new custom variables to user settings if updated
-                if (settingsUpdated)
-                {
-                    SettingsService.Save(settings);
-                }
+                              
 
                 Process.Start(new ProcessStartInfo
                 {

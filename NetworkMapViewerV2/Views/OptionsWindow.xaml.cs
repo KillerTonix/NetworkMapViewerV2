@@ -17,26 +17,26 @@ namespace NetworkMapViewerV2.Views
         public ObservableCollection<DeviceGroup> DeviceGroups { get; set; }
         public ObservableCollection<NotificationRule> ActiveUI_Rules { get; set; } = [];
         public bool Saved { get; private set; }
-        private static AppSettings settings = SettingsService.Load();
-        private static readonly string DbPath = settings.DatabaseServer ?? "";
+
         public OptionsWindow(int tabIndex = 0)
         {
             InitializeComponent();
 
             _settings = SettingsService.Load();
+
+            // --- COMMANDS ---
             Commands = new ObservableCollection<ExternalCommand>(_settings.Commands);
             CommandsListBox.ItemsSource = Commands;
 
-            // --- LOAD PING SETTINGS ---
+            // --- PING SETTINGS ---
             AutostartPingChk.IsChecked = _settings.PingAutostart;
             PingPeriodTextBox.Text = _settings.PingPeriodSeconds.ToString();
 
-
-            // --- LOAD SEARCH SETTINGS ---
+            // --- SEARCH SETTINGS ---
             DeeperSearchRB.IsChecked = _settings.DeepperSearchMode;
             EqualityModeCheckBox.IsChecked = _settings.EqualitySearchMode;
 
-            // --- LOAD PATH SETTINGS ---
+            // --- PATH SETTINGS ---
             DatabaseServerTextBox.Text = _settings.DatabaseServer;
             DatabaseNameTextBox.Text = _settings.DatabaseName;
             DatabaseUserTextBox.Text = _settings.DatabaseUser;
@@ -44,8 +44,8 @@ namespace NetworkMapViewerV2.Views
             HintImagesPathTextBox.Text = _settings.HintImagesPath;
             ScriptsPathTextBox.Text = _settings.ScriptsPath;
 
-            // --- LOAD PASSWORD SETTINGS ---
-            if (!(DbPath == null || DbPath == ""))
+            // --- PASSWORD SETTINGS ---
+            if (!string.IsNullOrEmpty(_settings.DatabaseServer))
             {
                 DatabasePasswordTextBox.Text = "******";
                 PrinterPasswordTextBox.Text = "******";
@@ -56,29 +56,10 @@ namespace NetworkMapViewerV2.Views
                 QmsPasswordTextBox.Text = "******";
             }
 
-            // --- LOAD NOTIFICATION SETTINGS ---
-            lstRules.ItemsSource = ActiveUI_Rules;
-            ActiveUI_Rules.Clear();
-            if (_settings.ENS_Rules != null)
-            {
-                foreach (var rule in _settings.ENS_Rules)
-                {
-                    ActiveUI_Rules.Add(rule);
-                }
-            }
-            NotificationEngine.ActiveRules = [.. ActiveUI_Rules];
-            // 1. General
-            chkSaveToLog.IsChecked = _settings.ENS_SaveToLog;
-            chkShowMessage.IsChecked = _settings.ENS_ShowMessage;
+            // --- NOTIFICATION SETTINGS ---
+            LoadNotificationSettings();
 
-            // 2. Offline Sound
-            EnableOfflineSoundChk.IsChecked = _settings.ENS_PlayOfflineSound;
-            txtOfflineSoundPath.Text = _settings.ENS_OfflineSoundFilePath;
-
-            // 3. Online Sound
-            EnableOnlineSoundChk.IsChecked = _settings.ENS_PlayOnlineSound;
-            txtOnlineSoundPath.Text = _settings.ENS_OnlineSoundFilePath;
-
+            // --- TAB & GROUPS ---
             SettingsTC.SelectedIndex = tabIndex;
             var repo = new Data.MapRepository();
             DeviceGroups = new ObservableCollection<DeviceGroup>(repo.GetAllDeviceGroups());
@@ -267,7 +248,6 @@ namespace NetworkMapViewerV2.Views
             if (int.TryParse(PingPeriodTextBox.Text, out int period) && period > 0)
                 _settings.PingPeriodSeconds = period;
 
-
             // Save Search settings
             _settings.DeepperSearchMode = DeeperSearchRB.IsChecked == true;
             _settings.EqualitySearchMode = EqualityModeCheckBox.IsChecked == true;
@@ -280,7 +260,7 @@ namespace NetworkMapViewerV2.Views
             _settings.HintImagesPath = HintImagesPathTextBox.Text.Trim();
             _settings.ScriptsPath = ScriptsPathTextBox.Text.Trim();
 
-
+            // Save Passwords
             if (DatabasePasswordTextBox.Text != "******")
                 _settings.DatabasePassword = SecureSettingsHelper.ProtectPassword(DatabasePasswordTextBox.Text.Trim());
             if (PrinterPasswordTextBox.Text != "******")
@@ -296,10 +276,8 @@ namespace NetworkMapViewerV2.Views
             if (QmsPasswordTextBox.Text != "******")
                 _settings.QMSPassword = SecureSettingsHelper.ProtectPassword(QmsPasswordTextBox.Text.Trim());
 
-
+            // Save Notifications
             _settings.ENS_Rules = [.. ActiveUI_Rules];
-            NotificationEngine.ActiveRules = [.. settings.ENS_Rules];
-
             _settings.ENS_SaveToLog = chkSaveToLog.IsChecked == true;
             _settings.ENS_ShowMessage = chkShowMessage.IsChecked == true;
 
@@ -309,16 +287,46 @@ namespace NetworkMapViewerV2.Views
             _settings.ENS_PlayOnlineSound = EnableOnlineSoundChk.IsChecked == true;
             _settings.ENS_OnlineSoundFilePath = txtOnlineSoundPath.Text;
 
+            // Sync with active background engine
+            NotificationEngine.ActiveRules = [.. _settings.ENS_Rules];
 
-            // Write to disk
+            // Persist to disk
             SettingsService.Save(_settings);
             Saved = true;
-            this.Close();
+            Close();
         }
 
         private void CancelButton_Click(object sender, RoutedEventArgs e)
         {
-            this.Close();
+            Close();
+        }
+
+
+        #region Notification Section Refactoring
+
+        private void LoadNotificationSettings()
+        {
+            ActiveUI_Rules.Clear();
+            if (_settings.ENS_Rules != null)
+            {
+                foreach (var rule in _settings.ENS_Rules)
+                {
+                    ActiveUI_Rules.Add(rule);
+                }
+            }
+
+            lstRules.ItemsSource = ActiveUI_Rules;
+
+            // General Flags
+            chkSaveToLog.IsChecked = _settings.ENS_SaveToLog;
+            chkShowMessage.IsChecked = _settings.ENS_ShowMessage;
+
+            // Audio Alerts
+            EnableOfflineSoundChk.IsChecked = _settings.ENS_PlayOfflineSound;
+            txtOfflineSoundPath.Text = _settings.ENS_OfflineSoundFilePath;
+
+            EnableOnlineSoundChk.IsChecked = _settings.ENS_PlayOnlineSound;
+            txtOnlineSoundPath.Text = _settings.ENS_OnlineSoundFilePath;
         }
 
         private void AddNotifButton_Click(object sender, RoutedEventArgs e)
@@ -326,11 +334,11 @@ namespace NetworkMapViewerV2.Views
             var repo = new Data.MapRepository();
             var dbGroups = repo.GetAllDeviceGroups();
 
-            var groupItems = new List<TargetGroupItem>();
-            foreach (var group in dbGroups)
+            var groupItems = dbGroups.ConvertAll(g => new TargetGroupItem
             {
-                groupItems.Add(new TargetGroupItem { GroupId = group.GroupId, GroupName = group.GroupName });
-            }
+                GroupId = g.GroupId,
+                GroupName = g.GroupName
+            });
 
             var dialog = new AddNotificationRuleWindow(groupItems)
             {
@@ -339,14 +347,8 @@ namespace NetworkMapViewerV2.Views
 
             if (dialog.ShowDialog() == true && dialog.CreatedRule != null)
             {
-                // 1. Add directly to the Observable Collection (NEVER use lstRules.Items.Add!)
+                // Mutate local UI collection only (saved to disk on OK click)
                 ActiveUI_Rules.Add(dialog.CreatedRule);
-
-                var settings = SettingsService.Load();
-                settings.ENS_Rules = [.. ActiveUI_Rules]; // Convert the UI list to standard list
-                SettingsService.Save(settings);      // Save to JSON instantly
-
-                NotificationEngine.ActiveRules = [.. ActiveUI_Rules];
             }
         }
 
@@ -360,16 +362,8 @@ namespace NetworkMapViewerV2.Views
 
                 if (result == MessageBoxResult.Yes)
                 {
-                    // 1. Remove from the Observable Collection
+                    // Mutate local UI collection only (saved to disk on OK click)
                     ActiveUI_Rules.Remove(selectedRule);
-
-
-                    var settings = SettingsService.Load();
-                    settings.ENS_Rules = [.. ActiveUI_Rules];
-                    SettingsService.Save(settings);
-
-                    // Instantly remove it from the background Engine
-                    NotificationEngine.ActiveRules = [.. ActiveUI_Rules];
                 }
             }
             else
@@ -378,46 +372,30 @@ namespace NetworkMapViewerV2.Views
             }
         }
 
-        private void BtnBrowseOffline_Click(object sender, RoutedEventArgs e)
+
+        // --- Audio Helpers ---
+
+        private void BtnBrowseOffline_Click(object sender, RoutedEventArgs e) => BrowseAudioFile(txtOfflineSoundPath, "Select Offline Sound");
+        private void BtnBrowseOnline_Click(object sender, RoutedEventArgs e) => BrowseAudioFile(txtOnlineSoundPath, "Select Online Sound");
+
+        private void BtnTestOffline_Click(object sender, RoutedEventArgs e) => PlayTestSound(txtOfflineSoundPath.Text);
+        private void BtnTestOnline_Click(object sender, RoutedEventArgs e) => PlayTestSound(txtOnlineSoundPath.Text);
+
+        private void BrowseAudioFile(TextBox targetTextBox, string title)
         {
             var openFileDialog = new OpenFileDialog
             {
                 Filter = "Audio Files (*.wav)|*.wav",
-                Title = "Select Offline Sound"
+                Title = title
             };
 
             if (openFileDialog.ShowDialog() == true)
             {
-                txtOfflineSoundPath.Text = openFileDialog.FileName;
+                targetTextBox.Text = openFileDialog.FileName;
             }
         }
 
-        private void BtnTestOffline_Click(object sender, RoutedEventArgs e)
-        {
-            PlayTestSound(txtOfflineSoundPath.Text);
-        }
-
-        private void BtnBrowseOnline_Click(object sender, RoutedEventArgs e)
-        {
-            var openFileDialog = new OpenFileDialog
-            {
-                Filter = "Audio Files (*.wav)|*.wav",
-                Title = "Select Online Sound"
-            };
-
-            if (openFileDialog.ShowDialog() == true)
-            {
-                txtOnlineSoundPath.Text = openFileDialog.FileName;
-            }
-        }
-
-        private void BtnTestOnline_Click(object sender, RoutedEventArgs e)
-        {
-            PlayTestSound(txtOnlineSoundPath.Text);
-        }
-
-        // Reusable sound player for the Test buttons
-        private void PlayTestSound(string filePath)
+        private static void PlayTestSound(string filePath)
         {
             if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
             {
@@ -435,5 +413,7 @@ namespace NetworkMapViewerV2.Views
                 MessageBox.Show($"Failed to play sound: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
+        #endregion
     }
 }

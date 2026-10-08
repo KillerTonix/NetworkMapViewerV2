@@ -17,8 +17,7 @@
         <KeyBinding Key="F2" Modifiers="Ctrl" Command="{Binding OutOfBoundsDevicesCommand}" />
 
         <KeyBinding Key="F5" Modifiers="Ctrl" Command="{Binding PingOptionsCommand}" />
-
-        <KeyBinding Key="F11" Command="{Binding NotifiactionCommand}" />
+       
         <KeyBinding Key="F12" Command="{Binding ReportCommand}" />
         <KeyBinding Key="F11" Modifiers="Ctrl" Command="{Binding NotificationOptionsCommand}" />
 
@@ -106,12 +105,7 @@
                 </MenuItem>
             </MenuItem>
 
-            <MenuItem Header="_Notification">
-                <MenuItem Header="_Notification" InputGestureText="F11"  Command="{Binding NotificationCommand}">
-                    <MenuItem.Icon>
-                        <TextBlock Text="🔔" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                    </MenuItem.Icon>
-                </MenuItem>
+            <MenuItem Header="_Notification">                
                 <MenuItem Header="_Report" InputGestureText="F12"  Command="{Binding ReportCommand}">
                     <MenuItem.Icon>
                         <TextBlock Text="📊" VerticalAlignment="Center" HorizontalAlignment="Center"/>

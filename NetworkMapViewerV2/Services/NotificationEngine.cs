@@ -1,4 +1,6 @@
 ﻿using NetworkMapViewerV2.Models;
+using System.IO;
+using System.Media;
 using System.Windows;
 using System.Windows.Threading;
 
@@ -6,119 +8,128 @@ namespace NetworkMapViewerV2.Services
 {
     public static class NotificationEngine
     {
-        // In reality, load this from your MSSQL database!
         public static List<NotificationRule> ActiveRules { get; set; } = [];
-        private static List<string> _pendingAlerts = new();
-        private static DispatcherTimer _toastTimer = new();
-        private static bool isShowMessage = SettingsService.Load().ENS_ShowMessage;
+
+        private static readonly List<string> PendingAlerts = [];
+        private static readonly object BufferLock = new();
+        private static readonly DispatcherTimer ToastTimer;
 
         static NotificationEngine()
         {
-            _toastTimer.Interval = TimeSpan.FromSeconds(3); // Wait 3 seconds for other devices to fail before alerting
-            _toastTimer.Tick += FlushAlertsToToast;
+            ToastTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(3)
+            };
+            ToastTimer.Tick += FlushAlertsToToast;
         }
 
         public static void ProcessStateChange(NetworkDevice device, bool wentDown, bool wokeUp)
         {
-            // 1. THE SANITY CHECK: Ignore map placeholders and empty IPs entirely!
-            if (string.IsNullOrWhiteSpace(device.Address) || device.Address == "0.0.0.0")
+            // 1. Sanity Check
+            if (device == null || string.IsNullOrWhiteSpace(device.Address) || device.Address == "0.0.0.0")
                 return;
 
-            // 2. THE RULES CHECK: Does this device match any rule in your Options tab?
-            bool ruleMatched = false;
-
-            // ActiveRules should be populated from your settings.json when the app starts
-            foreach (var rule in ActiveRules)
+            // 2. Rules Matching Check
+            bool ruleMatched = ActiveRules.Any(rule =>
             {
-                // If TargetGroupId is null, it means "All Devices". Otherwise, it must match the device's group (e.g., Printers)
-                bool isGroupMatch = (rule.TargetGroupId == null || rule.TargetGroupId == device.GroupId);
-
-                // Does the rule care about the direction the device went?
+                bool isGroupMatch = rule.TargetGroupId == null || rule.TargetGroupId == device.GroupId;
                 bool isTriggerMatch = (wentDown && rule.TriggerOnDown) || (wokeUp && rule.TriggerOnUp);
+                return isGroupMatch && isTriggerMatch;
+            });
 
-                if (isGroupMatch && isTriggerMatch)
-                {
-                    ruleMatched = true;
-                    break; // We found a valid rule, stop checking and proceed to notify!
-                }
-            }
-
-            // If no rules matched this specific device, silently exit and do nothing.
             if (!ruleMatched) return;
 
-            // 3. BUILD THE BUFFER
-            // We only reach this point if it's a real IP *and* a rule allows it!
+            // 3. Format Device Name
+            string deviceName = string.Join(" ", device.Titles?.Where(t => !string.IsNullOrWhiteSpace(t)) ?? [])
+                                      .Replace("%Address", device.Address)
+                                      .Trim();
+
+            if (string.IsNullOrEmpty(deviceName))
+                deviceName = device.Address;
+
             string stateString = wentDown ? "is down" : "is up";
-            string deviceName = string.Empty;
 
-           
-            foreach (string deviceTitle in device.Titles)
-            {
-                if (!string.IsNullOrWhiteSpace(deviceTitle))
-                {
-                    deviceName += deviceTitle + " ";
-                }
-            }
-
+            // 4. Log Event
             var settings = SettingsService.Load();
             if (settings.ENS_SaveToLog)
             {
-                var logevent = new NotificationService();
-                logevent.LogEvent(deviceName.Replace("%Address", ""), device.Address, !wentDown);
+                NotificationService.LogEvent(deviceName, device.Address, !wentDown);
             }
 
-
-            string msg = $"{deviceName.Replace("%Address", device.Address)}: {stateString}";       
-            if (!_pendingAlerts.Contains(msg))
+            // 5. Buffer Alerts
+            string msg = $"{deviceName}: {stateString}";
+            lock (BufferLock)
             {
-                _pendingAlerts.Add(msg);
+                if (!PendingAlerts.Contains(msg))
+                {
+                    PendingAlerts.Add(msg);
 
-                // Reset the 3-second buffer timer
-                _toastTimer.Stop();
-                _toastTimer.Start();
+                    ToastTimer.Stop();
+                    ToastTimer.Start();
+                }
             }
         }
 
         private static void FlushAlertsToToast(object? sender, EventArgs e)
         {
-            _toastTimer.Stop();
-            if (_pendingAlerts.Count == 0) return;
+            ToastTimer.Stop();
 
-            // 1. Scan the buffer to see what kind of alerts we collected
-            bool hasDownAlerts = _pendingAlerts.Any(msg => msg.Contains("is down"));
-            bool hasUpAlerts = _pendingAlerts.Any(msg => msg.Contains("is up"));
-
-            // 2. Dynamically set the Title based on what happened
-            string title = "Network Status Alert";
-            if (hasDownAlerts && !hasUpAlerts)
+            List<string> alertsToFlush;
+            lock (BufferLock)
             {
-                title = "Device(s) Went Offline";
-            }
-            else if (!hasDownAlerts && hasUpAlerts)
-            {
-                title = "Device(s) Woke Up";
-            }
-            else if (hasDownAlerts && hasUpAlerts)
-            {
-                title = "Mixed Network Changes";
+                if (PendingAlerts.Count == 0) return;
+                alertsToFlush = [.. PendingAlerts];
+                PendingAlerts.Clear();
             }
 
-            // 3. Determine the Color (isDown = true makes it Red, false makes it Green)
-            // If even ONE device went down, we force the window to be Red to get your attention!
-            bool isCritical = hasDownAlerts;
+            bool hasDownAlerts = alertsToFlush.Any(msg => msg.Contains("is down"));
+            bool hasUpAlerts = alertsToFlush.Any(msg => msg.Contains("is up"));
 
-            // 4. Build the message and clear the buffer
-            string message = string.Join("\n", _pendingAlerts);
-            _pendingAlerts.Clear();
-
-            if (isShowMessage)
+            string title = (hasDownAlerts, hasUpAlerts) switch
             {
-                // 5. Show the smart Toast!
+                (true, false) => "Device(s) Went Offline",
+                (false, true) => "Device(s) Woke Up",
+                _ => "Mixed Network Changes"
+            };
+
+            var settings = SettingsService.Load();
+
+            // Play Audio Alerts
+            PlayConfiguredSound(hasDownAlerts, hasUpAlerts, settings);
+
+            // Show Toast Notification Window
+            if (settings.ENS_ShowMessage)
+            {
+                string message = string.Join("\n", alertsToFlush);
                 Application.Current.Dispatcher.Invoke(() =>
                 {
-                    var toast = new Views.ToastNotificationWindow(title, message, isCritical);
+                    var toast = new Views.ToastNotificationWindow(title, message, hasDownAlerts);
                     toast.Show();
                 });
+            }
+        }
+
+        private static void PlayConfiguredSound(bool hasDown, bool hasUp, AppSettings settings)
+        {
+            string? soundPath = null;
+
+            if (hasDown && settings.ENS_PlayOfflineSound)
+            {
+                soundPath = settings.ENS_OfflineSoundFilePath;
+            }
+            else if (hasUp && settings.ENS_PlayOnlineSound)
+            {
+                soundPath = settings.ENS_OnlineSoundFilePath;
+            }
+
+            if (!string.IsNullOrWhiteSpace(soundPath) && File.Exists(soundPath))
+            {
+                try
+                {
+                    using var player = new SoundPlayer(soundPath);
+                    player.Play();
+                }
+                catch { /* Ignore audio playback errors */ }
             }
         }
     }

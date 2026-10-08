@@ -101,48 +101,25 @@ namespace NetworkMapViewerV2.ViewModels
         {
             OpenOptionsWindow(2); //options 2 page
         }
-
-        [RelayCommand]
-        private void Notification()
-        {
-            var events = NotificationService.LoadAllEvents();
-            if (events.Count == 0)
-            {
-                MessageBox.Show("No events recorded yet.\nStart pinging to begin logging device state changes.",
-                    "Notifications", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            // Show last 20 events in a summary
-            var recent = events.Skip(Math.Max(0, events.Count - 20)).ToList();
-            string summary = string.Join("\n", recent.Select(ev =>
-                $"[{ev.Timestamp:HH:mm:ss}] {ev.Status,-7} {ev.DeviceName} ({ev.Address})"));
-
-            if (events.Count > 20)
-                summary = $"... showing last 20 of {events.Count} events:\n\n" + summary;
-
-            MessageBox.Show(summary, "Recent Events", MessageBoxButton.OK, MessageBoxImage.Information);
-        }
+       
 
         [RelayCommand]
         private void Report()
         {
             var result = MessageBox.Show(
-               "Generate report as:\n\n• Yes = HTML report\n• No = CSV report\n• Cancel = abort",
-               "Generate Report", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+                "Generate report as:\n\nYes = HTML report\nNo = CSV report\nCancel = Abort",
+                "Generate Report",
+                MessageBoxButton.YesNoCancel,
+                MessageBoxImage.Question);
 
             if (result == MessageBoxResult.Cancel) return;
 
             try
             {
+                string path = result == MessageBoxResult.Yes
+                    ? NotificationService.GenerateHtmlReport()
+                    : NotificationService.GenerateCsvReport();
 
-                string path;
-                if (result == MessageBoxResult.Yes)
-                    path = NotificationService.GenerateHtmlReport();
-                else
-                    path = NotificationService.GenerateCsvReport();
-
-                // Open the generated file in default app
                 Process.Start(new ProcessStartInfo { FileName = path, UseShellExecute = true });
             }
             catch (Exception ex)
