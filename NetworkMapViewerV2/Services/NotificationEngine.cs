@@ -12,7 +12,7 @@ namespace NetworkMapViewerV2.Services
 
         private static readonly List<string> PendingAlerts = [];
         private static readonly object BufferLock = new();
-        private static readonly DispatcherTimer ToastTimer;
+        private static readonly DispatcherTimer ToastTimer; 
 
         static NotificationEngine()
         {
