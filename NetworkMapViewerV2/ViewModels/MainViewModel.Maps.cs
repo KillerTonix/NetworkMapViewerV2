@@ -196,7 +196,7 @@ namespace NetworkMapViewerV2.ViewModels
 
 
         [RelayCommand]
-        private void SaveMap()
+        private async Task SaveMap()
         {
             if (SelectedTab == null || SelectedTab.MapId <= 0) return;
 
@@ -213,6 +213,8 @@ namespace NetworkMapViewerV2.ViewModels
                 // Save all devices and labels in memory to the database
                 foreach (var device in SelectedTab.Devices) repo.UpdateDevice(device, SelectedTab.MapName);
                 foreach (var label in SelectedTab.Labels) repo.UpdateLabel(label, SelectedTab.MapName);
+
+                await repo.IncrementAndSaveMapVersionAsync(SelectedTab);
 
                 SelectedTab.HasUnsavedChanges = false;
             }
@@ -295,6 +297,57 @@ namespace NetworkMapViewerV2.ViewModels
                     HeadOfficeMaps.Add(map);
                 }
             }
+        }
+
+
+        /// <summary>
+        /// Reloads map devices and labels from the database when a remote version change is detected.
+        /// </summary>
+        private async Task RefreshCurrentMapAsync(int mapId)
+        {
+            var tab = OpenTabs.FirstOrDefault(t => t.MapId == mapId);
+            if (tab == null) return;
+
+            await Application.Current.Dispatcher.InvokeAsync(async () =>
+            {
+                try
+                {
+                    // 1. Fetch fresh devices & labels from database
+                    var freshData = _repo.LoadMap(mapId);
+
+                    // 2. Clear & repopulate devices
+                    tab.Devices.Clear();
+                    foreach (var device in freshData.Devices)
+                    {
+                        tab.Devices.Add(device);
+                    }
+
+                    // 3. Clear & repopulate labels
+                    tab.Labels.Clear();
+                    foreach (var label in freshData.Labels)
+                    {
+                        tab.Labels.Add(label);
+                    }
+
+                    tab.HasUnsavedChanges = false;
+
+                    // 4. Trigger UI redraw if canvas delegate is assigned
+                    tab.TriggerRedraw?.Invoke();
+
+                    // 5. Update background ping service with newly loaded addresses
+                    SyncOpenTabDevices();
+
+                    // 6. Recalculate pings for active view
+                    if (SelectedTab == tab)
+                    {
+                        await RecalculatePingsAsync(tab.Devices);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Failed to auto-refresh map {mapId}: {ex.Message}");
+                }
+            });
         }
     }
 }

@@ -2,6 +2,7 @@
 using NetworkMapViewerV2.Models;
 using NetworkMapViewerV2.Services;
 using System.Collections.ObjectModel;
+using System.Net.NetworkInformation;
 using System.Text.Json;
 using System.Windows;
 
@@ -89,8 +90,8 @@ namespace NetworkMapViewerV2.Data
 
             using var connection = GetOpenConnection();
 
-            // 1. Get Map Name
-            using (var cmd = new SqlCommand("SELECT MapId, MapName, MapType FROM Maps WHERE MapId = @MapId", connection))
+            // 1. Get Map Name AND Version
+            using (var cmd = new SqlCommand("SELECT MapId, MapName, MapType, Version FROM Maps WHERE MapId = @MapId", connection))
             {
                 cmd.Parameters.AddWithValue("@MapId", mapId);
                 using var reader = cmd.ExecuteReader();
@@ -99,6 +100,7 @@ namespace NetworkMapViewerV2.Data
                     state.MapId = reader.GetInt32(0);
                     state.MapName = reader.GetString(1);
                     state.MapType = reader.IsDBNull(2) ? "Head Office" : reader.GetString(2);
+                    state.Version = reader.IsDBNull(3) ? 1 : reader.GetInt32(3); // <--- READ VERSION HERE!
                 }
                 reader.Close();
             }
@@ -163,6 +165,38 @@ namespace NetworkMapViewerV2.Data
 
             return state;
         }
+
+
+        public async Task<int> GetMapVersionAsync(int mapId)
+        {
+            using var connection = GetOpenConnection();
+            using var cmd = new SqlCommand("SELECT Version FROM Maps WHERE MapId = @MapId", connection);
+            cmd.Parameters.AddWithValue("@MapId", mapId);
+            object result = await cmd.ExecuteScalarAsync();
+            return result != null && result != DBNull.Value ? Convert.ToInt32(result) : 0;
+        }
+
+        public async Task IncrementAndSaveMapVersionAsync(MapTabState map)
+        {
+            using var connection = GetOpenConnection(); // Connection is already open!
+
+            string sql = @"
+        UPDATE Maps 
+        SET [Version] = [Version] + 1
+        WHERE [MapId] = @MapId;
+
+        SELECT [Version] FROM [NMViewer].[dbo].[Maps] WHERE [MapId] = @MapId;";
+
+            using var cmd = new SqlCommand(sql, connection);
+            cmd.Parameters.AddWithValue("@MapId", map.MapId);
+
+            object result = await cmd.ExecuteScalarAsync();
+            if (result != null && result != DBNull.Value)
+            {
+                map.Version = Convert.ToInt32(result);
+            }
+        }
+
 
         // ─── UPSERT (UPDATE OR INSERT) OPERATIONS ───────────────────────
 

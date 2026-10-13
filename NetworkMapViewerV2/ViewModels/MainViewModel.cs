@@ -11,7 +11,7 @@ namespace NetworkMapViewerV2.ViewModels
     public partial class MainViewModel : ObservableObject
     {
         private AppSettings _appSettings = new();
-        private DispatcherTimer? _autoRefreshTimer; // Timer for auto-refreshing tabs
+        private DispatcherTimer? _mapSyncTimer;
         private static MapRepository _repo = new();    
         private List<MapTabState> _allMaps = _repo.GetAvailableMaps().ToList();
 
@@ -31,6 +31,9 @@ namespace NetworkMapViewerV2.ViewModels
             // 3. Subscribe to global device state changes for UI updates
             BackgroundPingService.Instance.DeviceStatusChanged += OnDeviceStatusChanged;
 
+            // 4. START THE MAP SYNC TIMER HERE!
+            InitializeMapSyncTimer();
+
             LoadMapDirectories();
 
             Application.Current.Dispatcher.InvokeAsync(() =>
@@ -42,12 +45,7 @@ namespace NetworkMapViewerV2.ViewModels
                 }
             });
 
-            _autoRefreshTimer = new DispatcherTimer
-            {
-                Interval = TimeSpan.FromMinutes(30)
-            };
-            _autoRefreshTimer.Tick += AutoRefreshTimer_Tick;
-            _autoRefreshTimer.Start();
+           
         }
 
         /// <summary>
@@ -73,14 +71,40 @@ namespace NetworkMapViewerV2.ViewModels
             });
         }
 
-        private void AutoRefreshTimer_Tick(object? sender, EventArgs e)
+        public void InitializeMapSyncTimer()
         {
-            // SAFETY CHECK: Never reload if actively editing or has unsaved changes!
-            if (SelectedTab != null && !SelectedTab.IsEditingEnabled && !SelectedTab.HasUnsavedChanges)
+            _mapSyncTimer = new DispatcherTimer
             {
-                _ = ReloadMap();
+                Interval = TimeSpan.FromSeconds(3)
+            };
+            _mapSyncTimer.Tick += async (s, e) => await CheckForRemoteMapUpdatesAsync();
+            _mapSyncTimer.Start();
+        }
+
+        private async Task CheckForRemoteMapUpdatesAsync()
+        {
+            var tab = SelectedTab;
+
+            // Guard Clause: Skip check if no tab selected, if user has unsaved edits, or is in edit mode
+            if (tab == null || tab.HasUnsavedChanges || IsEditingEnabled)
+                return;
+
+            
+            int serverVersion = await _repo.GetMapVersionAsync(tab.MapId);
+
+            // If server has a newer version than our local tab, trigger auto-reload!
+            if (serverVersion > tab.Version)
+            {
+                tab.Version = serverVersion;
+                await RefreshCurrentMapAsync(tab.MapId);
             }
         }
+
+        public void StopMapSyncTimer()
+        {
+            _mapSyncTimer?.Stop();
+        }
+               
 
         /// <summary>
         /// Call this when options/settings are saved (e.g. from OptionsWindow) to restart pinging with new intervals.

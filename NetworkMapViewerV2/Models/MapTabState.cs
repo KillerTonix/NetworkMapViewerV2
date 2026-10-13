@@ -9,6 +9,7 @@ namespace NetworkMapViewerV2.Models
         public string FilePath { get; set; } = string.Empty;    
         public string MapName { get; set; } = string.Empty;
         public string MapType { get; set; } = "Head Office";
+        public int Version { get; set; } = 1;
         public List<NetworkDevice> Devices { get; set; } = [];
         public List<NetworkLabel> Labels { get; set; } = [];
         public List<int> PendingDeletedDeviceIds { get; set; } = [];
