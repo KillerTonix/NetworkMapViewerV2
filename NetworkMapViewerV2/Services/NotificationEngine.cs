@@ -1,8 +1,8 @@
 ﻿using NetworkMapViewerV2.Models;
+using System.Diagnostics;
 using System.IO;
 using System.Media;
 using System.Windows;
-using System.Windows.Threading;
 
 namespace NetworkMapViewerV2.Services
 {
@@ -12,24 +12,27 @@ namespace NetworkMapViewerV2.Services
 
         private static readonly List<string> PendingAlerts = [];
         private static readonly object BufferLock = new();
-        private static readonly DispatcherTimer ToastTimer; 
-
-        static NotificationEngine()
-        {
-            ToastTimer = new DispatcherTimer
-            {
-                Interval = TimeSpan.FromSeconds(3)
-            };
-            ToastTimer.Tick += FlushAlertsToToast;
-        }
+        private static Timer? _bufferTimer;
 
         public static void ProcessStateChange(NetworkDevice device, bool wentDown, bool wokeUp)
         {
+            Debug.WriteLine($"[NotificationEngine] ProcessStateChange triggered for {device?.Address} (wentDown={wentDown}, wokeUp={wokeUp})");
+
             // 1. Sanity Check
             if (device == null || string.IsNullOrWhiteSpace(device.Address) || device.Address == "0.0.0.0")
+            {
+                Debug.WriteLine("[NotificationEngine] Skipped: Invalid device or IP.");
                 return;
+            }
 
-            // 2. Rules Matching Check
+            // 2. Rules Existence Check
+            if (ActiveRules == null || ActiveRules.Count == 0)
+            {
+                Debug.WriteLine("[NotificationEngine] Skipped: ActiveRules is empty! Ensure rules are loaded in App/MainViewModel startup.");
+                return;
+            }
+
+            // 3. Rules Match Check
             bool ruleMatched = ActiveRules.Any(rule =>
             {
                 bool isGroupMatch = rule.TargetGroupId == null || rule.TargetGroupId == device.GroupId;
@@ -37,43 +40,49 @@ namespace NetworkMapViewerV2.Services
                 return isGroupMatch && isTriggerMatch;
             });
 
-            if (!ruleMatched) return;
+            if (!ruleMatched)
+            {
+                Debug.WriteLine($"[NotificationEngine] Skipped: No matching rule found for {device.Address} (GroupId={device.GroupId}).");
+                return;
+            }
 
-            // 3. Format Device Name
+            Debug.WriteLine($"[NotificationEngine] MATCHED notification rule for {device.Address}!");
+
+            // 4. Format Device Name
             string deviceName = string.Join(" ", device.Titles?.Where(t => !string.IsNullOrWhiteSpace(t)) ?? [])
                                       .Replace("%Address", device.Address)
                                       .Trim();
 
+            Debug.WriteLine($"[NotificationEngine] Formatted device name: {deviceName}");
             if (string.IsNullOrEmpty(deviceName))
                 deviceName = device.Address;
 
             string stateString = wentDown ? "is down" : "is up";
 
-            // 4. Log Event
+            // 5. Log Event
             var settings = SettingsService.Load();
             if (settings.ENS_SaveToLog)
             {
                 NotificationService.LogEvent(deviceName, device.Address, !wentDown);
             }
 
-            // 5. Buffer Alerts
+            // 6. Buffer Alerts (Thread-Safe Debounce Timer)
             string msg = $"{deviceName}: {stateString}";
             lock (BufferLock)
             {
                 if (!PendingAlerts.Contains(msg))
                 {
                     PendingAlerts.Add(msg);
-
-                    ToastTimer.Stop();
-                    ToastTimer.Start();
                 }
+
+                // Reset/restart 3-second buffer timer on thread pool
+                _bufferTimer?.Dispose();
+                _bufferTimer = new Timer(FlushAlertsToToast, null, 3000, Timeout.Infinite);
             }
         }
 
-        private static void FlushAlertsToToast(object? sender, EventArgs e)
+        private static void FlushAlertsToToast(object? state)
         {
-            ToastTimer.Stop();
-
             List<string> alertsToFlush;
             lock (BufferLock)
             {
@@ -81,6 +90,8 @@ namespace NetworkMapViewerV2.Services
                 alertsToFlush = [.. PendingAlerts];
                 PendingAlerts.Clear();
             }
+
+            Debug.WriteLine($"[NotificationEngine] Flushing {alertsToFlush.Count} alert(s) to Toast notification UI...");
 
             bool hasDownAlerts = alertsToFlush.Any(msg => msg.Contains("is down"));
             bool hasUpAlerts = alertsToFlush.Any(msg => msg.Contains("is up"));
@@ -94,14 +105,14 @@ namespace NetworkMapViewerV2.Services
 
             var settings = SettingsService.Load();
 
-            // Play Audio Alerts
+            // Play Audio
             PlayConfiguredSound(hasDownAlerts, hasUpAlerts, settings);
 
-            // Show Toast Notification Window
+            // Show Toast Notification Window on WPF UI Thread
             if (settings.ENS_ShowMessage)
             {
                 string message = string.Join("\n", alertsToFlush);
-                Application.Current.Dispatcher.Invoke(() =>
+                Application.Current?.Dispatcher.Invoke(() =>
                 {
                     var toast = new Views.ToastNotificationWindow(title, message, hasDownAlerts);
                     toast.Show();
@@ -114,13 +125,9 @@ namespace NetworkMapViewerV2.Services
             string? soundPath = null;
 
             if (hasDown && settings.ENS_PlayOfflineSound)
-            {
                 soundPath = settings.ENS_OfflineSoundFilePath;
-            }
             else if (hasUp && settings.ENS_PlayOnlineSound)
-            {
                 soundPath = settings.ENS_OnlineSoundFilePath;
-            }
 
             if (!string.IsNullOrWhiteSpace(soundPath) && File.Exists(soundPath))
             {
@@ -129,7 +136,10 @@ namespace NetworkMapViewerV2.Services
                     using var player = new SoundPlayer(soundPath);
                     player.Play();
                 }
-                catch { /* Ignore audio playback errors */ }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[NotificationEngine] Sound Error: {ex.Message}");
+                }
             }
         }
     }

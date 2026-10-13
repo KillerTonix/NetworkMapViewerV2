@@ -22,28 +22,12 @@ namespace NetworkMapViewerV2.Models
         public int FailedPingCount { get; set; } = 0;
 
         // THE FIX: Use standard property syntax, but power it with SetProperty!
-        private bool _isOnline = true;
+        private bool _isOnline;
 
         public bool IsOnline
         {
             get => _isOnline;
-            set
-            {
-                bool oldValue = _isOnline; // Snapshot the state before changing it
-
-                // SetProperty automatically updates _isOnline AND fires the UI refresh event!
-                // It returns 'true' only if the value actually changed.
-                if (SetProperty(ref _isOnline, value))
-                {
-                    bool wentDown = oldValue == true && value == false;
-                    bool wokeUp = oldValue == false && value == true;
-
-                    if (wentDown || wokeUp)
-                    {
-                        Services.NotificationEngine.ProcessStateChange(this, wentDown, wokeUp);
-                    }
-                }
-            }
+            set => SetProperty(ref _isOnline, value); // Pure UI notification only
         }
     }
 }

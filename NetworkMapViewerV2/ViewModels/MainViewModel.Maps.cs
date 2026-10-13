@@ -266,6 +266,8 @@ namespace NetworkMapViewerV2.ViewModels
                 // 3. If it's truly not open, add the new tab to the UI
                 OpenTabs.Add(dbMapState);
                 SelectedTab = dbMapState;
+
+                SyncOpenTabDevices();
             }
             catch (Exception ex)
             {

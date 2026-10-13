@@ -45,7 +45,14 @@ namespace NetworkMapViewerV2.Views
                 // 3. Annihilate the background process
                 System.Diagnostics.Process.GetCurrentProcess().Kill();
             };
-            NotificationEngine.ActiveRules = SettingsService.Load().ENS_Rules;
+            var settings = SettingsService.Load();
+            NotificationEngine.ActiveRules = settings.ENS_Rules ?? [];
+
+            // Start central background monitoring
+            if (settings.PingAutostart)
+            {
+                BackgroundPingService.Instance.Start();
+            }
         }
 
 
