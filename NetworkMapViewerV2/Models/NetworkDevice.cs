@@ -29,5 +29,12 @@ namespace NetworkMapViewerV2.Models
             get => _isOnline;
             set => SetProperty(ref _isOnline, value); // Pure UI notification only
         }
+
+        private bool _isSelected;
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set => SetProperty(ref _isSelected, value);
+        }
     }
 }

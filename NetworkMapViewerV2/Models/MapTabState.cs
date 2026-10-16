@@ -34,6 +34,20 @@ namespace NetworkMapViewerV2.Models
             set { _hasUnsavedChanges = value; OnPropertyChanged(); }
         }
 
+        private string? _pendingHighlightAddress;
+        public string? PendingHighlightAddress
+        {
+            get => _pendingHighlightAddress;
+            set
+            {
+                if (_pendingHighlightAddress != value)
+                {
+                    _pendingHighlightAddress = value;
+                    OnPropertyChanged(nameof(PendingHighlightAddress));
+                }
+            }
+        }
+
         public Action? TriggerRedraw { get; set; }
 
         // ==========================================

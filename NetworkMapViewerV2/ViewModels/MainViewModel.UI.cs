@@ -1,5 +1,7 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using NetworkMapViewerV2.Data;
+using NetworkMapViewerV2.Models;
 using NetworkMapViewerV2.Services;
 using NetworkMapViewerV2.Views;
 using System.Diagnostics;
@@ -144,8 +146,66 @@ namespace NetworkMapViewerV2.ViewModels
         [RelayCommand]
         private void ActionLogs()
         {
-            ActionLogsWindow actionLogs = new();
-            actionLogs.ShowDialog();
+            var window = new AuditLogWindow
+            {
+                Owner = Application.Current.MainWindow
+            };
+
+            window.OnSelectDeviceRequested = (mapName, targetId, targetIp) =>
+            {
+                if (string.IsNullOrWhiteSpace(mapName)) return;
+
+                // 1. Locate map tab in database
+                var repo = new MapRepository();
+                var map = repo.GetAvailableMaps()
+                              .FirstOrDefault(m => m.MapName.Equals(mapName, StringComparison.OrdinalIgnoreCase));
+
+                if (map == null) return;
+
+                // 2. Open or switch to map tab
+                OpenMapFromDatabase(map.MapId);
+
+                // 3. Defer highlight until WPF finishes tab loading and canvas layout
+                Application.Current.Dispatcher.InvokeAsync(() =>
+                {
+                    if (SelectedTab == null) return;
+
+                    NetworkDevice? targetDevice = null;
+
+                    // Strategy A: Resolve device by TargetID
+                    if (targetId > 0)
+                    {
+                        targetDevice = SelectedTab.Devices.FirstOrDefault(d => d.DeviceId == targetId);
+                    }
+
+                    // Strategy B: Fallback to IP Address lookup if TargetID was 0 or unassigned
+                    if (targetDevice == null && !string.IsNullOrWhiteSpace(targetIp))
+                    {
+                        targetDevice = SelectedTab.Devices.FirstOrDefault(d => d.Address == targetIp);
+                    }
+
+                    if (targetDevice != null)
+                    {
+                        // Unselect other devices
+                        foreach (var dev in SelectedTab.Devices)
+                        {
+                            dev.IsSelected = false;
+                        }
+
+                        targetDevice.IsSelected = true;
+
+                        // Set PendingHighlightAddress to trigger MapCanvasView's PlayRippleAnimation()
+                        SelectedTab.PendingHighlightAddress = targetDevice.Address;
+                    }
+                    else if (!string.IsNullOrWhiteSpace(targetIp))
+                    {
+                        // Fallback direct assignment for canvas element matching
+                        SelectedTab.PendingHighlightAddress = targetIp;
+                    }
+                }, System.Windows.Threading.DispatcherPriority.Loaded);
+            };
+
+            window.ShowDialog();
         }
 
         private void OpenOptionsWindow(int tabIndex)
@@ -174,5 +234,8 @@ namespace NetworkMapViewerV2.ViewModels
                 }
             }
         }
+
+
+    
     }
 }

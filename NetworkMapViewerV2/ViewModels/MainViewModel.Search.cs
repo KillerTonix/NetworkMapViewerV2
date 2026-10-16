@@ -2,7 +2,6 @@
 using CommunityToolkit.Mvvm.Input;
 using NetworkMapViewerV2.Models;
 using NetworkMapViewerV2.Services;
-using System.Linq;
 using System.Windows;
 
 namespace NetworkMapViewerV2.ViewModels
