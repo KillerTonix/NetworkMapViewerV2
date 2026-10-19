@@ -206,7 +206,7 @@ namespace NetworkMapViewerV2.Data
 
             string sql = @"
                 SELECT TOP (1000) 
-                    [id], [TimeStamp], [mapName], [userName], [MachineName], [ActionType], [Target], [Details], [OldValue], [NewValue]
+                    [id], [TimeStamp], [mapName], [userName], [MachineName], [ActionType], [Target], [Details], [OldValue], [NewValue], [TargetID]
                 FROM [AuditLogs]
                 ORDER BY [TimeStamp] DESC";
 
@@ -226,7 +226,8 @@ namespace NetworkMapViewerV2.Data
                     Target = reader.IsDBNull(6) ? "" : reader.GetString(6),
                     Details = reader.IsDBNull(7) ? "" : reader.GetString(7),
                     OldValue = reader.IsDBNull(8) ? "" : reader.GetString(8),
-                    NewValue = reader.IsDBNull(9) ? "" : reader.GetString(9)
+                    NewValue = reader.IsDBNull(9) ? "" : reader.GetString(9),
+                    TargetID = reader.IsDBNull(10) ? 0 : reader.GetInt32(10)
                 });
             }
 

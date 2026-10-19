@@ -21,7 +21,7 @@ namespace NetworkMapViewerV2.Views
         private List<AuditLog> _allLogs = new();
 
         // Callback event when user double-clicks a log row to navigate to device
-        public Action<string, int, string>? OnSelectDeviceRequested { get; set; }
+        public Action<string, int>? OnSelectDeviceRequested { get; set; }
         public AuditLogWindow()
         {
             InitializeComponent();
@@ -146,18 +146,10 @@ namespace NetworkMapViewerV2.Views
         {
             if (dgAuditLogs.SelectedItem is AuditLog selectedLog)
             {
-                if (string.IsNullOrWhiteSpace(selectedLog.MapName)) return;
-
-                // Extract IP Address from log details as fallback
-                string ipAddress = "";
-                var ipMatch = Regex.Match(selectedLog.Details ?? "", @"\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b");
-                if (ipMatch.Success)
-                {
-                    ipAddress = ipMatch.Value;
-                }
+                if (string.IsNullOrWhiteSpace(selectedLog.MapName)) return;                             
 
                 // 1. Fire navigation callback with MapName, TargetID, and IP Address
-                OnSelectDeviceRequested?.Invoke(selectedLog.MapName, selectedLog.TargetID, ipAddress);
+                OnSelectDeviceRequested?.Invoke(selectedLog.MapName, selectedLog.TargetID);
 
                 // 2. Close modal window so the highlighted map canvas is visible
                 this.Close();

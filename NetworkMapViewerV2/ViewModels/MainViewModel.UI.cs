@@ -103,7 +103,7 @@ namespace NetworkMapViewerV2.ViewModels
         {
             OpenOptionsWindow(2); //options 2 page
         }
-       
+
 
         [RelayCommand]
         private void Report()
@@ -151,7 +151,7 @@ namespace NetworkMapViewerV2.ViewModels
                 Owner = Application.Current.MainWindow
             };
 
-            window.OnSelectDeviceRequested = (mapName, targetId, targetIp) =>
+            window.OnSelectDeviceRequested = (mapName, targetId) =>
             {
                 if (string.IsNullOrWhiteSpace(mapName)) return;
 
@@ -171,22 +171,18 @@ namespace NetworkMapViewerV2.ViewModels
                     if (SelectedTab == null) return;
 
                     NetworkDevice? targetDevice = null;
+                    NetworkLabel? targetLabel = null;
 
                     // Strategy A: Resolve device by TargetID
                     if (targetId > 0)
                     {
                         targetDevice = SelectedTab.Devices.FirstOrDefault(d => d.DeviceId == targetId);
+                        targetLabel = SelectedTab.Labels.FirstOrDefault(label => label.LabelId == targetId);
                     }
-
-                    // Strategy B: Fallback to IP Address lookup if TargetID was 0 or unassigned
-                    if (targetDevice == null && !string.IsNullOrWhiteSpace(targetIp))
-                    {
-                        targetDevice = SelectedTab.Devices.FirstOrDefault(d => d.Address == targetIp);
-                    }
+                    
 
                     if (targetDevice != null)
                     {
-                        // Unselect other devices
                         foreach (var dev in SelectedTab.Devices)
                         {
                             dev.IsSelected = false;
@@ -194,13 +190,11 @@ namespace NetworkMapViewerV2.ViewModels
 
                         targetDevice.IsSelected = true;
 
-                        // Set PendingHighlightAddress to trigger MapCanvasView's PlayRippleAnimation()
-                        SelectedTab.PendingHighlightAddress = targetDevice.Address;
+                        HighlightedDeviceId = targetDevice.DeviceId;
                     }
-                    else if (!string.IsNullOrWhiteSpace(targetIp))
-                    {
-                        // Fallback direct assignment for canvas element matching
-                        SelectedTab.PendingHighlightAddress = targetIp;
+                    if (targetLabel != null)
+                    {                       
+                        HighlightedDeviceId = targetLabel.LabelId;
                     }
                 }, System.Windows.Threading.DispatcherPriority.Loaded);
             };
@@ -236,6 +230,6 @@ namespace NetworkMapViewerV2.ViewModels
         }
 
 
-    
+
     }
 }
