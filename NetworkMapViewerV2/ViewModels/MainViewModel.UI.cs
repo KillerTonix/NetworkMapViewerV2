@@ -4,6 +4,7 @@ using NetworkMapViewerV2.Data;
 using NetworkMapViewerV2.Models;
 using NetworkMapViewerV2.Services;
 using NetworkMapViewerV2.Views;
+
 using System.Diagnostics;
 using System.Windows;
 
@@ -230,6 +231,97 @@ namespace NetworkMapViewerV2.ViewModels
         }
 
 
+        [RelayCommand]
+        private void AlignMapElements()
+        {
+            // 1. Ensure Edit Mode is active
+            if (!SelectedTab.IsEditingEnabled) // Adjust to SelectedTab.IsEditMode if stored per tab
+            {
+                MessageBox.Show("Please enable Edit Mode before aligning map elements.", "Edit Mode Required", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (SelectedTab == null) return;
+
+            const double LabelWidthStep = 125.0; // Standard label width grid step
+            const double RowStep = 130.0;        // 120px height + 10px vertical gap
+
+            const double MaxAllowedX = 1725.0;   // Boundary limit for X
+            const double MaxAllowedY = 790.0;    // Boundary limit for Y
+
+            bool elementsMoved = false;
+
+            foreach (var label in SelectedTab.Labels)
+            {
+                double oldLeft = label.Left;
+                double oldTop = label.Top;
+
+                if (oldLeft > MaxAllowedX || oldTop > MaxAllowedY) continue;
+
+                double newLeft = Math.Round(oldLeft / LabelWidthStep) * LabelWidthStep;
+                double newTop = Math.Round(oldTop / RowStep) * RowStep;
+
+                if (newLeft > MaxAllowedX || newTop > MaxAllowedY) continue;
+
+                double deltaX = newLeft - oldLeft;
+                double deltaY = newTop - oldTop;
+
+                if (Math.Abs(deltaX) < 0.01 && Math.Abs(deltaY) < 0.01) continue;
+
+                double labelRight = oldLeft + (label.Width > 0 ? label.Width : LabelWidthStep);
+                double labelBottom = oldTop + (label.Height > 0 ? label.Height : 120.0);
+
+                var overlappingDevices = SelectedTab.Devices.Where(d =>
+                    d.Left >= oldLeft - 10 &&
+                    d.Left <= labelRight + 10 &&
+                    d.Top >= oldTop - 10 &&
+                    d.Top <= labelBottom + 10
+                ).ToList();
+
+                // 1. Update model coordinates in memory
+                label.Left = newLeft;
+                label.Top = newTop;
+
+                foreach (var device in overlappingDevices)
+                {
+                    device.Left += deltaX;
+                    device.Top += deltaY;
+                }
+
+                elementsMoved = true;
+            }
+
+            if (elementsMoved)
+            {
+                SelectedTab.HasUnsavedChanges = true;
+
+                // 2. Locate current MapCanvasView control and update canvas child positions visually
+                if (Application.Current.MainWindow is Window mainWindow)
+                {
+                    var canvasView = FindVisualChild<MapCanvasView>(mainWindow);
+
+                    // Sync positions directly on DrawingCanvas.Children
+                    canvasView?.SyncVisualPositions();                           
+                }
+
+                SelectedTab.IsEditingEnabled = true; // Ensure Edit Mode remains active after alignment
+            }
+        }
+
+        private static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
+        {
+            int count = System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent);
+            for (int i = 0; i < count; i++)
+            {
+                var child = System.Windows.Media.VisualTreeHelper.GetChild(parent, i);
+                if (child is T typedChild && (child as FrameworkElement)?.IsVisible == true)
+                    return typedChild;
+
+                var result = FindVisualChild<T>(child);
+                if (result != null) return result;
+            }
+            return null;
+        }
 
     }
 }

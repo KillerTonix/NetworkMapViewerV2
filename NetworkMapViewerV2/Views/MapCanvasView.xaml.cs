@@ -1021,18 +1021,18 @@ namespace NetworkMapViewerV2.Views
             {
                 var brush = new DrawingBrush
                 {
-                    Viewport = new Rect(0, 0, 10, 10),
+                    Viewport = new Rect(0, 0, 125, 120),
                     ViewportUnits = BrushMappingMode.Absolute,
                     TileMode = TileMode.Tile
                 };
 
                 var drawingGroup = new DrawingGroup();
-                drawingGroup.Children.Add(new GeometryDrawing(_standardBrush, null, new RectangleGeometry(new Rect(0, 0, 10, 10))));
+                drawingGroup.Children.Add(new GeometryDrawing(_standardBrush, null, new RectangleGeometry(new Rect(0, 0, 125, 120))));
 
                 var pen = new Pen(new BrushConverter().ConvertFrom("#191919") as Brush, 1);
                 var lineGeometry = new GeometryGroup();
-                lineGeometry.Children.Add(new LineGeometry(new Point(0, 0), new Point(10, 0)));
-                lineGeometry.Children.Add(new LineGeometry(new Point(0, 0), new Point(0, 10)));
+                lineGeometry.Children.Add(new LineGeometry(new Point(0, 0), new Point(125, 0)));
+                lineGeometry.Children.Add(new LineGeometry(new Point(0, 0), new Point(0, 120)));
 
                 drawingGroup.Children.Add(new GeometryDrawing(null, pen, lineGeometry));
 
@@ -1820,6 +1820,31 @@ namespace NetworkMapViewerV2.Views
                 }
 
             }
+        }
+
+
+        public void SyncVisualPositions()
+        {
+            foreach (UIElement child in DrawingCanvas.Children)
+            {
+                if (child is FrameworkElement fe)
+                {
+                    // Check if child DataContext is a Label model
+                    if (fe.DataContext is NetworkLabel label)
+                    {
+                        Canvas.SetLeft(fe, label.Left);
+                        Canvas.SetTop(fe, label.Top);
+                    }
+                    // Check if child DataContext is a Device model
+                    else if (fe.DataContext is NetworkDevice device)
+                    {
+                        Canvas.SetLeft(fe, device.Left);
+                        Canvas.SetTop(fe, device.Top);
+                    }
+                }
+            }
+
+            DrawingCanvas.UpdateLayout();
         }
     }
 }

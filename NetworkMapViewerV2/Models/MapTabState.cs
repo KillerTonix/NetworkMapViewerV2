@@ -48,6 +48,20 @@ namespace NetworkMapViewerV2.Models
             }
         }
 
+        private bool _isDirty;
+        public bool IsDirty
+        {
+            get => _isDirty;
+            set
+            {
+                if (_isDirty != value)
+                {
+                    _isDirty = value;
+                    OnPropertyChanged(nameof(IsDirty)); // or OnPropertyChanged();
+                }
+            }
+        }
+
         public Action? TriggerRedraw { get; set; }
 
         // ==========================================
