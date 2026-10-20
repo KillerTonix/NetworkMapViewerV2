@@ -17,7 +17,7 @@
         <KeyBinding Key="F2" Modifiers="Ctrl" Command="{Binding OutOfBoundsDevicesCommand}" />
 
         <KeyBinding Key="F5" Modifiers="Ctrl" Command="{Binding PingOptionsCommand}" />
-       
+
         <KeyBinding Key="F12" Command="{Binding ReportCommand}" />
         <KeyBinding Key="F11" Modifiers="Ctrl" Command="{Binding NotificationOptionsCommand}" />
 
@@ -31,8 +31,8 @@
         <KeyBinding Key="F1" Modifiers="Shift" Command="{Binding ToggleHotkeysCommand}" />
 
         <KeyBinding Key="U" Modifiers="Ctrl" Command="{Binding UpdateGroupDataCommand}" />
-  
-        
+
+
     </Window.InputBindings>
 
     <Window.Resources>
@@ -73,7 +73,11 @@
                         <TextBlock Text="💾" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     </MenuItem.Icon>
                 </MenuItem>
-
+                <MenuItem Header="_Export Map" Command="{Binding ExportMapCommand}">
+                    <MenuItem.Icon>
+                        <TextBlock Text="📸" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                    </MenuItem.Icon>
+                </MenuItem>
                 <Separator />
                 <MenuItem x:Name="OptionsMI" Header="_Options" InputGestureText="Ctrl+K"  Command="{Binding OptionsCommand}">
                     <MenuItem.Icon>
@@ -105,7 +109,7 @@
                 </MenuItem>
             </MenuItem>
 
-            <MenuItem Header="_Notification">                
+            <MenuItem Header="_Notification">
                 <MenuItem Header="_Report" InputGestureText="F12"  Command="{Binding ReportCommand}">
                     <MenuItem.Icon>
                         <TextBlock Text="📊" VerticalAlignment="Center" HorizontalAlignment="Center"/>
@@ -150,8 +154,7 @@
             </MenuItem>
         </Menu>
 
-        <TabControl Grid.Row="1"  Style="{StaticResource MapTabControlStyle}" ItemsSource="{Binding OpenTabs}" 
-                    SelectedItem="{Binding SelectedTab}">
+        <TabControl Grid.Row="1"  Style="{StaticResource MapTabControlStyle}" ItemsSource="{Binding OpenTabs}" SelectedItem="{Binding SelectedTab, Mode=TwoWay}">
 
             <TabControl.ItemContainerStyle>
                 <Style TargetType="TabItem" BasedOn="{StaticResource SmartTabItemStyle}"/>
@@ -199,7 +202,7 @@
         Margin="20,0,20,20" Background="#FFFFFF" Padding="14,6" Height="52"
         BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="10"
         Visibility="{Binding IsSearchVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
-           
+
             <Border.Resources>
                 <!-- High Contrast TextBox Style -->
                 <Style TargetType="TextBox">
@@ -285,7 +288,7 @@
                 <TextBox x:Name="txtSearch" Width="200" Height="32" VerticalAlignment="Center" 
                  Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}" 
                  IsVisibleChanged="TxtSearch_IsVisibleChanged" PreviewKeyDown="TxtSearch_PreviewKeyDown">
-                   
+
                 </TextBox>
 
                 <!-- Next Search Result Button -->

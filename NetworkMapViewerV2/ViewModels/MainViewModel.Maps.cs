@@ -1,10 +1,15 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Win32;
+using NetworkMapViewerV2.Helpers;
 using NetworkMapViewerV2.Models;
 using NetworkMapViewerV2.Services;
 using NetworkMapViewerV2.Views;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
 
 namespace NetworkMapViewerV2.ViewModels
 {
@@ -349,5 +354,41 @@ namespace NetworkMapViewerV2.ViewModels
                 }
             });
         }
+
+
+
+        [RelayCommand]
+        private void ExportMap(object? parameter)
+        {
+            var mainWindow = Application.Current.MainWindow;
+            if (mainWindow == null)
+            {
+                MessageBox.Show("Could not locate main application window.", "Screenshot Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            var dialog = new SaveFileDialog
+            {
+                Title = "Save Map Canvas Screenshot",
+                FileName = $"{SelectedTab?.MapName ?? "Map"}_Export_{DateTime.Now:yyyyMMdd_HHmmss}",
+                Filter = "JPEG Image (*.jpg)|*.jpg;*.jpeg",
+                DefaultExt = ".jpg"
+            };
+
+            if (dialog.ShowDialog() == true)
+            {
+                try
+                {
+                    MapExporter.SaveCanvasScreenshotToJpeg(mainWindow, dialog.FileName, qualityLevel: 95);
+
+                    MessageBox.Show($"Map screenshot saved successfully to:\n{dialog.FileName}", "Export Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Failed to save screenshot:\n{ex.Message}", "Screenshot Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
     }
+    
 }
