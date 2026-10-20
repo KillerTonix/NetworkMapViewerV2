@@ -68,6 +68,7 @@ namespace NetworkMapViewerV2.Views
                 // Editing & Map Layout
                 new("Editing & Map Layout", "Ctrl + E", "Toggle Edit Mode ON / OFF"),
                 new("Editing & Map Layout", "Ctrl + G", "Toggle Grid Snapping / Visibility"),
+                new("Editing & Map Layout", "Ctrl + Shift + G", "Toggle Grid Snapping / Visibility for all tabs"),
                 new("Editing & Map Layout", "F2", "Open Properties for selected item"),
                 new("Editing & Map Layout", "Delete", "Remove selected item(s) from map"),
                 new("Editing & Map Layout", "Ctrl + Z", "Undo last editing action"),
@@ -75,7 +76,6 @@ namespace NetworkMapViewerV2.Views
                 new("Editing & Map Layout", "Ctrl + C / Ctrl + V", "Copy / Paste items (with offset)"),
                 new("Editing & Map Layout", "Ctrl + Shift + V", "Paste in Place (exact original coordinates)"),
                 new("Editing & Map Layout", "Ctrl + H", "Find and Replace text/IPs"),
-                new("Editing & Map Layout", "Ctrl + F2", "Find and recover Out-of-Bounds devices"),
                 new("Editing & Map Layout", "Alt + A", "Auto-Align: Snaps Devices to nearest Label"),
                 new("Editing & Map Layout", "Alt + Arrows / C / S", "Manual Alignment: Align edges/centers of items"),
 

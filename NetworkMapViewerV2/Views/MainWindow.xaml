@@ -15,7 +15,6 @@
         <KeyBinding Key="E" Modifiers="Ctrl" Command="{Binding ToggleEditModeCommand}" />
         <KeyBinding Key="G" Modifiers="Ctrl" Command="{Binding ToggleGridModeCommand}" />
         <KeyBinding Key="G" Modifiers="Ctrl+Shift" Command="{Binding AlignMapElementsCommand}" />
-        <KeyBinding Key="F2" Modifiers="Ctrl" Command="{Binding OutOfBoundsDevicesCommand}" />
 
         <KeyBinding Key="F5" Modifiers="Ctrl" Command="{Binding PingOptionsCommand}" />
 
