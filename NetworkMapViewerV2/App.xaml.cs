@@ -29,7 +29,6 @@ namespace NetworkMapViewerV2
         protected override void OnExit(ExitEventArgs e)
         {
             base.OnExit(e);
-            Environment.FailFast("Force closing application from App.OnExit");
         }
     }
 

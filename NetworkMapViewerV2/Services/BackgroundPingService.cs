@@ -164,10 +164,6 @@ namespace NetworkMapViewerV2.Services
                 return false;
             }
         }
-
-        public bool IsDeviceOnline(string address)
-        {
-            return _deviceStates.TryGetValue(address, out bool isOnline) && isOnline;
-        }
+       
     }
 }

@@ -12,19 +12,7 @@ namespace NetworkMapViewerV2.ViewModels
         [ObservableProperty]
         private ObservableCollection<MapTabState> _openTabs = [];
         [ObservableProperty]
-        public MapTabState _selectedTab = new();
-
-        [RelayCommand]
-        public void AddNewTab(string tabName)
-        {
-            var newTab = new MapTabState
-            {
-                MapName = tabName
-            };
-
-            OpenTabs.Add(newTab);
-            SelectedTab = newTab; // Automatically switch to the new tab
-        }
+        public MapTabState _selectedTab = new();   
 
         [RelayCommand]
         public void CloseTab(MapTabState tabToClose)
@@ -77,14 +65,6 @@ namespace NetworkMapViewerV2.ViewModels
                     CloseTab(SelectedTab);
                 }
             }
-        }
-
-        [RelayCommand]
-        public void OutOfBoundsDevices()
-        {
-            // Tell the currently selected tab to broadcast the gather request
-            SelectedTab?.RequestGatherDevices?.Invoke();
-        }
-       
+        }       
     }
 }

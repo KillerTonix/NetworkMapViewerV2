@@ -94,6 +94,10 @@ namespace NetworkMapViewerV2.Data
                         if (dbFontFamily != (label.FontFamily ?? "Segoe UI")) { hasChanges = true; changedFields.Add("Font Family"); }
                         if (dbFontWeight != (label.FontWeight ?? "Normal")) { hasChanges = true; changedFields.Add("Font Weight"); }
                         if (dbFontStyle != (label.FontStyle ?? "Normal")) { hasChanges = true; changedFields.Add("Font Style"); }
+                        if (dbBorderBrush != (label.BorderBrush ?? "Transparent")) { hasChanges = true; changedFields.Add("Border Brush"); }
+                        if (dbBorderThickness != label.BorderThickness) { hasChanges = true; changedFields.Add("Border Thickness"); }
+                        if (dbHorizontalAlignment != (label.HorizontalAlignment ?? "Center")) { hasChanges = true; changedFields.Add("Horizontal Alignment"); }
+                        if (dbVerticalAlignment != (label.VerticalAlignment ?? "Center")) { hasChanges = true; changedFields.Add("Vertical Alignment"); }
                     }
                     else
                     {

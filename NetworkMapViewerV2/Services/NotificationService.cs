@@ -136,7 +136,7 @@ namespace NetworkMapViewerV2.Services
             for (int i = 0; i < events.Count; i++)
             {
                 var e = events[i];
-                string cls = e.Status.Equals("Online", StringComparison.OrdinalIgnoreCase) ? "online" : "offline";
+                string cls = e.Status.Equals("is up", StringComparison.OrdinalIgnoreCase) ? "is up" : "is down";
                 sb.AppendLine($"<tr><td>{i + 1}</td><td>{e.Timestamp:dd.MM.yyyy HH:mm:ss}</td><td class='{cls}'>{e.Status}</td><td>{EscapeHtml(e.DeviceName)}</td><td>{e.Address}</td></tr>");
             }
 

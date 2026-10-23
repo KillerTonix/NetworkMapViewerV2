@@ -46,10 +46,11 @@ namespace NetworkMapViewerV2.Data
 
             cmd.Parameters.AddWithValue("@MapName", mapName);
             cmd.Parameters.AddWithValue("@MapType", mapType);
+            int newMapId = Convert.ToInt32(cmd.ExecuteScalar());
 
             InsertAuditLogInternal(actionType: "INSERT", target: "Maps", details: $"Created new map: {mapType}", targetId: 0, mapName: mapName, oldValue: null, newValue: null, connection: connection, transaction: null);
 
-            return Convert.ToInt32(cmd.ExecuteScalar());
+            return newMapId;
         }
 
         public void DeleteMap(int mapId)
@@ -180,7 +181,7 @@ namespace NetworkMapViewerV2.Data
             using var connection = GetOpenConnection();
 
             string sql = @"
-                UPDATE Maps 
+                UPDATE [Maps]
                 SET [Version] = [Version] + 1
                 WHERE [MapId] = @MapId;
 

@@ -1,5 +1,4 @@
-﻿using CommunityToolkit.Mvvm.Input;
-using NetworkMapViewerV2.Helpers;
+﻿using NetworkMapViewerV2.Helpers;
 using NetworkMapViewerV2.Helpers.Alignment;
 using NetworkMapViewerV2.Helpers.LocalFetcher;
 using NetworkMapViewerV2.Models;
@@ -66,7 +65,6 @@ namespace NetworkMapViewerV2.Views
                     SelectElement(null, false);
                 }
             };
-            this.DataContextChanged += MapCanvasView_DataContextChanged;
             // --- NEW: Marquee Selection Events ---
             DrawingCanvas.MouseLeftButtonDown += DrawingCanvas_MouseLeftButtonDown;
             DrawingCanvas.MouseMove += DrawingCanvas_MouseMove;
@@ -80,7 +78,7 @@ namespace NetworkMapViewerV2.Views
             // Unsubscribe from the OLD tab's property changes to prevent memory leaks
             if (e.OldValue is MapTabState oldState)
             {
-                oldState.PropertyChanged -= CurrentState_PropertyChanged;              
+                oldState.PropertyChanged -= CurrentState_PropertyChanged;
             }
             if (e.NewValue is MapTabState state)
             {
@@ -494,7 +492,6 @@ namespace NetworkMapViewerV2.Views
                         if (element.Tag is NetworkDevice dev)
                         {
                             _ = new DevicePropertiesWindow(dev, true) { Owner = Window.GetWindow(this) };
-                            HandleDeviceDoubleClick(dev);
                         }
                     }
                     return; // Stop processing the rest of the mouse down logic!
@@ -726,11 +723,6 @@ namespace NetworkMapViewerV2.Views
             if (element != null && !_selectedElements?.Contains(element) == true)
             {
                 _selectedElements?.Add(element);
-                this.Loaded += (s, e) =>
-                {
-                    this.Focus();
-                    Keyboard.Focus(this);
-                };
                 element.Effect = _selectionGlow; // Apply visual cyan glow!
             }
         }
@@ -992,27 +984,6 @@ namespace NetworkMapViewerV2.Views
             }
         }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        // --- HELPER: Finds a specific control inside a container ---
-
-
-
         private Brush GetGridBrush()
         {
             if (_gridBrush == null)
@@ -1170,33 +1141,21 @@ namespace NetworkMapViewerV2.Views
                 menu.Items.Add(new Separator());
                 var miAlign = new MenuItem { Icon = "📐", Header = "Align Selected...", FontWeight = FontWeights.Bold };
 
-                var miAlignLeft = new MenuItem { Header = "Align Left" };
-                miAlignLeft.Click += (s, ev) => Align.AlignSelectedElements(_selectedElements, GlobalViewModel, this, AlignMode.Left);
+                (string? Header, AlignMode Mode)[] alignItems =
+                     [
+                     ("Align Left", AlignMode.Left), ("Align Center (Horizontal)", AlignMode.Center),
+                     ("Align Right", AlignMode.Right), (null, default),
+                     ("Align Top", AlignMode.Top), ("Align Middle (Vertical)", AlignMode.Middle),
+                     ("Align Bottom", AlignMode.Bottom),
+                     ];
+                foreach (var (header, mode) in alignItems)
+                {
+                    if (header is null) { miAlign.Items.Add(new Separator()); continue; }
+                    var mi = new MenuItem { Header = header };
+                    mi.Click += (_, _) => Align.AlignSelectedElements(_selectedElements, GlobalViewModel, this, mode);
+                    miAlign.Items.Add(mi);
+                }
 
-                var miAlignCenter = new MenuItem { Header = "Align Center (Horizontal)" };
-                miAlignCenter.Click += (s, ev) => Align.AlignSelectedElements(_selectedElements, GlobalViewModel, this, AlignMode.Center);
-
-                var miAlignRight = new MenuItem { Header = "Align Right" };
-                miAlignRight.Click += (s, ev) => Align.AlignSelectedElements(_selectedElements, GlobalViewModel, this, AlignMode.Right);
-
-                var miAlignTop = new MenuItem { Header = "Align Top" };
-                miAlignTop.Click += (s, ev) => Align.AlignSelectedElements(_selectedElements, GlobalViewModel, this, AlignMode.Top);
-
-                var miAlignMiddle = new MenuItem { Header = "Align Middle (Vertical)" };
-                miAlignMiddle.Click += (s, ev) => Align.AlignSelectedElements(_selectedElements, GlobalViewModel, this, AlignMode.Middle);
-
-                var miAlignBottom = new MenuItem { Header = "Align Bottom" };
-                miAlignBottom.Click += (s, ev) => Align.AlignSelectedElements(_selectedElements, GlobalViewModel, this, AlignMode.Bottom);
-
-                miAlign.Items.Add(miAlignLeft);
-                miAlign.Items.Add(miAlignCenter);
-                miAlign.Items.Add(miAlignRight);
-                miAlign.Items.Add(new Separator());
-                miAlign.Items.Add(miAlignTop);
-                miAlign.Items.Add(miAlignMiddle);
-                miAlign.Items.Add(miAlignBottom);
-
-                menu.Items.Add(miAlign);
             }
 
             if (_selectedElements != null)
@@ -1207,14 +1166,14 @@ namespace NetworkMapViewerV2.Views
                     miAutoAlign.Click += (sender, args) => AutoAlignSelectedPairs();
                     menu.Items.Add(miAutoAlign);
                 }
-            }    
+            }
 
             if (string.Equals(_currentState.MapType, "Branch", StringComparison.OrdinalIgnoreCase))
             {
                 menu.Items.Add(miDiscover);
                 menu.Items.Add(new Separator());
             }
-            
+
             menu.Items.Add(miGetLastPC);
             menu.Items.Add(new Separator());
             menu.Items.Add(miUpdateDevices);
@@ -1374,7 +1333,7 @@ namespace NetworkMapViewerV2.Views
             };
 
             if (window.ShowDialog() == true && _currentState != null)
-            {                
+            {
                 for (int i = 0; i < window.Quantity; i++)
                 {
                     // 2. Calculate offsets. (Horizontal uses Width + 10 gap, Vertical uses 40 as requested)
@@ -1395,28 +1354,7 @@ namespace NetworkMapViewerV2.Views
                 if (GlobalViewModel != null) _currentState?.HasUnsavedChanges = true;
                 DrawMap(_currentState);
             }
-        }
-
-        private void AddDevice_Click(object sender, RoutedEventArgs e)
-        {
-            if (_currentState == null) return;
-
-            var newDevice = new NetworkDevice
-            {
-                MapId = _currentState.MapId,
-                Address = "0.0.0.0",
-                Left = _lastRightClickPosition.X,
-                Top = _lastRightClickPosition.Y,
-                GroupId = 0
-            };
-
-            newDevice.Titles.Add("New Device"); // Adds text safely to the JSON list!
-
-            _currentState.Devices.Add(newDevice);
-            GlobalViewModel?.HasUnsavedChanges = true;
-            DrawMap(_currentState);
-        }
-
+        }              
 
         internal void EnforceBounds(FrameworkElement el, ref double newLeft, ref double newTop)
         {
@@ -1601,9 +1539,9 @@ namespace NetworkMapViewerV2.Views
 
 
 
-        
 
-                
+
+
         public async Task GetNewlyAddedComputers()
         {
             if (_currentState == null || !_currentState.IsEditingEnabled) return;
@@ -1627,7 +1565,7 @@ namespace NetworkMapViewerV2.Views
             if (importWin.ShowDialog() == true && importWin.SelectedComputers.Count != 0)
             {
                 // 4. Position and spawn selected devices onto map canvas
-            
+
                 double startX = _lastRightClickPosition.X;
                 double startY = _lastRightClickPosition.Y;
                 double spacingX = 120;
@@ -1726,7 +1664,6 @@ namespace NetworkMapViewerV2.Views
 
             // 3. Multithreaded Ping Sweep
             var foundIps = new ConcurrentBag<string>();
-            using var semaphore = new SemaphoreSlim(100); // 100 concurrent pings for rapid sweeping
             var tasks = new List<Task>();
 
             // Optional: Show a loading overlay here so the user knows it's scanning
@@ -1735,15 +1672,7 @@ namespace NetworkMapViewerV2.Views
             {
                 tasks.Add(Task.Run(async () =>
                 {
-                    await semaphore.WaitAsync();
-                    try
-                    {
-                        foundIps.Add(ip);
-                    }
-                    finally
-                    {
-                        semaphore.Release();
-                    }
+                    foundIps.Add(ip);
                 }));
             }
 
@@ -1783,30 +1712,6 @@ namespace NetworkMapViewerV2.Views
 
             }
         }
-
-
-        public void SyncVisualPositions()
-        {
-            foreach (UIElement child in DrawingCanvas.Children)
-            {
-                if (child is FrameworkElement fe)
-                {
-                    // Check if child DataContext is a Label model
-                    if (fe.DataContext is NetworkLabel label)
-                    {
-                        Canvas.SetLeft(fe, label.Left);
-                        Canvas.SetTop(fe, label.Top);
-                    }
-                    // Check if child DataContext is a Device model
-                    else if (fe.DataContext is NetworkDevice device)
-                    {
-                        Canvas.SetLeft(fe, device.Left);
-                        Canvas.SetTop(fe, device.Top);
-                    }
-                }
-            }
-
-            DrawingCanvas.UpdateLayout();
-        }
+        
     }
 }

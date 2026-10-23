@@ -50,7 +50,7 @@ namespace NetworkMapViewerV2.ViewModels
         }
 
         [RelayCommand]
-        private void ToggleEditMode()
+        private async Task ToggleEditMode()
         {
             if (SelectedTab == null) return;
 
@@ -69,13 +69,13 @@ namespace NetworkMapViewerV2.ViewModels
                     }
                     else if (result == MessageBoxResult.Yes)
                     {
-                        SaveMap();
-                        _ = ReloadMap();
+                        await SaveMap();
+                        await ReloadMap();
                     }
                     else if (result == MessageBoxResult.No)
                     {
                         SelectedTab.HasUnsavedChanges = false;
-                        _ = ReloadMap();
+                        await ReloadMap();
                     }
                 }
 
@@ -234,14 +234,14 @@ namespace NetworkMapViewerV2.ViewModels
         [RelayCommand]
         private void AlignMapElements()
         {
+            if (SelectedTab == null) return;
+
             // 1. Ensure Edit Mode is active
             if (!SelectedTab.IsEditingEnabled) // Adjust to SelectedTab.IsEditMode if stored per tab
             {
                 MessageBox.Show("Please enable Edit Mode before aligning map elements.", "Edit Mode Required", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
-            }
-
-            if (SelectedTab == null) return;
+            }            
 
             const double LabelWidthStep = 125.0; // Standard label width grid step
             const double RowStep = 130.0;        // 120px height + 10px vertical gap
@@ -298,10 +298,7 @@ namespace NetworkMapViewerV2.ViewModels
                 // 2. Locate current MapCanvasView control and update canvas child positions visually
                 if (Application.Current.MainWindow is Window mainWindow)
                 {
-                    var canvasView = FindVisualChild<MapCanvasView>(mainWindow);
-
-                    // Sync positions directly on DrawingCanvas.Children
-                    canvasView?.SyncVisualPositions();                           
+                    var canvasView = FindVisualChild<MapCanvasView>(mainWindow);                    
                 }
 
                 SelectedTab.IsEditingEnabled = true; // Ensure Edit Mode remains active after alignment

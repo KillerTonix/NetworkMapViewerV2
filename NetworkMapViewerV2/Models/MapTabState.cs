@@ -6,7 +6,6 @@ namespace NetworkMapViewerV2.Models
     public class MapTabState : INotifyPropertyChanged
     {
         public int MapId { get; set; }
-        public string FilePath { get; set; } = string.Empty;    
         public string MapName { get; set; } = string.Empty;
         public string MapType { get; set; } = "Head Office";
         public int Version { get; set; } = 1;
@@ -32,35 +31,7 @@ namespace NetworkMapViewerV2.Models
             get => _hasUnsavedChanges;
             // When this changes, tell the UI to turn the Tab red!
             set { _hasUnsavedChanges = value; OnPropertyChanged(); }
-        }
-
-        private string? _pendingHighlightAddress;
-        public string? PendingHighlightAddress
-        {
-            get => _pendingHighlightAddress;
-            set
-            {
-                if (_pendingHighlightAddress != value)
-                {
-                    _pendingHighlightAddress = value;
-                    OnPropertyChanged(nameof(PendingHighlightAddress));
-                }
-            }
-        }
-
-        private bool _isDirty;
-        public bool IsDirty
-        {
-            get => _isDirty;
-            set
-            {
-                if (_isDirty != value)
-                {
-                    _isDirty = value;
-                    OnPropertyChanged(nameof(IsDirty)); // or OnPropertyChanged();
-                }
-            }
-        }
+        }                     
 
         public Action? TriggerRedraw { get; set; }
 

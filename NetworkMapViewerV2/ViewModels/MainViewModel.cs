@@ -13,7 +13,6 @@ namespace NetworkMapViewerV2.ViewModels
         private AppSettings _appSettings = new();
         private DispatcherTimer? _mapSyncTimer;
         private static MapRepository _repo = new();    
-        private List<MapTabState> _allMaps = _repo.GetAvailableMaps().ToList();
 
         public MainViewModel()
         {
@@ -56,9 +55,9 @@ namespace NetworkMapViewerV2.ViewModels
             Application.Current.Dispatcher.Invoke(() =>
             {
                 // 1. Update devices across ALL open tabs in memory (not just SelectedTab)
-                if (_allMaps != null)
+                if (OpenTabs != null)
                 {
-                    foreach (var tab in _allMaps)
+                    foreach (var tab in OpenTabs)
                     {
                         if (tab.Devices == null) continue;
 
@@ -131,9 +130,9 @@ namespace NetworkMapViewerV2.ViewModels
         /// </summary>
         public void SyncOpenTabDevices()
         {
-            if (_allMaps == null) return;
+            if (OpenTabs == null) return;
 
-            var activeAddresses = _allMaps
+            var activeAddresses = OpenTabs
                 .Where(tab => tab.Devices != null)
                 .SelectMany(tab => tab.Devices)
                 .Select(d => d.Address)
