@@ -311,7 +311,7 @@ namespace NetworkMapViewerV2.ViewModels
             for (int i = 0; i < count; i++)
             {
                 var child = System.Windows.Media.VisualTreeHelper.GetChild(parent, i);
-                if (child is T typedChild && (child as FrameworkElement)?.IsVisible == true)
+                if (child is T typedChild && child is FrameworkElement { IsVisible: true })
                     return typedChild;
 
                 var result = FindVisualChild<T>(child);
