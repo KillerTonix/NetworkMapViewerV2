@@ -322,18 +322,18 @@ namespace NetworkMapViewerV2.Views
             {
                 var brush = new DrawingBrush
                 {
-                    Viewport = new Rect(0, 0, 125, 120),
+                    Viewport = new Rect(0, 0, 125, 130),
                     ViewportUnits = BrushMappingMode.Absolute,
                     TileMode = TileMode.Tile
                 };
 
                 var drawingGroup = new DrawingGroup();
-                drawingGroup.Children.Add(new GeometryDrawing(_standardBrush, null, new RectangleGeometry(new Rect(0, 0, 125, 120))));
+                drawingGroup.Children.Add(new GeometryDrawing(_standardBrush, null, new RectangleGeometry(new Rect(0, 0, 125, 130))));
 
                 var pen = new Pen(new BrushConverter().ConvertFrom("#191919") as Brush, 1);
                 var lineGeometry = new GeometryGroup();
                 lineGeometry.Children.Add(new LineGeometry(new Point(0, 0), new Point(125, 0)));
-                lineGeometry.Children.Add(new LineGeometry(new Point(0, 0), new Point(0, 120)));
+                lineGeometry.Children.Add(new LineGeometry(new Point(0, 0), new Point(0, 130)));
 
                 drawingGroup.Children.Add(new GeometryDrawing(null, pen, lineGeometry));
 
