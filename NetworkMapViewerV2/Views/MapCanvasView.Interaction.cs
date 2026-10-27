@@ -5,9 +5,17 @@ using System.Windows.Input;
 
 namespace NetworkMapViewerV2.Views
 {
+    // Part: Interaction
+    // Click, double-click and drag handling for devices and labels,
+    // plus position clamping and the view-mode double-click action.
     public partial class MapCanvasView : UserControl
     {
         // ─── SELECTION & DRAG LOGIC ──────────────────────────────
+        /// <summary>
+        /// Handles a click on a device or label. Double-click opens the properties window (edit mode) or runs
+        /// the device action (view mode); a single click updates the selection and, in edit mode, prepares a
+        /// batch drag.
+        /// </summary>
         private void Element_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (sender is FrameworkElement element)
@@ -107,6 +115,10 @@ namespace NetworkMapViewerV2.Views
             }
         }
 
+        /// <summary>
+        /// Moves all selected elements together while dragging (Shift locks to one axis, positions are clamped
+        /// to the canvas) and marks the tab as modified after a small threshold.
+        /// </summary>
         private void Element_MouseMove(object sender, MouseEventArgs e)
         {
             if (_isDragging && _draggedElement != null)
@@ -157,6 +169,10 @@ namespace NetworkMapViewerV2.Views
             }
         }
 
+        /// <summary>
+        /// Ends a drag. A click without movement on an already selected item narrows the selection to that item
+        /// or unselects it.
+        /// </summary>
         private void Element_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
             if (e.ChangedButton != MouseButton.Left) return;
@@ -200,12 +216,17 @@ namespace NetworkMapViewerV2.Views
             }
         }
 
+        /// <summary>Writes a new Left / Top back to the underlying device or label model.</summary>
         internal static void UpdateModelPosition(FrameworkElement el, double? left, double? top)
         {
             if (el.Tag is NetworkDevice device) { if (left.HasValue) device.Left = left.Value; if (top.HasValue) device.Top = top.Value; }
             else if (el.Tag is NetworkLabel label) { if (left.HasValue) label.Left = left.Value; if (top.HasValue) label.Top = top.Value; }
         }
 
+        /// <summary>
+        /// View-mode double-click action: opens the linked map for Map Link devices, otherwise runs the group's
+        /// default command (falls back to Ping). Returns true if an action was run.
+        /// </summary>
         private static bool HandleDeviceDoubleClick(NetworkDevice device)
         {
             var repo = new Data.MapRepository();
@@ -252,6 +273,7 @@ namespace NetworkMapViewerV2.Views
             return false;
         }
 
+        /// <summary>Clamps a proposed position so the element stays inside the canvas.</summary>
         internal void EnforceBounds(FrameworkElement el, ref double newLeft, ref double newTop)
         {
             // 1. Lock the Top/Left edges at 0

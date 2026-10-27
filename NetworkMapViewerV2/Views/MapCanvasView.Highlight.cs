@@ -7,8 +7,16 @@ using System.Windows.Shapes;
 
 namespace NetworkMapViewerV2.Views
 {
+    // Part: Highlight
+    // Scrolls to and animates a device whose highlight was requested
+    // through GlobalViewModel.HighlightedDeviceId.
     public partial class MapCanvasView : UserControl
     {
+
+        /// <summary>
+        /// If a device highlight was requested, waits until the canvas is laid out, scrolls the device into
+        /// view, plays the ripple and then resets the request.
+        /// </summary>
         private void CheckForPendingHighlight()
         {
             if (GlobalViewModel != null && GlobalViewModel.HighlightedDeviceId > 0)
@@ -36,6 +44,10 @@ namespace NetworkMapViewerV2.Views
             }
         }
 
+        /// <summary>
+        /// Plays expanding, fading rings centered on the given point; each ring removes itself when its
+        /// animation completes.
+        /// </summary>
         private static void PlayRippleAnimation(Canvas canvas, double centerX, double centerY)
         {
             const double startSize = 10;

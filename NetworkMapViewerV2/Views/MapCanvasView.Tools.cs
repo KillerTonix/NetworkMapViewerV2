@@ -7,8 +7,15 @@ using static NetworkMapViewerV2.Helpers.Alignment.Align;
 
 namespace NetworkMapViewerV2.Views
 {
+    // Part: Tools
+    // Editing helpers: auto-align device / label pairs and find and replace.
     public partial class MapCanvasView : UserControl
     {
+
+        /// <summary>
+        /// Pairs each selected device with its nearest selected label and aligns each pair (phones: top and
+        /// right, others: middle and center), then restores the original selection.
+        /// </summary>
         internal void AutoAlignSelectedPairs()
         {
             if (_currentState == null || !_currentState.IsEditingEnabled) return;
@@ -96,6 +103,10 @@ namespace NetworkMapViewerV2.Views
             DrawMap(_currentState);
         }
 
+        /// <summary>
+        /// Replaces text in device addresses, titles and hints across the current map, redraws, and reports how
+        /// many devices changed.
+        /// </summary>
         internal void ExecuteFindAndReplace()
         {
             if (_currentState == null || !_currentState.IsEditingEnabled) return;

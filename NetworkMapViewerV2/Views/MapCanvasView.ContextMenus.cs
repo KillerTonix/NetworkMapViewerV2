@@ -9,10 +9,17 @@ using static NetworkMapViewerV2.Helpers.Alignment.Align;
 
 namespace NetworkMapViewerV2.Views
 {
+    // Part: ContextMenus
+    // Right-click menus for devices, labels and the canvas background.
+    // Menus are built lazily when ContextMenuOpening fires.
     public partial class MapCanvasView : UserControl
     {
         // ─── CONTEXT MENUS ───────────────────────────────────────
 
+        /// <summary>
+        /// Attaches the device right-click menu: external commands, properties, copy IP and open linked map for
+        /// everyone; auto-fill and delete in edit mode only.
+        /// </summary>
         private void AttachDeviceContextMenu(Border container, NetworkDevice device)
         {
             // 1. Give it a blank menu immediately so WPF knows it can be right-clicked!
@@ -149,6 +156,8 @@ namespace NetworkMapViewerV2.Views
                 // NOTICE: We removed the `container.ContextMenu = menu;` line from down here!
             };
         }
+
+        /// <summary>Attaches the label right-click menu (configure, delete). It is blocked entirely in view mode.</summary>
         private void AttachLabelContextMenu(Border container, NetworkLabel label)
         {
             // Everything happens inside this event the moment the user right-clicks!
@@ -206,6 +215,10 @@ namespace NetworkMapViewerV2.Views
         }
 
         // ─── DYNAMIC CREATION MENUS ──────────────────────────────
+        /// <summary>
+        /// Builds the canvas background menu (edit mode only): AD import, auto-discovery, add and batch-add
+        /// devices and labels, grid generator, alignment and auto-align. Referenced from MapCanvasView.xaml.
+        /// </summary>
         private void DrawingCanvas_ContextMenuOpening(object sender, ContextMenuEventArgs e)
         {
             if (e.OriginalSource != DrawingCanvas) return;

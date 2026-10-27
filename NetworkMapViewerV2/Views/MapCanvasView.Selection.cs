@@ -7,8 +7,13 @@ using System.Windows.Shapes;
 
 namespace NetworkMapViewerV2.Views
 {
+    // Part: Selection
+    // Marquee (rubber-band) selection on the canvas background and
+    // selection state / glow handling.
     public partial class MapCanvasView : UserControl
     {
+
+        /// <summary>Starts a marquee selection when the empty canvas background is clicked in edit mode.</summary>
         private void DrawingCanvas_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             // Only start marquee if we click the empty canvas background, NOT an icon
@@ -37,6 +42,7 @@ namespace NetworkMapViewerV2.Views
             }
         }
 
+        /// <summary>Resizes the marquee rectangle while dragging; works in any drag direction.</summary>
         private void DrawingCanvas_MouseMove(object sender, MouseEventArgs e)
         {
             if (_isMarqueeSelecting && _selectionBox != null)
@@ -56,6 +62,7 @@ namespace NetworkMapViewerV2.Views
             }
         }
 
+        /// <summary>Finishes the marquee: selects every device and label it intersects, then removes the rectangle.</summary>
         private void DrawingCanvas_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
             if (_isMarqueeSelecting && _selectionBox != null)
@@ -85,6 +92,10 @@ namespace NetworkMapViewerV2.Views
             }
         }
 
+        /// <summary>
+        /// Selects an element (cyan glow). With multiSelect false the previous selection is cleared first;
+        /// passing null just clears the selection.
+        /// </summary>
         internal void SelectElement(FrameworkElement? element, bool multiSelect)
         {
             // Clear old selection if we aren't holding CTRL

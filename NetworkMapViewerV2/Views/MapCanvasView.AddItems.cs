@@ -4,8 +4,15 @@ using System.Windows.Controls;
 
 namespace NetworkMapViewerV2.Views
 {
+    // Part: AddItems
+    // Creates new devices and labels (single or batch) at the last right-click position.
     public partial class MapCanvasView : UserControl
     {
+
+        /// <summary>
+        /// Creates a device of the chosen group with preset hint text for that type, opens its properties
+        /// window, and adds it to the map if confirmed.
+        /// </summary>
         private void AddSpecificDevice(int groupId, Point position)
         {
             if (_currentState == null) return;
@@ -74,6 +81,10 @@ namespace NetworkMapViewerV2.Views
             }
         }
 
+        /// <summary>
+        /// Creates a default label at the right-click position, opens its properties window, and adds it to the
+        /// map if confirmed.
+        /// </summary>
         private void AddLabel_Click(object sender, RoutedEventArgs e)
         {
             if (_currentState == null) return;
@@ -100,6 +111,10 @@ namespace NetworkMapViewerV2.Views
             }
         }
 
+        /// <summary>
+        /// Adds a row or column of labels, laid out from the batch dialog settings, starting at the dialog's
+        /// start position.
+        /// </summary>
         private void BatchAddLabels_Click(object sender, RoutedEventArgs e)
         {
             var window = new BatchAddLabelsWindow(_lastRightClickPosition.X, _lastRightClickPosition.Y)
@@ -138,6 +153,7 @@ namespace NetworkMapViewerV2.Views
 
 
 
+        /// <summary>Adds several devices of one group in a row or column starting at the right-click position.</summary>
         private void BatchAdd_Click(object sender, RoutedEventArgs e)
         {
             // Creates a fast, dynamic popup window just for batch adding!
@@ -173,6 +189,7 @@ namespace NetworkMapViewerV2.Views
             }
         }
 
+        /// <summary>Adds a single blank device at the right-click position without opening a dialog.</summary>
         private void AddDevice_Click(object sender, RoutedEventArgs e)
         {
             if (_currentState == null) return;

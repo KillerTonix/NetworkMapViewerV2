@@ -12,8 +12,16 @@ using System.Windows.Media.Imaging;
 
 namespace NetworkMapViewerV2.Views
 {
+    // Part: Rendering
+    // Builds the canvas from the current MapTabState (labels, devices, tooltips)
+    // and manages the canvas background (grid or plain).
     public partial class MapCanvasView : UserControl
     {
+
+        /// <summary>
+        /// Clears the canvas and fully redraws it for the given tab (labels first, then devices). Bindings are
+        /// cleared first so WPF can release the old elements.
+        /// </summary>
         internal void DrawMap(MapTabState? state)
         {
             // 1. DESTROY ALL BINDINGS SO WPF CAN DELETE THE OLD UI ELEMENTS
@@ -41,6 +49,10 @@ namespace NetworkMapViewerV2.Views
 
         // ─── DRAW LABELS ─────────────────────────────────────────
 
+        /// <summary>
+        /// Creates a bordered text block for each label with its colors, font and alignment, and attaches the
+        /// context menu and mouse handlers.
+        /// </summary>
         private void DrawLabels(MapTabState? state)
         {
             if (state == null) return;
@@ -98,6 +110,10 @@ namespace NetworkMapViewerV2.Views
 
         // ─── DRAW DEVICES ────────────────────────────────────────
 
+        /// <summary>
+        /// Creates the element for each device: an icon bound to its online status (sized from the group's
+        /// icon), its title text, tooltip, context menu and mouse handlers.
+        /// </summary>
         private void DrawDevices(MapTabState? state)
         {
             if (state == null) return;
@@ -236,6 +252,7 @@ namespace NetworkMapViewerV2.Views
 
         // ─── TOOLTIPS & ALIGNMENT ────────────────────────────────
 
+        /// <summary>Builds the hover tooltip for a device from its hint image and hint text.</summary>
         private static void BuildDeviceTooltip(Border container, NetworkDevice device)
         {
             var toolTipPanel = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(5) };
@@ -263,6 +280,10 @@ namespace NetworkMapViewerV2.Views
             container.ToolTip = toolTipPanel.Children.Count > 0 ? toolTipPanel : null;
         }
 
+        /// <summary>
+        /// Renders a small HTML subset (bold, italic, underline and line-break tags) into the inlines of a
+        /// TextBlock.
+        /// </summary>
         private static void RenderHtmlToTextBlock(TextBlock tb, string text)
         {
             tb.Inlines.Clear();
@@ -294,6 +315,7 @@ namespace NetworkMapViewerV2.Views
             }
         }
 
+        /// <summary>Lazily builds and caches the tiled grid brush used as the canvas background.</summary>
         private Brush GetGridBrush()
         {
             if (_gridBrush == null)
@@ -322,6 +344,7 @@ namespace NetworkMapViewerV2.Views
             return _gridBrush;
         }
 
+        /// <summary>Shows the grid or the plain background depending on GlobalViewModel.IsGridVisible.</summary>
         private void UpdateBackground()
         {
             DrawingCanvas.Background = GlobalViewModel != null && GlobalViewModel.IsGridVisible ? GetGridBrush() : _standardBrush;

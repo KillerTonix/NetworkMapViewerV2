@@ -7,8 +7,15 @@ using System.Windows.Controls;
 
 namespace NetworkMapViewerV2.Views
 {
+    // Part: Discovery
+    // Finds devices to add: recently added Active Directory computers and CIDR range scans.
     public partial class MapCanvasView : UserControl
     {
+
+        /// <summary>
+        /// Fetches computers recently added to Active Directory, lets the user pick which to import, and places
+        /// them as devices starting at the right-click position.
+        /// </summary>
         public async Task GetNewlyAddedComputers()
         {
             if (_currentState == null || !_currentState.IsEditingEnabled) return;
@@ -63,6 +70,10 @@ namespace NetworkMapViewerV2.Views
             }
         }
 
+        /// <summary>
+        /// Asks for a CIDR range (default guessed from existing device IPs), finds online IPs not yet on the
+        /// map, and optionally adds them as devices.
+        /// </summary>
         private async Task RunAutoDiscoveryAsync()
         {
             if (_currentState == null) return;

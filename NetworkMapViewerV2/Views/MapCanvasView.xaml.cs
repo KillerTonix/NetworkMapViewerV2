@@ -9,10 +9,17 @@ using System.Windows.Shapes;
 
 namespace NetworkMapViewerV2.Views
 {
+    // Part: Core
+    // Shared state, constructor and DataContext / property-change wiring.
+    // Other responsibilities live in MapCanvasView.*.cs (Rendering, Highlight, Selection,
+    // Interaction, ContextMenus, AddItems, Tools, Discovery).
     public partial class MapCanvasView : UserControl
     {
         // --- NEW: Interactivity State ---
+        /// <summary>Elements currently selected (shown with a cyan glow) on the canvas.</summary>
         internal readonly List<FrameworkElement> _selectedElements = [];
+
+        /// <summary>The map tab currently displayed by this view (set when the DataContext changes).</summary>
         public MapTabState _currentState = new(); // Keep track of the current map
         private readonly DropShadowEffect _selectionGlow = new() { Color = Colors.Cyan, BlurRadius = 20, ShadowDepth = 0 };
         private Brush? _gridBrush;
@@ -24,6 +31,8 @@ namespace NetworkMapViewerV2.Views
         internal FrameworkElement? _draggedElement;
         internal int _originalZIndex;
         internal readonly Dictionary<FrameworkElement, Point> _dragStartPositions = [];
+
+        /// <summary>Canvas position of the last right-click; used as the spawn point for new devices and labels.</summary>
         internal Point _lastRightClickPosition;
 
         // --- NEW: Marquee Selection & Clipboard State ---
@@ -38,6 +47,10 @@ namespace NetworkMapViewerV2.Views
         // Helper to get global state from our ViewModel
         internal static MainViewModel GlobalViewModel => (MainViewModel)Application.Current.MainWindow.DataContext;
 
+        /// <summary>
+        /// Initializes the view and hooks the canvas mouse events used for background clicks and marquee
+        /// selection.
+        /// </summary>
         public MapCanvasView()
         {
             InitializeComponent();
@@ -62,6 +75,10 @@ namespace NetworkMapViewerV2.Views
             this.IsTabStop = true;
         }
 
+        /// <summary>
+        /// Switches the view to a new map tab: unsubscribes from the old tab, wires the redraw callback, draws
+        /// the map, and listens to global ViewModel changes.
+        /// </summary>
         private void MapCanvasView_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
             // Unsubscribe from the OLD tab's property changes to prevent memory leaks
@@ -111,6 +128,10 @@ namespace NetworkMapViewerV2.Views
                 DrawMap(_currentState);
         }
 
+        /// <summary>
+        /// Reacts to global ViewModel changes: grid visibility updates the background, a highlight request
+        /// starts the highlight animation.
+        /// </summary>
         private void GlobalViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
             if (e.PropertyName == nameof(GlobalViewModel.IsGridVisible))
@@ -124,11 +145,19 @@ namespace NetworkMapViewerV2.Views
             }
         }
 
+        /// <summary>
+        /// Forwards keyboard shortcuts (e.g. copy / paste) to MapKeyboardService. Referenced from
+        /// MapCanvasView.xaml.
+        /// </summary>
         private void UserControl_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             Services.MapKeyboardService.HandlePreviewKeyDown(e, this);
         }
 
+        /// <summary>
+        /// Re-applies Left / Top from the label and device models to their canvas elements, then refreshes the
+        /// layout.
+        /// </summary>
         public void SyncVisualPositions()
         {
             foreach (UIElement child in DrawingCanvas.Children)
