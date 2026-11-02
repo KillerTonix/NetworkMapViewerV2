@@ -40,17 +40,32 @@ namespace NetworkMapViewerV2.Data
 
         public int CreateNewMap(string mapName, string mapType)
         {
-            using var connection = GetOpenConnection();
-            string sql = "INSERT INTO Maps (MapName, MapType) VALUES (@MapName, @MapType); SELECT SCOPE_IDENTITY();";
-            using var cmd = new SqlCommand(sql, connection);
+            try
+            {
+                using var connection = GetOpenConnection();
+                string sql = "INSERT INTO Maps (MapName, MapType) VALUES (@MapName, @MapType); SELECT SCOPE_IDENTITY();";
+                using var cmd = new SqlCommand(sql, connection);
 
-            cmd.Parameters.AddWithValue("@MapName", mapName);
-            cmd.Parameters.AddWithValue("@MapType", mapType);
-            int newMapId = Convert.ToInt32(cmd.ExecuteScalar());
+                cmd.Parameters.AddWithValue("@MapName", mapName);
+                cmd.Parameters.AddWithValue("@MapType", mapType);
+                int newMapId = Convert.ToInt32(cmd.ExecuteScalar());
 
-            InsertAuditLogInternal(actionType: "INSERT", target: "Maps", details: $"Created new map: {mapType}", targetId: 0, mapName: mapName, oldValue: null, newValue: null, connection: connection, transaction: null);
+                InsertAuditLogInternal(actionType: "INSERT", target: "Maps", details: $"Created new map: {mapType}", targetId: 0, mapName: mapName, oldValue: null, newValue: null, connection: connection, transaction: null);
 
-            return newMapId;
+                return newMapId;
+            }
+            catch (Exception ex)
+            {
+                if (ex.Message.Contains("permission was denied"))
+                {
+                    MessageBox.Show("Failed to create map:\nYou don't have permission to modify the database.", "Database Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                else
+                {
+                    MessageBox.Show($"Failed to create map:\n{ex.Message}", "Database Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                return -1; // Indicate failure
+            }
         }
 
         public void DeleteMap(int mapId)
@@ -178,22 +193,29 @@ namespace NetworkMapViewerV2.Data
 
         public async Task IncrementAndSaveMapVersionAsync(MapTabState map)
         {
-            using var connection = GetOpenConnection();
+            try
+            {
+                using var connection = GetOpenConnection();
 
-            string sql = @"
+                string sql = @"
                 UPDATE [Maps]
                 SET [Version] = [Version] + 1
                 WHERE [MapId] = @MapId;
 
                 SELECT [Version] FROM [NMViewer].[dbo].[Maps] WHERE [MapId] = @MapId;";
 
-            using var cmd = new SqlCommand(sql, connection);
-            cmd.Parameters.AddWithValue("@MapId", map.MapId);
+                using var cmd = new SqlCommand(sql, connection);
+                cmd.Parameters.AddWithValue("@MapId", map.MapId);
 
-            object result = await cmd.ExecuteScalarAsync();
-            if (result != null && result != DBNull.Value)
+                object result = await cmd.ExecuteScalarAsync();
+                if (result != null && result != DBNull.Value)
+                {
+                    map.Version = Convert.ToInt32(result);
+                }
+            }
+            catch (Exception ex)
             {
-                map.Version = Convert.ToInt32(result);
+                MessageBox.Show($"Failed to increment map version:\n{ex.Message}", "Database Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
     }

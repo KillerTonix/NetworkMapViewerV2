@@ -1,4 +1,5 @@
 ﻿using Microsoft.Win32;
+using NetworkMapViewerV2.Data;
 using NetworkMapViewerV2.Helpers.Passwords;
 using NetworkMapViewerV2.Models;
 using NetworkMapViewerV2.Services;
@@ -381,7 +382,7 @@ namespace NetworkMapViewerV2.Views
         private void BtnTestOffline_Click(object sender, RoutedEventArgs e) => PlayTestSound(txtOfflineSoundPath.Text);
         private void BtnTestOnline_Click(object sender, RoutedEventArgs e) => PlayTestSound(txtOnlineSoundPath.Text);
 
-        private void BrowseAudioFile(TextBox targetTextBox, string title)
+        private static void BrowseAudioFile(TextBox targetTextBox, string title)
         {
             var openFileDialog = new OpenFileDialog
             {
@@ -414,6 +415,27 @@ namespace NetworkMapViewerV2.Views
             }
         }
 
+
         #endregion
+
+        private void PrepareDatabaseButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(_settings.DatabaseServer) || string.IsNullOrWhiteSpace(_settings.DatabaseName) ||
+                string.IsNullOrWhiteSpace(_settings.DatabaseUser) || string.IsNullOrWhiteSpace(_settings.DatabasePassword))
+            {
+                MessageBox.Show("Please fill in all database connection fields before preparing the database.", "Missing Information", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            try
+            {
+                DatabaseService.PrepareDatabaseForFirstUse();
+                MessageBox.Show("Database is ready for first use!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to prepare the database:\n{ex.Message}", "Database Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
     }
 }

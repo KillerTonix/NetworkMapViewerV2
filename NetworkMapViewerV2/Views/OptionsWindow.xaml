@@ -505,13 +505,22 @@
                                 <TextBox x:Name="DatabaseNameTextBox" Grid.Column="1" Text="TestDB"/>
                             </Grid>
 
-                            <Grid Margin="0,0,0,16">
+                            <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="150"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Text="Database User:" VerticalAlignment="Center" FontSize="12" Foreground="#334155" FontWeight="Medium"/>
                                 <TextBox x:Name="DatabaseUserTextBox" Grid.Column="1" Text="TestUser"/>
+                            </Grid>
+                            
+                            <Grid Margin="0,0,0,16">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="150"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Database Password:" VerticalAlignment="Center" FontSize="12" Foreground="#334155" FontWeight="Medium"/>
+                                <TextBox x:Name="DatabasePasswordTextBox" Grid.Column="1"/>
                             </Grid>
 
                             <!-- Asset & Script Paths -->
@@ -547,6 +556,7 @@
                                     </Grid>
                                 </StackPanel>
                             </Border>
+                            <Button Content="Prepare Database for First Use" x:Name="PrepareDatabaseButton" Width="280" Margin="0,80,0,0" Click="PrepareDatabaseButton_Click"/>
 
                         </StackPanel>
                     </Border>
@@ -559,16 +569,6 @@
                     <Border Style="{StaticResource SectionCard}">
                         <StackPanel>
                             <TextBlock Text="Saved Passwords &amp; Credentials" FontWeight="Bold" FontSize="14" Foreground="#0F172A" Margin="0,0,0,12"/>
-
-                            <Grid Margin="0,0,0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="170"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="Database Password:" VerticalAlignment="Center" FontSize="12" Foreground="#334155" FontWeight="Medium"/>
-                                <TextBox x:Name="DatabasePasswordTextBox" Grid.Column="1"/>
-                            </Grid>
-
                             <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="170"/>
