@@ -31,4 +31,8 @@
 	<ItemGroup>
 		<AssemblyMetadata Include="BuildDate" Value="$([System.DateTime]::Now.ToString('yyyy-MM-dd HH:mm:ss'))" />
 	</ItemGroup>
+
+	<ItemGroup>
+	  <Folder Include="Additional Files\" />
+	</ItemGroup>
 </Project>
