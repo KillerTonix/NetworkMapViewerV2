@@ -36,6 +36,9 @@ namespace NetworkMapViewerV2.Views
 
                             PlayRippleAnimation(DrawingCanvas, cx, cy);
 
+                            // Select the found device too, so shortcuts that act on the selection (F2 = properties) work on it.
+                            SelectElement(b, false);
+
                             GlobalViewModel.HighlightedDeviceId = 0; // Clear the signal
                             break;
                         }

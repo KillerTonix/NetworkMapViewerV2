@@ -241,5 +241,55 @@ namespace NetworkMapViewerV2.Data
 
             return devices;
         }
+
+
+        /// <summary>
+        /// Every saved device that has an address, across all maps, with its readable name and map name.
+        /// Used by the IP usage window to tell which addresses in a CIDR range are taken.
+        /// Unsaved edits on an open map are not included.
+        /// </summary>
+        public List<UsedAddressInfo> GetUsedAddresses()
+        {
+            var result = new List<UsedAddressInfo>();
+            using var connection = GetOpenConnection();
+
+            const string sql = @"
+                SELECT d.Address, d.TitleJson, m.MapName
+                FROM Devices d
+                INNER JOIN Maps m ON m.MapId = d.MapId
+                WHERE d.Address IS NOT NULL AND LTRIM(RTRIM(d.Address)) <> ''";
+
+            using var cmd = new SqlCommand(sql, connection);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                result.Add(new UsedAddressInfo(
+                    reader.GetString(0).Trim(),
+                    BuildDeviceName(reader.IsDBNull(1) ? null : reader.GetString(1)),
+                    reader.IsDBNull(2) ? "" : reader.GetString(2)));
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Titles are stored as JSON and may contain the "%Address" placeholder (the canvas replaces it with the IP),
+        /// e.g. "%Address\nPC-01". Strip the placeholder and join what is left into one readable name.
+        /// </summary>
+        private static string BuildDeviceName(string? titleJson)
+        {
+            if (string.IsNullOrWhiteSpace(titleJson)) return "";
+            try
+            {
+                var titles = JsonSerializer.Deserialize<List<string>>(titleJson) ?? [];
+                var parts = titles
+                    .SelectMany(t => (t ?? "").Replace("%Address", "", StringComparison.OrdinalIgnoreCase)
+                                      .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+                return string.Join(" / ", parts);
+            }
+            catch (JsonException)
+            {
+                return "";
+            }
+        }       
     }
 }

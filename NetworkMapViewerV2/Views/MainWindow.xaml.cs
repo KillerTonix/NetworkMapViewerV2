@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Media;
 using System.Windows.Threading;
 
 namespace NetworkMapViewerV2.Views
@@ -26,13 +27,21 @@ namespace NetworkMapViewerV2.Views
         private const uint MOD_SHIFT = 0x0004;
         private const uint VK_SPACE = 0x20; // Spacebar
 
-
-
         public MainWindow()
         {
             InitializeComponent();
             ViewModel = new MainViewModel();
             this.DataContext = ViewModel;
+
+            // Whenever the search bar closes (Esc, the X button, ...) hand the keyboard back to the map,
+            // otherwise map shortcuts such as F2 / Delete / Ctrl+C stay dead until the canvas is clicked.
+            ViewModel.PropertyChanged += (s, e) =>
+            {
+                if (e.PropertyName == nameof(MainViewModel.IsSearchVisible) && !ViewModel.IsSearchVisible)
+                {
+                    Dispatcher.BeginInvoke(new Action(FocusActiveMap), DispatcherPriority.Input);
+                }
+            };
 
             this.Closed += (sender, args) =>
             {
@@ -75,7 +84,7 @@ namespace NetworkMapViewerV2.Views
         {
             var helper = new WindowInteropHelper(this);
             UnregisterHotKey(helper.Handle, HOTKEY_ID); // CRITICAL: Free the hotkey on exit
-            base.OnClosed(e);           
+            base.OnClosed(e);
             Environment.Exit(0);
         }
 
@@ -141,8 +150,51 @@ namespace NetworkMapViewerV2.Views
             }
         }
 
+        /// <summary>Finds the map canvas of the tab that is currently shown (null if no map is open).</summary>
+        private static MapCanvasView? FindActiveMapCanvas(DependencyObject root)
+        {
+            int count = VisualTreeHelper.GetChildrenCount(root);
+            for (int i = 0; i < count; i++)
+            {
+                var child = VisualTreeHelper.GetChild(root, i);
+                if (child is MapCanvasView view && view.IsVisible) return view;
+
+                var nested = FindActiveMapCanvas(child);
+                if (nested != null) return nested;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Gives keyboard focus to the active map canvas. Map shortcuts (F2, Delete, Ctrl+C/V/Z, arrows) are
+        /// handled by the canvas, so they only work while it has focus. Falls back to the window if no map is open.
+        /// </summary>
+        private void FocusActiveMap()
+        {
+            var canvas = FindActiveMapCanvas(this);
+            if (canvas != null)
+            {
+                canvas.Focus();
+                Keyboard.Focus(canvas);
+            }
+            else
+            {
+                this.Focus();
+                Keyboard.Focus(this);
+            }
+        }
+
         private void TxtSearch_PreviewKeyDown(object sender, KeyEventArgs e)
         {
+            // F2 (properties) normally needs focus on the map. Forward it so it also works straight after a search,
+            // when the cursor is still in the search box and the found device is the selected one.
+            if (e.Key == Key.F2)
+            {
+                var canvas = FindActiveMapCanvas(this);
+                if (canvas != null) MapKeyboardService.HandlePreviewKeyDown(e, canvas);
+                return;
+            }
+
             if (e.Key == Key.Enter)
             {
                 e.Handled = true; // Stops Enter from performing default WPF focus navigation
@@ -173,12 +225,8 @@ namespace NetworkMapViewerV2.Views
                 {
                     vm.ToggleSearchCloseCommand.Execute(null);
                 }
-                // 2. Explicitly return focus to the main window
-                Dispatcher.BeginInvoke(new Action(() =>
-                {
-                    this.Focus();
-                    Keyboard.Focus(this);
-                }), DispatcherPriority.Input);
+                // 2. Return focus to the map (not just the window), so F2 / Delete / Ctrl+C work right away
+                Dispatcher.BeginInvoke(new Action(FocusActiveMap), DispatcherPriority.Input);
             }
         }
     }

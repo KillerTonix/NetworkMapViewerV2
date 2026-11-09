@@ -81,6 +81,9 @@ namespace NetworkMapViewerV2.ViewModels
             await Task.WhenAll(pingTasks);
         }
 
+
+
+
         [RelayCommand]
         public async Task UpdateGroupData()
         {
@@ -181,6 +184,17 @@ namespace NetworkMapViewerV2.ViewModels
                 tab.HasUnsavedChanges = true;
                 MessageBox.Show($"Update complete for {devicesToUpdate.Count} online devices.\nOffline devices were skipped.", "Finished", MessageBoxButton.OK, MessageBoxImage.Information);
             }
+        }
+
+
+        [RelayCommand]
+        public void IPAM()
+        {
+            var ipamWindow = new IPAMWindow
+            {
+                Owner = Application.Current.MainWindow
+            };
+            ipamWindow.ShowDialog();
         }
 
     }

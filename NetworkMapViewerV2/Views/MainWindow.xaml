@@ -31,6 +31,8 @@
         <KeyBinding Key="F1" Modifiers="Shift" Command="{Binding ToggleHotkeysCommand}" />
 
         <KeyBinding Key="U" Modifiers="Ctrl" Command="{Binding UpdateGroupDataCommand}" />
+        
+        <KeyBinding Key="I" Modifiers="Ctrl" Command="{Binding IPAMCommand}" />
 
 
     </Window.InputBindings>
@@ -105,6 +107,14 @@
                 <MenuItem Header="Ping _Settings" InputGestureText="Ctrl+F5"  Command="{Binding PingOptionsCommand}" >
                     <MenuItem.Icon>
                         <TextBlock Text="⚙️" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                    </MenuItem.Icon>
+                </MenuItem>
+            </MenuItem>
+            
+            <MenuItem Header="_Tools">
+                <MenuItem Header="_IP Address Usage..." Command="{Binding IPAMCommand}">
+                    <MenuItem.Icon>
+                        <TextBlock Text="🌐" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     </MenuItem.Icon>
                 </MenuItem>
             </MenuItem>
