@@ -1,4 +1,5 @@
 ﻿using Microsoft.Data.SqlClient;
+using NetworkMapViewerV2.Helpers;
 using NetworkMapViewerV2.Models;
 using System.Collections.ObjectModel;
 using System.Text.Json;
@@ -244,8 +245,8 @@ namespace NetworkMapViewerV2.Data
 
 
         /// <summary>
-        /// Every saved device that has an address, across all maps, with its readable name and map name.
-        /// Used by the IP usage window to tell which addresses in a CIDR range are taken.
+        /// Every saved device that has an address, across all maps, with its readable name, type, note and map.
+        /// Used by the IPAM window to tell which addresses in a CIDR range are taken and to edit those devices.
         /// Unsaved edits on an open map are not included.
         /// </summary>
         public List<UsedAddressInfo> GetUsedAddresses()
@@ -254,9 +255,10 @@ namespace NetworkMapViewerV2.Data
             using var connection = GetOpenConnection();
 
             const string sql = @"
-                SELECT d.Address, d.TitleJson, m.MapName
+                SELECT d.Address, d.TitleJson, m.MapName, d.DeviceId, d.MapId, d.GroupId, g.GroupName, d.HintsJson
                 FROM Devices d
                 INNER JOIN Maps m ON m.MapId = d.MapId
+                LEFT JOIN Groups g ON g.GroupId = d.GroupId
                 WHERE d.Address IS NOT NULL AND LTRIM(RTRIM(d.Address)) <> ''";
 
             using var cmd = new SqlCommand(sql, connection);
@@ -264,32 +266,32 @@ namespace NetworkMapViewerV2.Data
             while (reader.Read())
             {
                 result.Add(new UsedAddressInfo(
-                    reader.GetString(0).Trim(),
-                    BuildDeviceName(reader.IsDBNull(1) ? null : reader.GetString(1)),
-                    reader.IsDBNull(2) ? "" : reader.GetString(2)));
+                    Address: reader.GetString(0).Trim(),
+                    DeviceName: BuildDeviceName(reader.IsDBNull(1) ? null : reader.GetString(1)),
+                    MapName: reader.IsDBNull(2) ? "" : reader.GetString(2),
+                    DeviceId: reader.GetInt32(3),
+                    MapId: reader.GetInt32(4),
+                    GroupId: reader.GetInt32(5),
+                    DeviceType: reader.IsDBNull(6) ? "" : reader.GetString(6),
+                    Note: IpamHelper.ExtractNote(ParseJsonList(reader.IsDBNull(7) ? null : reader.GetString(7)))));
             }
             return result;
         }
 
-        /// <summary>
-        /// Titles are stored as JSON and may contain the "%Address" placeholder (the canvas replaces it with the IP),
-        /// e.g. "%Address\nPC-01". Strip the placeholder and join what is left into one readable name.
-        /// </summary>
-        private static string BuildDeviceName(string? titleJson)
+        /// <summary>Titles are stored as JSON, e.g. ["%Address","PC-01"]; see <see cref="IpamHelper.ExtractName"/>.</summary>
+        private static string BuildDeviceName(string? titleJson) => IpamHelper.ExtractName(ParseJsonList(titleJson));
+
+        private static List<string> ParseJsonList(string? json)
         {
-            if (string.IsNullOrWhiteSpace(titleJson)) return "";
+            if (string.IsNullOrWhiteSpace(json)) return [];
             try
             {
-                var titles = JsonSerializer.Deserialize<List<string>>(titleJson) ?? [];
-                var parts = titles
-                    .SelectMany(t => (t ?? "").Replace("%Address", "", StringComparison.OrdinalIgnoreCase)
-                                      .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
-                return string.Join(" / ", parts);
+                return JsonSerializer.Deserialize<List<string>>(json) ?? [];
             }
             catch (JsonException)
             {
-                return "";
+                return [];
             }
-        }       
+        }
     }
 }

@@ -190,11 +190,14 @@ namespace NetworkMapViewerV2.ViewModels
         [RelayCommand]
         public void IPAM()
         {
-            var ipamWindow = new IPAMWindow
-            {
-                Owner = Application.Current.MainWindow
-            };
-            ipamWindow.ShowDialog();
+            /*   var ipamWindow = new IPAMWindow
+               {
+                   Owner = Application.Current.MainWindow
+               };
+               ipamWindow.ShowDialog();*/
+
+            var ipamWindow = new IPAMWindow { Owner = Application.Current.MainWindow };
+            ipamWindow.Show();
         }
 
     }

@@ -322,6 +322,7 @@
           AlternatingRowBackground="#F8FAFC"
           RowHeight="32"
           HeadersVisibility="Column"
+          BeginningEdit="DgIps_BeginningEdit"
           CellEditEnding="DgIps_CellEditEnding"
           Margin="0,0,0,10">
                     <DataGrid.Columns>
@@ -361,7 +362,7 @@
                                 <DataTemplate>
                                     <ComboBox SelectedItem="{Binding DeviceType, UpdateSourceTrigger=PropertyChanged}"
                               ItemsSource="{Binding DataContext.AvailableDeviceTypes, RelativeSource={RelativeSource AncestorType=Window}}"
-                              IsEditable="True" Height="26" VerticalContentAlignment="Center"/>
+                              IsEditable="False" Height="26" VerticalContentAlignment="Center"/>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellEditingTemplate>
                         </DataGridTemplateColumn>
@@ -410,6 +411,9 @@
                         <Button x:Name="btnPing" Content="Ping Free IPs" Width="130" Height="32" Margin="0,0,8,0"
                                 Click="BtnPing_Click" Style="{StaticResource PrimaryButton}" IsEnabled="False"
                                 ToolTip="Send ping to every address that is not on a map"/>
+                        <Button x:Name="btnExport" Content="Export CSV" Width="110" Height="32" Margin="0,0,8,0"
+                                Click="BtnExport_Click" Style="{StaticResource SecondaryButton}" IsEnabled="False"
+                                ToolTip="Save the addresses currently shown in the grid (respects the filter) as a CSV file"/>
                         <Button x:Name="btnStop" Content="Stop" Width="85" Height="32" Margin="0,0,8,0"
                                 Click="BtnStop_Click" Style="{StaticResource SecondaryButton}" IsEnabled="False"/>
                         <Button x:Name="btnClose" Content="Close" Width="85" Height="32"
