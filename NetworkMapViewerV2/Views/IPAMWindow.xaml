@@ -7,6 +7,8 @@
         FontFamily="Segoe UI">
 
     <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
+
         <!-- DataGrid Header Style -->
         <Style TargetType="DataGridColumnHeader">
             <Setter Property="Background" Value="#F1F5F9"/>
@@ -199,7 +201,7 @@
                             <DataTemplate>
                                 <StackPanel>
                                     <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis"/>
-                                    <TextBlock Text="{Binding Cidr}" FontSize="12" Foreground="#64748B" Margin="0,2,0,0"/>
+                                    <TextBlock Text="{Binding Subtitle, Mode=OneWay}" FontSize="12" Foreground="#64748B" Margin="0,2,0,0"/>
                                 </StackPanel>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
@@ -222,6 +224,13 @@
                         <TextBlock Text="CIDR" FontSize="11" FontWeight="SemiBold" Foreground="#475569" Margin="0,8,0,2"/>
                         <TextBox x:Name="txtSubnetCidr" Height="28" VerticalContentAlignment="Center"
                                  PreviewKeyDown="SubnetEditor_PreviewKeyDown" ToolTip="e.g. 192.168.102.0/24"/>
+
+                        <TextBlock Text="Type" FontSize="11" FontWeight="SemiBold" Foreground="#475569" Margin="0,8,0,2"/>
+                        <ComboBox x:Name="cmbSubnetKind" Height="28" VerticalContentAlignment="Center" SelectedIndex="0"
+                                  ToolTip="Head Office always shows its whole range. Branch can use the cut range (Printers / Phones / PCs).">
+                            <ComboBoxItem Content="Branch"/>
+                            <ComboBoxItem Content="Head Office"/>
+                        </ComboBox>
 
                         <TextBlock x:Name="txtSubnetEditorError" Foreground="#B91C1C" FontSize="11" FontWeight="SemiBold"
                                    TextWrapping="Wrap" Margin="0,8,0,0" Visibility="Collapsed"/>
@@ -299,6 +308,10 @@
 
                 <!-- Summary / validation message -->
                 <StackPanel Grid.Row="2" Margin="0,0,0,8">
+                    <CheckBox x:Name="chkCutRange" IsChecked="True" Margin="0,0,0,6" FontSize="12" FontWeight="SemiBold"
+                              Content="Cut range: Printers .10-.30 · Phones .50-.70 · PCs / NUCs .101-.140"
+                              Checked="ChkCutRange_Changed" Unchecked="ChkCutRange_Changed"
+                              ToolTip="Show only the planned blocks. Unticked shows the full range. Head Office ranges always show the full range."/>
                     <TextBlock x:Name="txtMessage" Foreground="#B91C1C" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" Visibility="Collapsed"/>
                     <TextBlock x:Name="txtSummary" Foreground="#475569" FontSize="12" TextWrapping="Wrap"
                                Text="Enter a CIDR range and press Show IPs, or pick a saved range on the left."/>
@@ -345,6 +358,10 @@
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
 
+                        <!-- Pool (only visible in cut range mode) -->
+                        <DataGridTextColumn x:Name="colPool" Header="Pool" Binding="{Binding Pool, Mode=OneWay}"
+                            Width="100" IsReadOnly="True" Visibility="Collapsed"/>
+
                         <!-- Device Name -->
                         <DataGridTextColumn Header="Device Name" 
                             Binding="{Binding DeviceName, UpdateSourceTrigger=PropertyChanged}" 
@@ -383,11 +400,17 @@
                             </DataGridTemplateColumn.CellEditingTemplate>
                         </DataGridTemplateColumn>
 
-                        <!-- Note (Editable Text) -->
-                        <DataGridTextColumn Header="Note" 
-                            Binding="{Binding Note, UpdateSourceTrigger=PropertyChanged}" 
-                            Width="*" 
-                            IsReadOnly="False"/>
+                        <!-- Add to map: puts a free address on the chosen map (edit mode, unsaved) -->
+                        <DataGridTemplateColumn Header="Map" Width="*" MinWidth="120" IsReadOnly="True">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Button Content="Add to map" Height="24" Padding="12,0" HorizontalAlignment="Left"
+                                            Click="BtnAddToMap_Click" Style="{StaticResource SecondaryButton}"
+                                            Visibility="{Binding CanAddToMap, Converter={StaticResource BoolToVisibility}}"
+                                            ToolTip="Fill in Device Name, Device Type and Map Name, then press this. The map opens in edit mode with the new device; save it with Ctrl+S or when you leave edit mode."/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
                     </DataGrid.Columns>
                 </DataGrid>
 

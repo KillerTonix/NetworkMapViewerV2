@@ -24,6 +24,9 @@ namespace NetworkMapViewerV2.Models
         public uint SortKey { get; init; }
         public string Address { get; init; } = "";
 
+        /// <summary>Planned block of this address (Printers / Phones / PCs / NUCs); empty when cut range is off.</summary>
+        public string Pool { get; init; } = "";
+
         [ObservableProperty] private IpState _state = IpState.Free;
         [ObservableProperty] private string _deviceName = "";
         [ObservableProperty] private string _deviceType = "";
@@ -49,7 +52,14 @@ namespace NetworkMapViewerV2.Models
             _ => "Free"
         };
 
-        partial void OnStateChanged(IpState value) => OnPropertyChanged(nameof(StateText));
+        partial void OnStateChanged(IpState value)
+        {
+            OnPropertyChanged(nameof(StateText));
+            OnPropertyChanged(nameof(CanAddToMap));
+        }
+
+        /// <summary>The "Add to map" button is offered for addresses that are not on any map yet.</summary>
+        public bool CanAddToMap => DeviceId == 0 && State != IpState.Used;
 
         // ─── CHANGE TRACKING ──────────────────────────────────────────────
 

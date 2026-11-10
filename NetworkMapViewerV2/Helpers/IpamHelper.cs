@@ -5,11 +5,41 @@ namespace NetworkMapViewerV2.Helpers
     /// titles (name lines, with the "%Address" placeholder for the IP), hints (HTML lines such as "&lt;b&gt;NOTE:&lt;/b&gt; text"),
     /// placement of new devices on a map, and CSV escaping.
     /// </summary>
+    /// <summary>The planned address blocks of a branch network.</summary>
+    public enum IpPool { None, Printers, Phones, Computers }
+
     public static class IpamHelper
     {
         public const string AddressPlaceholder = "%Address";
         public const string NotePrefix = "<b>NOTE:</b>";
         private const string NameSeparator = " / ";
+
+        // ─── CUT RANGE  (planned address blocks per device kind) ──────────
+
+        /// <summary>
+        /// Branch networks keep one fixed block of the last octet per kind of device. With "cut range" on, the IPAM grid
+        /// shows only these blocks. Inside a range larger than a /24 the same blocks repeat in every /24.
+        /// </summary>
+        public static readonly (IpPool Pool, int From, int To, string Label)[] CutRanges =
+        [
+            (IpPool.Printers, 10, 30, "Printers"),
+            (IpPool.Phones, 50, 70, "Phones"),
+            (IpPool.Computers, 101, 140, "PCs / NUCs"),
+        ];
+
+        /// <summary>Which planned block an address belongs to, going by its last octet (IpPool.None = outside every block).</summary>
+        public static IpPool GetPool(uint address)
+        {
+            int last = (int)(address & 0xFF);
+            foreach (var range in CutRanges)
+            {
+                if (last >= range.From && last <= range.To) return range.Pool;
+            }
+            return IpPool.None;
+        }
+
+        public static string PoolLabel(IpPool pool) =>
+            CutRanges.FirstOrDefault(r => r.Pool == pool).Label ?? "";
 
         // ─── NAME  (stored in Titles) ─────────────────────────────────────
 

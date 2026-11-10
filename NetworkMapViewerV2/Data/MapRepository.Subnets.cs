@@ -24,8 +24,15 @@ namespace NetworkMapViewerV2.Data
                         SubnetId INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
                         Name NVARCHAR(200) NOT NULL,
                         Cidr NVARCHAR(50) NOT NULL,
+                        Kind NVARCHAR(20) NOT NULL CONSTRAINT DF_Subnets_Kind DEFAULT 'Branch',
                         CONSTRAINT UQ_Subnets_Cidr UNIQUE (Cidr)
                     );
+                END;
+
+                -- Tables created before range classification existed get the new column (existing ranges become Branch).
+                IF COL_LENGTH('dbo.Subnets', 'Kind') IS NULL
+                BEGIN
+                    ALTER TABLE dbo.Subnets ADD Kind NVARCHAR(20) NOT NULL CONSTRAINT DF_Subnets_Kind DEFAULT 'Branch';
                 END;";
 
             using var cmd = new SqlCommand(sql, connection);
@@ -39,7 +46,7 @@ namespace NetworkMapViewerV2.Data
             using var connection = GetOpenConnection();
             EnsureSubnetsTable(connection);
 
-            using var cmd = new SqlCommand("SELECT SubnetId, Name, Cidr FROM dbo.Subnets ORDER BY Name, Cidr", connection);
+            using var cmd = new SqlCommand("SELECT SubnetId, Name, Cidr, Kind FROM dbo.Subnets ORDER BY Name, Cidr", connection);
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
             {
@@ -47,7 +54,8 @@ namespace NetworkMapViewerV2.Data
                 {
                     SubnetId = reader.GetInt32(0),
                     Name = reader.GetString(1),
-                    Cidr = reader.GetString(2)
+                    Cidr = reader.GetString(2),
+                    Kind = SavedSubnet.KindFromDb(reader.GetString(3))
                 });
             }
             return result;
@@ -65,35 +73,38 @@ namespace NetworkMapViewerV2.Data
                 if (subnet.SubnetId == 0)
                 {
                     using var insert = new SqlCommand(
-                        "INSERT INTO dbo.Subnets (Name, Cidr) VALUES (@Name, @Cidr); SELECT CAST(SCOPE_IDENTITY() AS INT);",
+                        "INSERT INTO dbo.Subnets (Name, Cidr, Kind) VALUES (@Name, @Cidr, @Kind); SELECT CAST(SCOPE_IDENTITY() AS INT);",
                         connection, transaction);
                     insert.Parameters.AddWithValue("@Name", subnet.Name);
                     insert.Parameters.AddWithValue("@Cidr", subnet.Cidr);
+                    insert.Parameters.AddWithValue("@Kind", SavedSubnet.KindToDb(subnet.Kind));
                     subnet.SubnetId = Convert.ToInt32(insert.ExecuteScalar());
 
-                    InsertAuditLogInternal(actionType: "INSERT", target: "Subnets", details: $"Saved IP range: {subnet.Name} ({subnet.Cidr})",
+                    InsertAuditLogInternal(actionType: "INSERT", target: "Subnets", details: $"Saved IP range: {subnet.Name} ({subnet.Cidr}, {subnet.KindText})",
                         targetId: subnet.SubnetId, mapName: null, oldValue: null, newValue: null, connection: connection, transaction: transaction);
                 }
                 else
                 {
-                    string oldName = "", oldCidr = "";
-                    using (var select = new SqlCommand("SELECT Name, Cidr FROM dbo.Subnets WHERE SubnetId = @Id", connection, transaction))
+                    string oldName = "", oldCidr = "", oldKind = "";
+                    using (var select = new SqlCommand("SELECT Name, Cidr, Kind FROM dbo.Subnets WHERE SubnetId = @Id", connection, transaction))
                     {
                         select.Parameters.AddWithValue("@Id", subnet.SubnetId);
                         using var reader = select.ExecuteReader();
                         if (!reader.Read()) throw new InvalidOperationException("This range no longer exists. It was probably deleted by someone else.");
                         oldName = reader.GetString(0);
                         oldCidr = reader.GetString(1);
+                        oldKind = SavedSubnet.KindFromDb(reader.GetString(2)) == SubnetKind.HeadOffice ? "Head Office" : "Branch";
                     }
 
-                    using var update = new SqlCommand("UPDATE dbo.Subnets SET Name = @Name, Cidr = @Cidr WHERE SubnetId = @Id", connection, transaction);
+                    using var update = new SqlCommand("UPDATE dbo.Subnets SET Name = @Name, Cidr = @Cidr, Kind = @Kind WHERE SubnetId = @Id", connection, transaction);
                     update.Parameters.AddWithValue("@Id", subnet.SubnetId);
                     update.Parameters.AddWithValue("@Name", subnet.Name);
                     update.Parameters.AddWithValue("@Cidr", subnet.Cidr);
+                    update.Parameters.AddWithValue("@Kind", SavedSubnet.KindToDb(subnet.Kind));
                     update.ExecuteNonQuery();
 
                     InsertAuditLogInternal(actionType: "UPDATE", target: "Subnets",
-                        details: $"IP range changed: {oldName} ({oldCidr}) -> {subnet.Name} ({subnet.Cidr})",
+                        details: $"IP range changed: {oldName} ({oldCidr}, {oldKind}) -> {subnet.Name} ({subnet.Cidr}, {subnet.KindText})",
                         targetId: subnet.SubnetId, mapName: null, oldValue: null, newValue: null, connection: connection, transaction: transaction);
                 }
 

@@ -59,6 +59,9 @@ namespace NetworkMapViewerV2.Views
         private bool _lookupsLoaded;
         private bool _isSaving;
 
+        private bool _cutActive;      // the grid currently shows only the planned blocks
+        private int _hiddenUsed;      // used addresses of the range that fall outside those blocks
+
         // ─── LOADING ──────────────────────────────────────────────────────
 
         private async void BtnShow_Click(object sender, RoutedEventArgs e) => await LoadAsync(isFirstLoad: false);
@@ -177,20 +180,21 @@ namespace NetworkMapViewerV2.Views
                 ? $"{IpRangeHelper.ToIpString(network)}/{prefix}"
                 : "";
 
-            OpenSubnetEditor(null, "", current);
+            OpenSubnetEditor(null, "", current, SubnetKind.Branch);
         }
 
         private void BtnSubnetEdit_Click(object sender, RoutedEventArgs e)
         {
-            if (lstSubnets.SelectedItem is SavedSubnet subnet) OpenSubnetEditor(subnet, subnet.Name, subnet.Cidr);
+            if (lstSubnets.SelectedItem is SavedSubnet subnet) OpenSubnetEditor(subnet, subnet.Name, subnet.Cidr, subnet.Kind);
         }
 
-        private void OpenSubnetEditor(SavedSubnet? subnet, string name, string cidr)
+        private void OpenSubnetEditor(SavedSubnet? subnet, string name, string cidr, SubnetKind kind)
         {
             _editingSubnet = subnet;
             txtSubnetEditorTitle.Text = subnet == null ? "New range" : "Edit range";
             txtSubnetName.Text = name;
             txtSubnetCidr.Text = cidr;
+            cmbSubnetKind.SelectedIndex = kind == SubnetKind.HeadOffice ? 1 : 0;
             ShowSubnetEditorError("");
             pnlSubnetEditor.Visibility = Visibility.Visible;
             txtSubnetName.Focus();
@@ -249,7 +253,8 @@ namespace NetworkMapViewerV2.Views
             btnSubnetSave.IsEnabled = false;
             try
             {
-                var toSave = new SavedSubnet { SubnetId = editingId, Name = name, Cidr = cidr };
+                var kind = cmbSubnetKind.SelectedIndex == 1 ? SubnetKind.HeadOffice : SubnetKind.Branch;
+                var toSave = new SavedSubnet { SubnetId = editingId, Name = name, Cidr = cidr, Kind = kind };
                 var saved = await Task.Run(() => new MapRepository().SaveSubnet(toSave));
 
                 CloseSubnetEditor();
@@ -363,10 +368,27 @@ namespace NetworkMapViewerV2.Views
                 entries.Add(used);
             }
 
+            string cidr = $"{IpRangeHelper.ToIpString(network)}/{prefix}";
+            bool cut = IsCutActive(cidr);
+            uint mask = IpRangeHelper.MaskFor(prefix);
+
+            // Used addresses that sit outside the planned blocks are not listed in cut mode; count them so the summary can say so.
+            _hiddenUsed = cut
+                ? byAddress.Keys.Count(k => (k & mask) == network && IpamHelper.GetPool(k) == IpPool.None)
+                : 0;
+
             var rows = new List<IpUsageRow>((int)Math.Min(IpRangeHelper.HostCount(prefix), int.MaxValue));
             foreach (uint host in IpRangeHelper.GetHostAddresses(network, prefix))
             {
-                var row = new IpUsageRow { SortKey = host, Address = IpRangeHelper.ToIpString(host) };
+                var pool = IpamHelper.GetPool(host);
+                if (cut && pool == IpPool.None) continue;
+
+                var row = new IpUsageRow
+                {
+                    SortKey = host,
+                    Address = IpRangeHelper.ToIpString(host),
+                    Pool = cut ? IpamHelper.PoolLabel(pool) : ""
+                };
 
                 if (byAddress.TryGetValue(host, out var entries))
                 {
@@ -401,7 +423,10 @@ namespace NetworkMapViewerV2.Views
             }
 
             _rows = rows;
-            _currentCidr = $"{IpRangeHelper.ToIpString(network)}/{prefix}";
+            _currentCidr = cidr;
+            _cutActive = cut;
+            colPool.Visibility = cut ? Visibility.Visible : Visibility.Collapsed;
+            UpdateCutOption();
 
             _view = CollectionViewSource.GetDefaultView(_rows);
             _view.Filter = FilterRow;
@@ -445,7 +470,9 @@ namespace NetworkMapViewerV2.Views
             int active = _rows.Count(r => r.State == IpState.ActiveNotOnMap);
             int free = _rows.Count - used;
 
-            string text = $"{_currentCidr}: {_rows.Count} usable addresses · {used} used · {free} free";
+            string text = _cutActive
+                ? $"{_currentCidr} (cut range): {_rows.Count} addresses in the planned blocks · {used} used · {free} free"
+                : $"{_currentCidr}: {_rows.Count} usable addresses · {used} used · {free} free";
             if (noReply + active > 0)
             {
                 text += $" ({noReply} confirmed by no ping reply";
@@ -453,7 +480,49 @@ namespace NetworkMapViewerV2.Views
                 text += ")";
             }
 
+            if (_cutActive)
+            {
+                // Free addresses left in each block, e.g. "Printers .10-.30: 14 free of 21".
+                var parts = IpamHelper.CutRanges.Select(r =>
+                {
+                    var inBlock = _rows.Where(x => x.Pool == r.Label).ToList();
+                    return $"{r.Label} .{r.From}-.{r.To}: {inBlock.Count(x => x.State != IpState.Used)} free of {inBlock.Count}";
+                });
+                text += "\n" + string.Join("  ·  ", parts);
+
+                if (_hiddenUsed > 0) text += $"\n{_hiddenUsed} used address(es) outside these blocks are hidden. Untick \"Cut range\" to see them.";
+            }
+
             txtSummary.Text = text;
+        }
+
+        // ─── CUT RANGE ────────────────────────────────────────────────────
+
+        private SavedSubnet? FindSavedSubnet(string cidr) => _subnets.FirstOrDefault(s => s.Cidr == cidr);
+
+        /// <summary>Cut range applies when the box is ticked and the range is not a saved Head Office range.</summary>
+        private bool IsCutActive(string cidr) =>
+            chkCutRange.IsChecked == true && FindSavedSubnet(cidr)?.Kind != SubnetKind.HeadOffice;
+
+        /// <summary>Head Office ranges always show everything, so the box is disabled for them.</summary>
+        private void UpdateCutOption()
+        {
+            bool headOffice = FindSavedSubnet(_currentCidr)?.Kind == SubnetKind.HeadOffice;
+            chkCutRange.IsEnabled = !_isPinging && !headOffice;
+            chkCutRange.ToolTip = headOffice
+                ? "Head Office ranges always show the full range."
+                : "Show only the planned blocks: Printers .10-.30, Phones .50-.70, PCs / NUCs .101-.140";
+        }
+
+        private void ChkCutRange_Changed(object sender, RoutedEventArgs e)
+        {
+            // Also fires while the XAML loads, before any range is shown.
+            if (_view == null || _isPinging || _isSaving) return;
+
+            if (IpRangeHelper.TryParseCidr(_currentCidr, out uint network, out int prefix, out _))
+            {
+                BuildRows(network, prefix); // from the already loaded devices, no database read needed
+            }
         }
 
         // ─── PING ─────────────────────────────────────────────────────────
@@ -551,6 +620,7 @@ namespace NetworkMapViewerV2.Views
             btnShow.IsEnabled = !pinging;
             txtCidr.IsEnabled = !pinging;
             pnlSidebar.IsEnabled = !pinging; // switching ranges mid-ping would mix results
+            UpdateCutOption();               // so would switching between cut and full range
             pbPing.Visibility = pinging ? Visibility.Visible : Visibility.Collapsed;
         }
 
@@ -601,17 +671,12 @@ namespace NetworkMapViewerV2.Views
         {
             if (!row.IsDirty || row.IsSaving || _isSaving) return;
 
+            // An address that is not on a map yet only keeps what was typed; the "Add to map" button puts it on the map.
+            if (row.DeviceId == 0) return;
+
             string name = row.DeviceName.Trim();
             string type = row.DeviceType.Trim();
             string map = row.MapName.Trim();
-            bool isNew = row.DeviceId == 0;
-
-            // A new device needs everything the map needs to place it. Keep what was typed until the rest is filled in.
-            if (isNew && (name.Length == 0 || type.Length == 0 || map.Length == 0))
-            {
-                txtProgress.Text = $"To add {row.Address} to a map, fill in Device Name, Device Type and Map Name.";
-                return;
-            }
 
             if (type.Length == 0 || map.Length == 0)
             {
@@ -664,7 +729,7 @@ namespace NetworkMapViewerV2.Views
                 _usedAddresses.RemoveAll(u => u.DeviceId == deviceId);
                 _usedAddresses.Add(new UsedAddressInfo(row.Address, row.DeviceName, row.MapName, deviceId, mapId, groupId, row.DeviceType, row.Note));
 
-                txtProgress.Text = isNew ? $"{row.Address} added to {row.MapName}." : $"{row.Address} saved.";
+                txtProgress.Text = $"{row.Address} saved.";
                 btnPing.IsEnabled = _rows.Any(r => r.State != IpState.Used);
                 UpdateSummary();
                 RefreshViewSafe();
@@ -716,6 +781,53 @@ namespace NetworkMapViewerV2.Views
                 ?.MapName;
         }
 
+        // ─── ADD TO MAP ───────────────────────────────────────────────────
+
+        /// <summary>
+        /// Puts this address on its map as an unsaved device and switches the main window to that map in edit mode.
+        /// This window is modal, so it closes; saving is then the usual Save (Ctrl+S) or the question when leaving edit mode.
+        /// </summary>
+        private void BtnAddToMap_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.DataContext is not IpUsageRow row || _isPinging || _isSaving) return;
+
+            try { dgIps.CommitEdit(DataGridEditingUnit.Row, true); } catch (InvalidOperationException) { }
+            ShowMessage("");
+
+            string name = row.DeviceName.Trim();
+            string type = row.DeviceType.Trim();
+            string map = row.MapName.Trim();
+
+            if (name.Length == 0 || type.Length == 0 || map.Length == 0)
+            {
+                ShowMessage($"Fill in Device Name, Device Type and Map Name for {row.Address}, then press Add to map.");
+                return;
+            }
+            if (!_typeIds.TryGetValue(type, out int groupId))
+            {
+                ShowMessage($"\"{type}\" is not a known device type. Pick one from the list.");
+                return;
+            }
+            if (!_mapIds.TryGetValue(map, out int mapId))
+            {
+                ShowMessage($"\"{map}\" is not a known map. Pick one from the list.");
+                return;
+            }
+            if (Application.Current?.MainWindow?.DataContext is not MainViewModel vm)
+            {
+                ShowMessage("The main window is not available.");
+                return;
+            }
+
+            if (!vm.TryAddDeviceToMapInEditMode(mapId, row.Address, name, groupId, out string error))
+            {
+                ShowMessage(error);
+                return;
+            }
+
+            Close();
+        }
+
         // ─── EXPORT ───────────────────────────────────────────────────────
 
         private void BtnExport_Click(object sender, RoutedEventArgs e)
@@ -727,7 +839,7 @@ namespace NetworkMapViewerV2.Views
                 Title = "Export IP list",
                 Filter = "CSV file (*.csv)|*.csv",
                 DefaultExt = ".csv",
-                FileName = $"IPAM_{_currentCidr.Replace('/', '_')}_{DateTime.Now:yyyyMMdd}.csv"
+                FileName = $"IPAM_{_currentCidr.Replace('/', '_')}{(_cutActive ? "_cut" : "")}_{DateTime.Now:yyyyMMdd}.csv"
             };
             if (dialog.ShowDialog(this) != true) return;
 
@@ -737,16 +849,17 @@ namespace NetworkMapViewerV2.Views
                 var rows = _view.Cast<IpUsageRow>().ToList();
 
                 var sb = new StringBuilder();
-                sb.AppendLine("IP Address,Status,Device Name,Device Type,Map Name,Note");
+                sb.AppendLine(_cutActive
+                    ? "IP Address,Pool,Status,Device Name,Device Type,Map Name"
+                    : "IP Address,Status,Device Name,Device Type,Map Name");
                 foreach (var r in rows)
                 {
                     sb.AppendLine(string.Join(",",
                         IpamHelper.CsvEscape(r.Address),
-                        IpamHelper.CsvEscape(r.StateText),
+                        _cutActive ? IpamHelper.CsvEscape(r.Pool) + "," + IpamHelper.CsvEscape(r.StateText) : IpamHelper.CsvEscape(r.StateText),
                         IpamHelper.CsvEscape(r.DeviceName),
                         IpamHelper.CsvEscape(r.DeviceType),
-                        IpamHelper.CsvEscape(r.MapName),
-                        IpamHelper.CsvEscape(r.Note)));
+                        IpamHelper.CsvEscape(r.MapName)));
                 }
 
                 // UTF-8 with BOM so Excel reads non-English device names correctly.
