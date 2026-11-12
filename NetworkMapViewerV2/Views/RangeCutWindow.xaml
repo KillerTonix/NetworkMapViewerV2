@@ -1,0 +1,140 @@
+<Window x:Class="NetworkMapViewerV2.Views.RangeCutWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Range Cut - planned address blocks" Height="480" Width="560" MinHeight="380" MinWidth="480"
+        WindowStartupLocation="CenterOwner"
+        Background="#E2E8F0" TextElement.Foreground="#0F172A"
+        FontFamily="Segoe UI">
+
+    <Window.Resources>
+        <!-- DataGrid Header Style -->
+        <Style TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="#F1F5F9"/>
+            <Setter Property="Foreground" Value="#1E293B"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="BorderBrush" Value="#CBD5E1"/>
+            <Setter Property="BorderThickness" Value="0,0,1,1"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        </Style>
+
+        <!-- Secondary Button Style -->
+        <Style x:Key="SecondaryButton" TargetType="Button">
+            <Setter Property="Background" Value="#F1F5F9"/>
+            <Setter Property="BorderBrush" Value="#94A3B8"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="#1E293B"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#E2E8F0"/>
+                                <Setter TargetName="border" Property="BorderBrush" Value="#64748B"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="border" Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Primary Action Blue Button Style -->
+        <Style x:Key="PrimaryButton" TargetType="Button">
+            <Setter Property="Background" Value="#2563EB"/>
+            <Setter Property="BorderBrush" Value="#2563EB"/>
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#1D4ED8"/>
+                                <Setter TargetName="border" Property="BorderBrush" Value="#1D4ED8"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="border" Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Border Margin="12" Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="10" Padding="16">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Explanation -->
+            <StackPanel Grid.Row="0" Margin="0,0,0,12">
+                <TextBlock Text="Planned address blocks" FontWeight="Bold" FontSize="16"/>
+                <TextBlock TextWrapping="Wrap" Foreground="#475569" FontSize="12" Margin="0,4,0,0"
+                           Text="Used when &quot;Cut range&quot; is ticked in IPAM. From and To are the last part of the IP address: From 10, To 30 means x.10 to x.30. The same blocks apply to every /24 of a range."/>
+            </StackPanel>
+
+            <!-- Blocks -->
+            <DataGrid x:Name="dgRanges" Grid.Row="1"
+                      AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                      CanUserResizeRows="False" HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                      SelectionMode="Single" SelectionUnit="FullRow" RowHeight="30"
+                      Background="#FFFFFF" BorderBrush="#CBD5E1" HorizontalGridLinesBrush="#E2E8F0">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Name (device kind)" Width="*"
+                                        Binding="{Binding Label, UpdateSourceTrigger=LostFocus}"/>
+                    <DataGridTextColumn Header="From (.x)" Width="90"
+                                        Binding="{Binding From, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}"/>
+                    <DataGridTextColumn Header="To (.x)" Width="90"
+                                        Binding="{Binding To, UpdateSourceTrigger=LostFocus, ValidatesOnExceptions=True}"/>
+                </DataGrid.Columns>
+            </DataGrid>
+
+            <!-- Row buttons + message -->
+            <Grid Grid.Row="2" Margin="0,10,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <Button x:Name="btnAdd" Content="+ Add" Width="70" Height="28" Margin="0,0,8,0"
+                            Click="BtnAdd_Click" Style="{StaticResource SecondaryButton}"/>
+                    <Button x:Name="btnRemove" Content="Remove" Width="80" Height="28" Margin="0,0,8,0"
+                            Click="BtnRemove_Click" Style="{StaticResource SecondaryButton}"
+                            ToolTip="Remove the selected block"/>
+                    <Button x:Name="btnDefaults" Content="Reset to defaults" Width="120" Height="28"
+                            Click="BtnDefaults_Click" Style="{StaticResource SecondaryButton}"
+                            ToolTip="Put back Printers .10-.30, Phones .50-.70, PCs / NUCs .101-.140 (not saved until you press Save)"/>
+                </StackPanel>
+                <TextBlock x:Name="txtError" Grid.Column="1" Foreground="#B91C1C" FontSize="12" FontWeight="SemiBold"
+                           TextWrapping="Wrap" VerticalAlignment="Center" Margin="12,0,0,0"/>
+            </Grid>
+
+            <!-- Save / Cancel -->
+            <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+                <Button x:Name="btnSave" Content="Save" Width="90" Height="32" Margin="0,0,8,0"
+                        Click="BtnSave_Click" Style="{StaticResource PrimaryButton}" IsDefault="True" IsEnabled="False"/>
+                <Button Content="Cancel" Width="90" Height="32" IsCancel="True" Style="{StaticResource SecondaryButton}"/>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

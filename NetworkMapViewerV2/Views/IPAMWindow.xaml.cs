@@ -59,6 +59,9 @@ namespace NetworkMapViewerV2.Views
         private bool _lookupsLoaded;
         private bool _isSaving;
 
+        // The planned address blocks (Printers .10-.30 ...). Starts with the defaults; replaced by the stored list on load.
+        private List<RangeCut> _cutRanges = IpamHelper.DefaultCutRanges();
+
         private bool _cutActive;      // the grid currently shows only the planned blocks
         private int _hiddenUsed;      // used addresses of the range that fall outside those blocks
 
@@ -76,6 +79,7 @@ namespace NetworkMapViewerV2.Views
             // The sidebar and drop-down lists load independently, so a problem there never blocks the address grid.
             if (isFirstLoad) await RefreshSubnetsAsync();
             if (!_lookupsLoaded) await LoadLookupsAsync();
+            if (isFirstLoad) await LoadCutRangesAsync();
 
             try
             {
@@ -374,20 +378,20 @@ namespace NetworkMapViewerV2.Views
 
             // Used addresses that sit outside the planned blocks are not listed in cut mode; count them so the summary can say so.
             _hiddenUsed = cut
-                ? byAddress.Keys.Count(k => (k & mask) == network && IpamHelper.GetPool(k) == IpPool.None)
+                ? byAddress.Keys.Count(k => (k & mask) == network && IpamHelper.FindRange(_cutRanges, k) == null)
                 : 0;
 
             var rows = new List<IpUsageRow>((int)Math.Min(IpRangeHelper.HostCount(prefix), int.MaxValue));
             foreach (uint host in IpRangeHelper.GetHostAddresses(network, prefix))
             {
-                var pool = IpamHelper.GetPool(host);
-                if (cut && pool == IpPool.None) continue;
+                var block = cut ? IpamHelper.FindRange(_cutRanges, host) : null;
+                if (cut && block == null) continue;
 
                 var row = new IpUsageRow
                 {
                     SortKey = host,
                     Address = IpRangeHelper.ToIpString(host),
-                    Pool = cut ? IpamHelper.PoolLabel(pool) : ""
+                    Pool = block?.Label ?? ""
                 };
 
                 if (byAddress.TryGetValue(host, out var entries))
@@ -483,7 +487,7 @@ namespace NetworkMapViewerV2.Views
             if (_cutActive)
             {
                 // Free addresses left in each block, e.g. "Printers .10-.30: 14 free of 21".
-                var parts = IpamHelper.CutRanges.Select(r =>
+                var parts = _cutRanges.OrderBy(r => r.From).Select(r =>
                 {
                     var inBlock = _rows.Where(x => x.Pool == r.Label).ToList();
                     return $"{r.Label} .{r.From}-.{r.To}: {inBlock.Count(x => x.State != IpState.Used)} free of {inBlock.Count}";
@@ -511,18 +515,60 @@ namespace NetworkMapViewerV2.Views
             chkCutRange.IsEnabled = !_isPinging && !headOffice;
             chkCutRange.ToolTip = headOffice
                 ? "Head Office ranges always show the full range."
-                : "Show only the planned blocks: Printers .10-.30, Phones .50-.70, PCs / NUCs .101-.140";
+                : $"Show only the planned blocks: {IpamHelper.DescribeCutRanges(_cutRanges)}";
+        }
+
+        /// <summary>Loads the stored blocks. If that fails the defaults stay in use, so the window still works.</summary>
+        private async Task LoadCutRangesAsync()
+        {
+            try
+            {
+                var stored = await Task.Run(() => new MapRepository().GetRangeCuts());
+                if (stored.Count > 0) _cutRanges = stored;
+            }
+            catch (Exception ex)
+            {
+                ShowMessage($"Could not load the range cut list, using the default blocks: {ex.Message}");
+            }
+
+            ShowCutRangesText();
+        }
+
+        /// <summary>Shows the current blocks next to the checkbox.</summary>
+        private void ShowCutRangesText()
+        {
+            chkCutRange.Content = new TextBlock
+            {
+                Text = $"Cut range: {IpamHelper.DescribeCutRanges(_cutRanges.OrderBy(r => r.From))}",
+                TextWrapping = TextWrapping.Wrap
+            };
+            UpdateCutOption();
+        }
+
+        private async void BtnChangeRangeCut_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new RangeCutWindow { Owner = this };
+            if (dlg.ShowDialog() != true) return;
+
+            await LoadCutRangesAsync();
+            RebuildCurrentRange(); // the grid may now show different addresses
+        }
+
+        /// <summary>Redraws the grid for the range on screen from the loaded devices (no database read).</summary>
+        private void RebuildCurrentRange()
+        {
+            if (_view == null || _isPinging || _isSaving) return;
+
+            if (IpRangeHelper.TryParseCidr(_currentCidr, out uint network, out int prefix, out _))
+            {
+                BuildRows(network, prefix);
+            }
         }
 
         private void ChkCutRange_Changed(object sender, RoutedEventArgs e)
         {
             // Also fires while the XAML loads, before any range is shown.
-            if (_view == null || _isPinging || _isSaving) return;
-
-            if (IpRangeHelper.TryParseCidr(_currentCidr, out uint network, out int prefix, out _))
-            {
-                BuildRows(network, prefix); // from the already loaded devices, no database read needed
-            }
+            RebuildCurrentRange();
         }
 
         // ─── PING ─────────────────────────────────────────────────────────
@@ -621,6 +667,7 @@ namespace NetworkMapViewerV2.Views
             txtCidr.IsEnabled = !pinging;
             pnlSidebar.IsEnabled = !pinging; // switching ranges mid-ping would mix results
             UpdateCutOption();               // so would switching between cut and full range
+            btnChangeRangeCut.IsEnabled = !pinging;
             pbPing.Visibility = pinging ? Visibility.Visible : Visibility.Collapsed;
         }
 

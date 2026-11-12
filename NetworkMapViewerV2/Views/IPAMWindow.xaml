@@ -308,10 +308,15 @@
 
                 <!-- Summary / validation message -->
                 <StackPanel Grid.Row="2" Margin="0,0,0,8">
-                    <CheckBox x:Name="chkCutRange" IsChecked="True" Margin="0,0,0,6" FontSize="12" FontWeight="SemiBold"
-                              Content="Cut range: Printers .10-.30 · Phones .50-.70 · PCs / NUCs .101-.140"
-                              Checked="ChkCutRange_Changed" Unchecked="ChkCutRange_Changed"
-                              ToolTip="Show only the planned blocks. Unticked shows the full range. Head Office ranges always show the full range."/>
+                    <DockPanel Margin="0,0,0,6" LastChildFill="True">
+                        <Button x:Name="btnChangeRangeCut" DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Width="120" Height="28"
+                                Margin="12,0,0,0" VerticalAlignment="Top" Content="Change Range Cut" Click="BtnChangeRangeCut_Click"
+                                ToolTip="Edit the planned address blocks (Printers, Phones, PCs ...)"/>
+                        <CheckBox x:Name="chkCutRange" IsChecked="True" FontSize="12" FontWeight="SemiBold" VerticalContentAlignment="Top"
+                                  Content="Cut range"
+                                  Checked="ChkCutRange_Changed" Unchecked="ChkCutRange_Changed"
+                                  ToolTip="Show only the planned blocks. Unticked shows the full range. Head Office ranges always show the full range."/>
+                    </DockPanel>
                     <TextBlock x:Name="txtMessage" Foreground="#B91C1C" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" Visibility="Collapsed"/>
                     <TextBlock x:Name="txtSummary" Foreground="#475569" FontSize="12" TextWrapping="Wrap"
                                Text="Enter a CIDR range and press Show IPs, or pick a saved range on the left."/>
