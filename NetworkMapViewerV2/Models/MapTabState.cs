@@ -6,7 +6,12 @@ namespace NetworkMapViewerV2.Models
     public class MapTabState : INotifyPropertyChanged
     {
         public int MapId { get; set; }
-        public string MapName { get; set; } = string.Empty;
+        private string _mapName = string.Empty;
+        public string MapName
+        {
+            get => _mapName;
+            set { _mapName = value; OnPropertyChanged(); }
+        }
         public string MapType { get; set; } = "Head Office";
         public int Version { get; set; } = 1;
         public List<NetworkDevice> Devices { get; set; } = [];

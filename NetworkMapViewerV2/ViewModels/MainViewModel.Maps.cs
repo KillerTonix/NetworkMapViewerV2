@@ -7,7 +7,9 @@ using NetworkMapViewerV2.Models;
 using NetworkMapViewerV2.Services;
 using NetworkMapViewerV2.Views;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Windows;
+using System.Windows.Threading;
 
 namespace NetworkMapViewerV2.ViewModels
 {
@@ -69,7 +71,7 @@ namespace NetworkMapViewerV2.ViewModels
         }
 
 
-        [RelayCommand]
+        [RelayCommand(CanExecute = nameof(CanEdit))]
         private void NewMap()
         {
             var dlg = new NewMapWindow { Owner = Application.Current.MainWindow };
@@ -124,7 +126,7 @@ namespace NetworkMapViewerV2.ViewModels
 
 
         [RelayCommand]
-        public void OpenMap()
+        public async Task OpenMap()
         {
             var dlg = new OpenDeleteMapsWindow { Owner = Application.Current.MainWindow };
 
@@ -137,31 +139,87 @@ namespace NetworkMapViewerV2.ViewModels
                 }
                 else if (dlg.ActionTaken == MapDialogAction.Delete)
                 {
-                    // 2. User clicked "Delete"
-                    var repo = new Data.MapRepository();
-                    repo.DeleteMap(dlg.SelectedMapId);
+                    int mapId = dlg.SelectedMapId;
 
-                    // Close the tab if it happens to be currently open
-                    var tabToRemove = OpenTabs.FirstOrDefault(t => t.MapId == dlg.SelectedMapId);
-                    if (tabToRemove != null)
+                    // 1. Screenshot first, as a record of what the map looked like
+                    string? shotPath = await SaveDeletedMapScreenshotAsync(mapId);
+                    if (shotPath == null &&
+                        MessageBox.Show("Could not save a screenshot of this map.\n\nDelete it anyway?", "Screenshot Failed",
+                                        MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                     {
-                        OpenTabs.Remove(tabToRemove);
-                        if (SelectedTab == tabToRemove)
-                        {
-                            SelectedTab = OpenTabs.FirstOrDefault()!;
-                        }
+                        return;
                     }
 
-                    // Refresh the UI dropdowns globally
-                    LoadMapDirectories();
+                    // 2. Delete. LoadMapDirectories closes the tab because the map no longer exists.
+                    if (_repo.DeleteMap(mapId))
+                    {
+                        LoadMapDirectories();
+                        if (shotPath != null)
+                            MessageBox.Show($"Map deleted.\n\nA screenshot was saved to:\n{shotPath}",
+                                            "Map Deleted", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
 
-                    // Re-open the window automatically so they can see the map is gone, 
-                    // or perform another action!
-                    OpenMap();
+                    // 3. Re-open the list for the next action
+                    await OpenMap();
                 }
+                else if (dlg.ActionTaken == MapDialogAction.Rename)
+                {
+                    try
+                    {
+                        _repo.RenameMap(dlg.SelectedMapId, dlg.NewMapName, dlg.NewMapType);                      
+
+                        LoadMapDirectories(); // sidebar dropdowns
+                    }
+                    catch (InvalidOperationException ex)
+                    {
+                        MessageBox.Show(ex.Message, "Name Already Used", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    }
+                    catch (SqlException ex) when (ex.Number is 229 or 230)
+                    {
+                        MessageBox.Show("Failed to rename:\nYou don't have permission to modify the database.", "Rename Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Failed to rename map:\n{ex.Message}", "Rename Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+
+                    OpenMap(); // reopen the list so the new name is visible
+                }
+
             }
         }
-                
+
+        /// <summary>
+        /// Opens the map, waits until it is drawn and saves a JPG of it to Documents\Network Map Viewer\Deleted Maps.
+        /// Returns the file path, or null if it failed.
+        /// </summary>
+        private async Task<string?> SaveDeletedMapScreenshotAsync(int mapId)
+        {
+            try
+            {
+                OpenMapFromDatabase(mapId);   // opens the tab, or switches to it if already open
+                var tab = SelectedTab;
+                if (tab == null || tab.MapId != mapId) return null;
+
+                // Let WPF finish drawing the map before taking the picture
+                await Application.Current.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                await Task.Delay(300);
+
+                string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Network Map Viewer", "Deleted Maps");
+                Directory.CreateDirectory(dir);
+
+                string safeName = string.Concat(tab.MapName.Split(Path.GetInvalidFileNameChars()));
+                string path = Path.Combine(dir, $"{safeName}_{DateTime.Now:yyyyMMdd_HHmmss}.jpg");
+
+                MapExporter.SaveCanvasScreenshotToJpeg(Application.Current.MainWindow!, path, qualityLevel: 95);
+                return path;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[Delete] Screenshot failed: {ex.Message}");
+                return null;
+            }
+        }
 
         // ─── PURE SQL RELOAD ──────────────────────────────
         [RelayCommand]
@@ -201,7 +259,7 @@ namespace NetworkMapViewerV2.ViewModels
         }
 
 
-        [RelayCommand]
+        [RelayCommand(CanExecute = nameof(CanEdit))]
         private async Task SaveMap()
         {
             var tab = SelectedTab;
@@ -252,18 +310,7 @@ namespace NetworkMapViewerV2.ViewModels
 
                 // FIX 1: Force the MapId to be correct just in case the repository forgot to set it!
                 dbMapState.MapId = mapId;
-
-                // FIX 2: Fallback Check - Is the tab open, but its MapId was 0?
-                foreach (var tab in OpenTabs)
-                {
-                    if (tab.MapName == dbMapState.MapName)
-                    {
-                        // Silently fix the broken ID on the existing tab and switch to it!
-                        tab.MapId = mapId;
-                        SelectedTab = tab;
-                        return;
-                    }
-                }
+                               
 
                 // 3. If it's truly not open, add the new tab to the UI
                 OpenTabs.Add(dbMapState);
@@ -277,27 +324,43 @@ namespace NetworkMapViewerV2.ViewModels
             }
         }
 
-
         public void LoadMapDirectories()
         {
-            var repo = new Data.MapRepository();
-            var allMaps = repo.GetAvailableMaps(); // Uses the updated method from the previous step
+            ApplyMapList(new Data.MapRepository().GetAvailableMaps());
+        }
+
+        /// <summary>Fills the sidebar dropdowns and keeps open tab titles in step with the database.</summary>
+        private List<string> ApplyMapList(List<MapTabState> allMaps)
+        {
+            _mapListSignature = BuildMapListSignature(allMaps);
 
             HeadOfficeMaps.Clear();
             BranchMaps.Clear();
-
             foreach (var map in allMaps)
             {
-                if (map.MapType == "Branch")
-                {
-                    BranchMaps.Add(map);
-                }
-                else
-                {
-                    HeadOfficeMaps.Add(map);
-                }
+                if (map.MapType == "Branch") BranchMaps.Add(map);
+                else HeadOfficeMaps.Add(map);
             }
+
+            // Someone may have renamed a map that is open here
+            foreach (var tab in OpenTabs)
+            {
+                var dbMap = allMaps.FirstOrDefault(m => m.MapId == tab.MapId);
+                if (dbMap == null) continue;
+                if (tab.MapName != dbMap.MapName) tab.MapName = dbMap.MapName;
+                if (tab.MapType != dbMap.MapType) tab.MapType = dbMap.MapType;
+            }
+            var closed = new List<string>();
+            foreach (var tab in OpenTabs.Where(t => t.MapId > 0 && !allMaps.Any(m => m.MapId == t.MapId)).ToList())
+            {
+                closed.Add(tab.MapName);
+                CloseMapTab(tab);
+            }
+            return closed;
         }
+
+        private static string BuildMapListSignature(List<MapTabState> maps) =>
+            string.Join("|", maps.Select(m => $"{m.MapId}:{m.MapType}:{m.MapName}"));
 
 
         /// <summary>

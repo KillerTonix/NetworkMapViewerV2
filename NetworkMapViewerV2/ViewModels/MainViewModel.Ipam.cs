@@ -14,6 +14,7 @@ namespace NetworkMapViewerV2.ViewModels
         /// </summary>
         public bool TryAddDeviceToMapInEditMode(int mapId, string address, string name, int groupId, out string error)
         {
+            if (!CanEdit) { error = "You have read-only access to the database."; return false; }
             error = "";
             address = address.Trim();
 

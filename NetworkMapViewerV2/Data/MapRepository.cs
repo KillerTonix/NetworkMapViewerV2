@@ -68,11 +68,11 @@ namespace NetworkMapViewerV2.Data
             }
         }
 
-        public void DeleteMap(int mapId)
+        public bool DeleteMap(int mapId)
         {
             try
             {
-                if (mapId <= 0) return;
+                if (mapId <= 0) return false;
 
                 using var connection = GetOpenConnection();
 
@@ -89,6 +89,7 @@ namespace NetworkMapViewerV2.Data
                 cmd.ExecuteNonQuery();
 
                 InsertAuditLogInternal(actionType: "DELETE", target: "Maps", details: "Entire map deleted.", targetId: mapId, mapName: mapName, oldValue: null, newValue: null, connection: connection, transaction: null);
+                return true;
             }
             catch (Exception ex)
             {
@@ -100,7 +101,38 @@ namespace NetworkMapViewerV2.Data
                 {
                     MessageBox.Show($"Failed to delete map:\n{ex.Message}", "Database Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
+                return false; // Indicate failure
             }
+        }
+
+        /// <summary>Renames a map (and optionally changes its type). Throws InvalidOperationException if the name is taken.</summary>
+        public void RenameMap(int mapId, string newName, string newType)
+        {
+            using var connection = GetOpenConnection();
+            using var transaction = connection.BeginTransaction();
+
+            string oldName = GetMapNameInternal(mapId, connection, transaction);
+
+            using (var dupCmd = new SqlCommand("SELECT COUNT(*) FROM Maps WHERE MapName = @Name AND MapId <> @MapId", connection, transaction))
+            {
+                dupCmd.Parameters.AddWithValue("@Name", newName);
+                dupCmd.Parameters.AddWithValue("@MapId", mapId);
+                if (Convert.ToInt32(dupCmd.ExecuteScalar()) > 0)
+                    throw new InvalidOperationException($"A map named \"{newName}\" already exists.");
+            }
+
+            using (var cmd = new SqlCommand("UPDATE Maps SET MapName = @Name, MapType = @Type WHERE MapId = @MapId", connection, transaction))
+            {
+                cmd.Parameters.AddWithValue("@Name", newName);
+                cmd.Parameters.AddWithValue("@Type", newType);
+                cmd.Parameters.AddWithValue("@MapId", mapId);
+                cmd.ExecuteNonQuery();
+            }
+
+            InsertAuditLogInternal("UPDATE", "Maps", $"Map renamed from \"{oldName}\" to \"{newName}\" ({newType})",
+                mapId, newName, oldName, newName, connection, transaction);
+
+            transaction.Commit();
         }
 
         public MapTabState LoadMap(int mapId)

@@ -8,6 +8,7 @@ namespace NetworkMapViewerV2.Views
         public string MapName { get; private set; } = string.Empty;
         public string MapType { get; private set; } = string.Empty;
 
+
         public NewMapWindow()
         {
             InitializeComponent();
@@ -18,6 +19,15 @@ namespace NetworkMapViewerV2.Views
                 txtMapName.Focus();
                 txtMapName.SelectAll();
             };
+        }
+
+        /// <summary>Same dialog, used to rename an existing map.</summary>
+        public NewMapWindow(string currentName, string currentType) : this()
+        {
+            Title = "Rename Map";
+            btnCreate.Content = "Rename";
+            txtMapName.Text = currentName;
+            cmbMapType.SelectedIndex = currentType == "Branch" ? 1 : 0;
         }
 
         private void BtnCreate_Click(object sender, RoutedEventArgs e)

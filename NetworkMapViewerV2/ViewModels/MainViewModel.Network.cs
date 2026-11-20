@@ -84,7 +84,7 @@ namespace NetworkMapViewerV2.ViewModels
 
 
 
-        [RelayCommand]
+        [RelayCommand(CanExecute = nameof(CanEdit))]
         public async Task UpdateGroupData()
         {
             if (IsEditingEnabled == false)

@@ -6,26 +6,29 @@ namespace NetworkMapViewerV2.Views
     // Custom Enum to tell the ViewModel exactly what button the user clicked
     public enum MapDialogAction
     {
-        None,
-        Open,
-        Delete
+        None,        Open,        Delete,        Rename
     }
 
     public partial class OpenDeleteMapsWindow : Window
     {
+
         public int SelectedMapId { get; private set; }
         public MapDialogAction ActionTaken { get; private set; } = MapDialogAction.None;
+        public string NewMapName { get; private set; } = string.Empty;
+        public string NewMapType { get; private set; } = string.Empty;
+        private List<Models.MapTabState> _maps = [];
 
         public OpenDeleteMapsWindow()
         {
             InitializeComponent();
+            if (!Data.DatabaseService.CanWrite) { btnDelete.Visibility = Visibility.Collapsed; btnRename.Visibility = Visibility.Collapsed; }
             LoadMaps();
         }
 
         private void LoadMaps()
         {
             var repo = new Data.MapRepository();
-            var allMaps = repo.GetAvailableMaps();
+            var allMaps = _maps = repo.GetAvailableMaps();
 
             Dictionary<int, string> availableMaps = allMaps.ToDictionary(m => m.MapId, m => $"{m.MapName} ({m.MapType})");
 
@@ -41,6 +44,25 @@ namespace NetworkMapViewerV2.Views
         private void BtnOpen_Click(object sender, RoutedEventArgs e)
         {
             ConfirmOpen();
+        }
+
+        private void BtnRename_Click(object sender, RoutedEventArgs e)
+        {
+            if (lstMaps.SelectedValue is not int mapId)
+            {
+                MessageBox.Show("Please select a map to rename.", "No Selection", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var map = _maps.First(m => m.MapId == mapId);
+            var dlg = new NewMapWindow(map.MapName, map.MapType) { Owner = this };
+            if (dlg.ShowDialog() != true) return;
+
+            SelectedMapId = mapId;
+            NewMapName = dlg.MapName;
+            NewMapType = dlg.MapType;
+            ActionTaken = MapDialogAction.Rename;
+            DialogResult = true;
         }
 
         private void LstMaps_MouseDoubleClick(object sender, MouseButtonEventArgs e)

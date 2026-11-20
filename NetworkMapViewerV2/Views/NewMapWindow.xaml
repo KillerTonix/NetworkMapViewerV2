@@ -114,8 +114,8 @@
 
                 <!-- Buttons -->
                 <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom">
-                    <Button Content="Create" Width="85" Height="30" Margin="0,0,8,0" Click="BtnCreate_Click" IsDefault="True" Style="{StaticResource PrimaryButton}"/>
-                    <Button Content="Cancel" Width="85" Height="30" Click="BtnCancel_Click" IsCancel="True" Style="{StaticResource SecondaryButton}"/>
+                    <Button x:Name="btnCreate" Content="Create" Width="85" Height="30" Margin="0,0,8,0" Click="BtnCreate_Click" IsDefault="True" Style="{StaticResource PrimaryButton}"/>
+                    <Button x:Name="btnCancel" Content="Cancel" Width="85" Height="30" Click="BtnCancel_Click" IsCancel="True" Style="{StaticResource SecondaryButton}"/>
                 </StackPanel>
             </Grid>
         </Border>

@@ -15,6 +15,7 @@ namespace NetworkMapViewerV2.Data
 
         // Make sure "NetMapVwr" database is created on the server first!
         public static string ConnectionString => @$"Server={settings.DatabaseServer};Database={settings.DatabaseName};User Id={settings.DatabaseUser};Password={decryptedPassword};TrustServerCertificate=True;Connect Timeout=5;Command Timeout=15;";
+        public static bool CanWrite { get; private set; } = true;
         public static void InitializeDatabase()
         {
             using var connection = new SqlConnection(ConnectionString);
@@ -23,6 +24,13 @@ namespace NetworkMapViewerV2.Data
             // Send a ping query to verify database response
             using var cmd = new SqlCommand("SELECT 1;", connection);
             cmd.ExecuteScalar();
+            using var permCmd = new SqlCommand(@"
+            SELECT CASE WHEN HAS_PERMS_BY_NAME('dbo.Devices', 'OBJECT', 'INSERT') = 1
+                 AND HAS_PERMS_BY_NAME('dbo.Devices', 'OBJECT', 'UPDATE') = 1
+                 AND HAS_PERMS_BY_NAME('dbo.Devices', 'OBJECT', 'DELETE') = 1
+                 AND HAS_PERMS_BY_NAME('dbo.Maps',    'OBJECT', 'UPDATE') = 1
+            THEN 1 ELSE 0 END;", connection);
+            CanWrite = Convert.ToInt32(permCmd.ExecuteScalar()) == 1;
         }
 
         public static void PrepareDatabaseForFirstUse()

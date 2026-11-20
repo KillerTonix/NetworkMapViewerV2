@@ -32,6 +32,7 @@ namespace NetworkMapViewerV2.Views
             InitializeComponent();
             ViewModel = new MainViewModel();
             this.DataContext = ViewModel;
+            if (!Data.DatabaseService.CanWrite) Title += "   [Read-only]";
 
             // Whenever the search bar closes (Esc, the X button, ...) hand the keyboard back to the map,
             // otherwise map shortcuts such as F2 / Delete / Ctrl+C stay dead until the canvas is clicked.

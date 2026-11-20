@@ -23,6 +23,13 @@ namespace NetworkMapViewerV2.ViewModels
             }
         }
 
+        /// <summary>Closes a map tab without asking (used when the map no longer exists in the database).</summary>
+        private void CloseMapTab(MapTabState tab)
+        {
+            OpenTabs.Remove(tab);
+            if (SelectedTab == tab) SelectedTab = OpenTabs.FirstOrDefault()!;
+        }
+
         partial void OnSelectedTabChanged(MapTabState value)
         {
             IsEditingEnabled = value?.IsEditingEnabled ?? false;

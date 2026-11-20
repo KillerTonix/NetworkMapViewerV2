@@ -15,6 +15,8 @@ namespace NetworkMapViewerV2.ViewModels
         private DispatcherTimer? _mapSyncTimer;
         private static MapRepository _repo = new();
         private bool _isCheckingForUpdates;
+        private string _mapListSignature = "";
+        private bool _isCheckingMapList;
         public MainViewModel()
         {
             _appSettings = SettingsService.Load();
@@ -43,9 +45,7 @@ namespace NetworkMapViewerV2.ViewModels
                 {
                     OpenMapFromDatabase(_appSettings.LastOpenedMapId);
                 }
-            });
-
-           
+            });           
         }
 
         private async Task CheckForRemoteMapUpdatesAsync()
@@ -74,6 +74,32 @@ namespace NetworkMapViewerV2.ViewModels
             }
         }
 
+        /// <summary>Picks up maps renamed, added or deleted by other users and refreshes tab titles and dropdowns.</summary>
+        private async Task CheckForMapListChangesAsync()
+        {
+            if (_isCheckingMapList) return;
+            _isCheckingMapList = true;
+            try
+            {
+                var maps = await Task.Run(() => _repo.GetAvailableMaps());
+                if (BuildMapListSignature(maps) != _mapListSignature)
+                {
+                    var closed = ApplyMapList(maps);
+                    if (closed.Count > 0)
+                        MessageBox.Show($"These maps were deleted by another user and have been closed:\n\n{string.Join("\n", closed)}",
+                            "Map Deleted", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MapSync] Map list check failed: {ex.Message}");  // DB down: skip, retry next tick
+            }
+            finally
+            {
+                _isCheckingMapList = false;
+            }
+        }
+
         /// <summary>
         /// Handles background ping state changes and updates open map tab UI elements.
         /// </summary>
@@ -97,13 +123,18 @@ namespace NetworkMapViewerV2.ViewModels
             });
         }
 
+        
         public void InitializeMapSyncTimer()
         {
             _mapSyncTimer = new DispatcherTimer
             {
                 Interval = TimeSpan.FromSeconds(3)
             };
-            _mapSyncTimer.Tick += async (s, e) => await CheckForRemoteMapUpdatesAsync();
+            _mapSyncTimer.Tick += async (s, e) =>
+            {
+                await CheckForRemoteMapUpdatesAsync();
+                await CheckForMapListChangesAsync();
+            };
             _mapSyncTimer.Start();
         }       
 

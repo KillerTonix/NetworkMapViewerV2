@@ -4,7 +4,6 @@ using NetworkMapViewerV2.Data;
 using NetworkMapViewerV2.Models;
 using NetworkMapViewerV2.Services;
 using NetworkMapViewerV2.Views;
-
 using System.Diagnostics;
 using System.Windows;
 
@@ -12,6 +11,8 @@ namespace NetworkMapViewerV2.ViewModels
 {
     public partial class MainViewModel
     {
+        public bool CanEdit => DatabaseService.CanWrite;
+
         [ObservableProperty]
         private bool _isEditingEnabled = false;
 
@@ -49,7 +50,7 @@ namespace NetworkMapViewerV2.ViewModels
             Application.Current.MainWindow?.Close();
         }
 
-        [RelayCommand]
+        [RelayCommand(CanExecute = nameof(CanEdit))]
         private async Task ToggleEditMode()
         {
             if (SelectedTab == null) return;
@@ -92,7 +93,7 @@ namespace NetworkMapViewerV2.ViewModels
             IsEditingEnabled = SelectedTab?.IsEditingEnabled ?? false;
         }
 
-        [RelayCommand]
+        [RelayCommand(CanExecute = nameof(CanEdit))]
         private void ToggleGridMode()
         {
             IsGridVisible = !IsGridVisible;
@@ -231,7 +232,7 @@ namespace NetworkMapViewerV2.ViewModels
         }
 
 
-        [RelayCommand]
+        [RelayCommand(CanExecute = nameof(CanEdit))]
         private void AlignMapElements()
         {
             if (SelectedTab == null) return;
