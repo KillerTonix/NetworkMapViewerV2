@@ -17,6 +17,24 @@ namespace NetworkMapViewerV2.Views
     // and manages the canvas background (grid or plain).
     public partial class MapCanvasView : UserControl
     {
+        private static readonly Dictionary<string, Size> _iconSizes = [];
+        private static readonly Dictionary<string, BitmapImage?> _hintImageCache = [];
+
+        /// <summary>Loads an image into memory and closes the file. Returns null if it's missing or the share is unreachable.</summary>
+        private static BitmapImage? LoadFrozenBitmap(string path)
+        {
+            try
+            {
+                var bmp = new BitmapImage();
+                bmp.BeginInit();
+                bmp.CacheOption = BitmapCacheOption.OnLoad;
+                bmp.UriSource = new Uri(path, UriKind.Absolute);
+                bmp.EndInit();
+                bmp.Freeze();
+                return bmp;
+            }
+            catch { return null; }
+        }
 
         /// <summary>
         /// Clears the canvas and fully redraws it for the given tab (labels first, then devices). Bindings are
@@ -119,9 +137,7 @@ namespace NetworkMapViewerV2.Views
             if (state == null) return;
 
             // 1. Fetch all groups ONCE before the loop so we don't spam the database
-            var repo = new Data.MapRepository();
-            var allGroups = repo.GetAllDeviceGroups().ToDictionary(g => g.GroupId);
-            var iconSizes = new Dictionary<string, Size>();
+            var allGroups = new Data.MapRepository().GetDeviceGroupsCached().ToDictionary(g => g.GroupId);
             foreach (var device in state.Devices)
             {
                 var container = new Border
@@ -155,36 +171,14 @@ namespace NetworkMapViewerV2.Views
 
                 if (!string.IsNullOrWhiteSpace(dbIconPath))
                 {
-                    // 1. Check if we already know the original size of this image
-                    if (!iconSizes.ContainsKey(dbIconPath))
+                    if (!_iconSizes.TryGetValue(dbIconPath, out var iconSize))
                     {
-                        try
-                        {
-                            if (File.Exists(dbIconPath))
-                            {
-                                var tempBmp = new BitmapImage();
-                                tempBmp.BeginInit();
-                                tempBmp.CacheOption = BitmapCacheOption.OnLoad; // Closes the file immediately!
-                                tempBmp.UriSource = new Uri(dbIconPath, UriKind.Absolute);
-                                tempBmp.EndInit();
-                                tempBmp.Freeze(); // CRITICAL: Makes the image read-only so it takes 90% less RAM
-
-                                iconSizes[dbIconPath] = new Size(tempBmp.PixelWidth, tempBmp.PixelHeight);
-                            }
-                            else
-                            {
-                                iconSizes[dbIconPath] = new Size(40, 40); // Missing file fallback
-                            }
-                        }
-                        catch
-                        {
-                            iconSizes[dbIconPath] = new Size(40, 40); // Error fallback
-                        }
+                        var bmp = LoadFrozenBitmap(dbIconPath);
+                        iconSize = bmp != null ? new Size(bmp.PixelWidth, bmp.PixelHeight) : new Size(40, 40);
+                        _iconSizes[dbIconPath] = iconSize;
                     }
-
-                    // 2. Apply the true original size!
-                    imgWidth = iconSizes[dbIconPath].Width;
-                    imgHeight = iconSizes[dbIconPath].Height;
+                    imgWidth = iconSize.Width;
+                    imgHeight = iconSize.Height;
 
                     var img = new Image { Width = imgWidth, Height = imgHeight };
 
@@ -252,32 +246,44 @@ namespace NetworkMapViewerV2.Views
 
         // ─── TOOLTIPS & ALIGNMENT ────────────────────────────────
 
-        /// <summary>Builds the hover tooltip for a device from its hint image and hint text.</summary>
+        /// <summary>
+        /// Gives the device a hover tooltip (hint image + hint text). The content is built only when the mouse
+        /// actually hovers, so drawing the map never touches the network share for hint images.
+        /// </summary>
         private static void BuildDeviceTooltip(Border container, NetworkDevice device)
+        {
+            container.ToolTip = "";   // placeholder: WPF only raises ToolTipOpening when ToolTip is set
+            container.ToolTipOpening += (s, e) =>
+            {
+                var panel = CreateTooltipContent(device);
+                if (panel == null) { e.Handled = true; return; }   // nothing to show
+                container.ToolTip = panel;
+            };
+        }
+
+        private static StackPanel? CreateTooltipContent(NetworkDevice device)
         {
             var toolTipPanel = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(5) };
 
-            if (!string.IsNullOrWhiteSpace(device.HintImagePath) && File.Exists(device.HintImagePath))
+            if (!string.IsNullOrWhiteSpace(device.HintImagePath))
             {
-                try
+                if (!_hintImageCache.TryGetValue(device.HintImagePath, out var hintBmp))
                 {
-                    var hintImg = new Image { MaxWidth = 100, MaxHeight = 100, Margin = new Thickness(1, 1, 1, 5) };
-                    var hintBmp = new BitmapImage(new Uri(device.HintImagePath, UriKind.Absolute));
-                    hintImg.Source = hintBmp;
-                    toolTipPanel.Children.Add(hintImg);
+                    hintBmp = LoadFrozenBitmap(device.HintImagePath);
+                    _hintImageCache[device.HintImagePath] = hintBmp;
                 }
-                catch { }
+                if (hintBmp != null)
+                    toolTipPanel.Children.Add(new Image { Source = hintBmp, MaxWidth = 100, MaxHeight = 100, Margin = new Thickness(1, 1, 1, 5) });
             }
 
             if (device.Hints.Count != 0)
             {
                 var hintTextBlock = new TextBlock { Margin = new Thickness(0, 0, 0, 5) };
-                string rawHintText = string.Join("\n", device.Hints);
-                RenderHtmlToTextBlock(hintTextBlock, rawHintText);
+                RenderHtmlToTextBlock(hintTextBlock, string.Join("\n", device.Hints));
                 toolTipPanel.Children.Add(hintTextBlock);
             }
 
-            container.ToolTip = toolTipPanel.Children.Count > 0 ? toolTipPanel : null;
+            return toolTipPanel.Children.Count > 0 ? toolTipPanel : null;
         }
 
         /// <summary>

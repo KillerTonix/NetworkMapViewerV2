@@ -3,21 +3,12 @@ using NetworkMapViewerV2.Helpers;
 using NetworkMapViewerV2.Models;
 using NetworkMapViewerV2.Services;
 using NetworkMapViewerV2.ViewModels;
-using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Linq;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Shapes;
 
 namespace NetworkMapViewerV2.Views
 {
@@ -29,6 +20,14 @@ namespace NetworkMapViewerV2.Views
         public IPAMWindow()
         {
             InitializeComponent();
+            if (!DatabaseService.CanWrite)
+            {
+                btnSubnetAdd.Visibility = Visibility.Collapsed;
+                btnSubnetEdit.Visibility = Visibility.Collapsed;
+                btnSubnetDelete.Visibility = Visibility.Collapsed;
+                btnChangeRangeCut.Visibility = Visibility.Collapsed;
+                dgIps.IsReadOnly = true;   // no editing names/types/maps in the grid
+            }
             DataContext = this; // the Device Type / Map Name drop-downs bind to the lists below
             Loaded += async (_, _) => await LoadAsync(isFirstLoad: true);
         }

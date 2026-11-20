@@ -66,7 +66,6 @@ namespace NetworkMapViewerV2.Views
                     SelectElement(null, false);
                 }
             };
-            this.DataContextChanged += MapCanvasView_DataContextChanged;
             // --- NEW: Marquee Selection Events ---
             DrawingCanvas.MouseLeftButtonDown += DrawingCanvas_MouseLeftButtonDown;
             DrawingCanvas.MouseMove += DrawingCanvas_MouseMove;

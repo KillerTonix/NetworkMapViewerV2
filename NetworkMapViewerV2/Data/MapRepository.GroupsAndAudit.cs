@@ -62,6 +62,27 @@ namespace NetworkMapViewerV2.Data
             return groups;
         }
 
+        private static List<DeviceGroup>? _groupCache;
+        private static DateTime _groupCacheTime;
+
+        /// <summary>
+        /// Device groups for drawing the map. Read from the DB at most once a minute; if the DB is unreachable,
+        /// the last known list is used instead of failing.
+        /// </summary>
+        public List<DeviceGroup> GetDeviceGroupsCached()
+        {
+            if (_groupCache == null || DateTime.Now - _groupCacheTime > TimeSpan.FromMinutes(1))
+            {
+                try
+                {
+                    _groupCache = GetAllDeviceGroups();
+                    _groupCacheTime = DateTime.Now;
+                }
+                catch when (_groupCache != null) { /* keep using the last list */ }
+            }
+            return _groupCache;
+        }
+
         public void SaveDeviceGroup(DeviceGroup group)
         {
             using var connection = GetOpenConnection();
@@ -128,6 +149,7 @@ namespace NetworkMapViewerV2.Data
             }
 
             SettingsService.UpdateGroupDefaultCommand(group.GroupId, group.DefaultCommand ?? "Ping");
+            _groupCache = null;
         }
 
         public void DeleteDeviceGroup(int groupId)
@@ -138,6 +160,7 @@ namespace NetworkMapViewerV2.Data
             cmd.ExecuteNonQuery();
 
             InsertAuditLogInternal(actionType: "DELETE", target: "Groups", details: "Device group removed.", targetId: groupId, mapName: null, oldValue: null, newValue: null, connection: connection, transaction: null);
+            _groupCache = null;
         }
 
         private static void AddGroupParameters(SqlCommand cmd, DeviceGroup group)

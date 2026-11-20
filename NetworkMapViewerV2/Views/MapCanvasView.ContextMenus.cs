@@ -83,9 +83,8 @@ namespace NetworkMapViewerV2.Views
                 menu.Items.Add(miCopy);
 
 
-                // If it's a Map Link, add the option to jump to the other map!
-                var repo = new Data.MapRepository();
-                var groups = repo.GetAllDeviceGroups();
+                // If it's a Map Link, add the option to jump to the other map!                
+                var groups = new Data.MapRepository().GetDeviceGroupsCached();
                 var myGroup = groups.FirstOrDefault(g => g.GroupId == device.GroupId);
 
                 if (myGroup != null && myGroup.IsMapLink && device.TargetMapId.HasValue)
