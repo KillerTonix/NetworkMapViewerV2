@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using NetworkMapViewerV2.Data;
 using NetworkMapViewerV2.Models;
 using NetworkMapViewerV2.Services;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Threading;
 
@@ -12,8 +13,8 @@ namespace NetworkMapViewerV2.ViewModels
     {
         private AppSettings _appSettings = new();
         private DispatcherTimer? _mapSyncTimer;
-        private static MapRepository _repo = new();    
-
+        private static MapRepository _repo = new();
+        private bool _isCheckingForUpdates;
         public MainViewModel()
         {
             _appSettings = SettingsService.Load();
@@ -47,6 +48,32 @@ namespace NetworkMapViewerV2.ViewModels
            
         }
 
+        private async Task CheckForRemoteMapUpdatesAsync()
+        {
+            var tab = SelectedTab;
+            if (_isCheckingForUpdates || tab == null || tab.MapId <= 0 || tab.HasUnsavedChanges || IsEditingEnabled)
+                return;
+
+            _isCheckingForUpdates = true;
+            try
+            {
+                int serverVersion = await Task.Run(() => _repo.GetMapVersionAsync(tab.MapId));
+                if (serverVersion > tab.Version)
+                {
+                    tab.Version = serverVersion;
+                    await RefreshCurrentMapAsync(tab.MapId);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MapSync] Version check failed: {ex.Message}");  // DB down: skip, retry next tick
+            }
+            finally
+            {
+                _isCheckingForUpdates = false;
+            }
+        }
+
         /// <summary>
         /// Handles background ping state changes and updates open map tab UI elements.
         /// </summary>
@@ -78,26 +105,7 @@ namespace NetworkMapViewerV2.ViewModels
             };
             _mapSyncTimer.Tick += async (s, e) => await CheckForRemoteMapUpdatesAsync();
             _mapSyncTimer.Start();
-        }
-
-        private async Task CheckForRemoteMapUpdatesAsync()
-        {
-            var tab = SelectedTab;
-
-            // Guard Clause: Skip check if no tab selected, if user has unsaved edits, or is in edit mode
-            if (tab == null || tab.HasUnsavedChanges || IsEditingEnabled)
-                return;
-
-            
-            int serverVersion = await _repo.GetMapVersionAsync(tab.MapId);
-
-            // If server has a newer version than our local tab, trigger auto-reload!
-            if (serverVersion > tab.Version)
-            {
-                tab.Version = serverVersion;
-                await RefreshCurrentMapAsync(tab.MapId);
-            }
-        }
+        }       
 
         public void StopMapSyncTimer()
         {

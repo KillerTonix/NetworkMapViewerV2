@@ -18,6 +18,7 @@ namespace NetworkMapViewerV2.Helpers.LocalFetcher
             {
                 cleanUsername = cleanUsername.Split('\\').Last();
             }
+            if (cleanUsername.Contains('"')) return rawUsername;
 
             string scriptPath = Path.Combine(ScriptsPath, "GetADUser.ps1");
 

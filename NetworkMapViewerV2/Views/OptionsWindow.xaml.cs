@@ -292,7 +292,8 @@ namespace NetworkMapViewerV2.Views
             NotificationEngine.ActiveRules = [.. _settings.ENS_Rules];
 
             // Persist to disk
-            SettingsService.Save(_settings);
+            SettingsService.SaveUserSpecific(_settings);
+            SettingsService.SaveGlobal(_settings);
             Saved = true;
             Close();
         }

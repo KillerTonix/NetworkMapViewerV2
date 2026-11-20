@@ -1,4 +1,5 @@
 ﻿using Microsoft.Win32;
+using NetworkMapViewerV2.Helpers;
 using NetworkMapViewerV2.Models;
 using System.Windows;
 using System.Windows.Input;
@@ -127,6 +128,15 @@ namespace NetworkMapViewerV2.Views
 
         private void BtnOk_Click(object sender, RoutedEventArgs e)
         {
+            string address = txtAddress.Text.Trim();
+            if (address.Length > 0 && !AddressValidator.IsSafe(address))   // empty is allowed (e.g. map-link devices)
+            {
+                MessageBox.Show("Address must be an IP address or a hostname (letters, digits, '.', '-', '_').",
+                    "Invalid Address", MessageBoxButton.OK, MessageBoxImage.Warning);
+                txtAddress.Focus();
+                return;
+            }
+
             // Safely update Titles
             EditingDevice.Titles.Clear();
             foreach (var line in txtName.Text.Split([Environment.NewLine], StringSplitOptions.RemoveEmptyEntries))
@@ -138,7 +148,7 @@ namespace NetworkMapViewerV2.Views
                 EditingDevice.Hints.Add(line);
 
             EditingDevice.HintImagePath = txtImagePath.Text;
-            EditingDevice.Address = txtAddress.Text;
+            EditingDevice.Address = address;
 
             if (cmbType.SelectedValue != null)
             {

@@ -14,7 +14,7 @@ namespace NetworkMapViewerV2.Data
         private static string IconsPath = Path.Combine(settings.DeviceIconsPath ?? "", "ON");
 
         // Make sure "NetMapVwr" database is created on the server first!
-        public static string ConnectionString => @$"Server={settings.DatabaseServer};Database={settings.DatabaseName};User Id={settings.DatabaseUser};Password={decryptedPassword};TrustServerCertificate=True;";
+        public static string ConnectionString => @$"Server={settings.DatabaseServer};Database={settings.DatabaseName};User Id={settings.DatabaseUser};Password={decryptedPassword};TrustServerCertificate=True;Connect Timeout=5;Command Timeout=15;";
         public static void InitializeDatabase()
         {
             using var connection = new SqlConnection(ConnectionString);

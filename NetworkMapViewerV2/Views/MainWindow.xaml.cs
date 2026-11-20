@@ -45,15 +45,14 @@ namespace NetworkMapViewerV2.Views
 
             this.Closed += (sender, args) =>
             {
-                // 1. Tell your ViewModel/PingService to stop the network loop
+                try { ViewModel?.StopMapSyncTimer(); } catch { }
                 try { ViewModel?.PingService.StopPinging(); } catch { }
+                try { BackgroundPingService.Instance.Stop(); } catch { }
 
-                // 2. Release all MS SQL connection pools 
-                try { Microsoft.Data.SqlClient.SqlConnection.ClearAllPools(); } catch { }
-
-                // 3. Annihilate the background process
+                // Hard exit: skips library cleanup that can wait on broken DB connections
                 System.Diagnostics.Process.GetCurrentProcess().Kill();
             };
+
             var settings = SettingsService.Load();
             NotificationEngine.ActiveRules = settings.ENS_Rules ?? [];
 
@@ -85,7 +84,6 @@ namespace NetworkMapViewerV2.Views
             var helper = new WindowInteropHelper(this);
             UnregisterHotKey(helper.Handle, HOTKEY_ID); // CRITICAL: Free the hotkey on exit
             base.OnClosed(e);
-            Environment.Exit(0);
         }
 
         // The actual listener that intercepts Windows OS messages

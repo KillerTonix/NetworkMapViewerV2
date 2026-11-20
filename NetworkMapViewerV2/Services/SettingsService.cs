@@ -6,7 +6,7 @@ using System.Windows;
 namespace NetworkMapViewerV2.Services
 {
     public static class SettingsService
-    {       
+    {
         // Global Shared Settings: Resides alongside the executable in the shared folder
         private static readonly string GlobalSettingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
 
@@ -64,15 +64,15 @@ namespace NetworkMapViewerV2.Services
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to load personal user settings: {ex.Message}","User Settings Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show($"Failed to load personal user settings: {ex.Message}", "User Settings Error", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
 
             return combinedSettings;
         }
 
-        public static void Save(AppSettings settings)
+        public static void SaveUserSpecific(AppSettings settings)
         {
-            // 1. Save User-Specific Settings to %APPDATA%
+            // Save User-Specific Settings to %APPDATA%
             try
             {
                 EnsureUserFolderExists();
@@ -84,8 +84,11 @@ namespace NetworkMapViewerV2.Services
             {
                 MessageBox.Show($"Failed to save user settings: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
 
-            // 2. Save Global Settings to Shared Folder (Only if write permissions exist)
+        public static void SaveGlobal(AppSettings settings)
+        {
+            // Save Global Settings to Shared Folder (Only if write permissions exist)
             try
             {
                 var globalData = ExtractGlobalSettings(settings);
@@ -94,12 +97,12 @@ namespace NetworkMapViewerV2.Services
             }
             catch (UnauthorizedAccessException)
             {
-               
+                MessageBox.Show("Shared settings (database, paths, passwords) were not saved: you have read-only access to the shared folder.\nYour personal settings were saved.",
+                    "Read-only Settings", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Could not update global shared settings: {ex.Message}",
-                    "Global Settings Save Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show($"Could not update global shared settings: {ex.Message}", "Global Settings Save Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -217,7 +220,7 @@ namespace NetworkMapViewerV2.Services
 
             // Update the user's personal preference and save to file
             settings.GroupDefaultCommands[groupId] = commandName;
-            Save(settings);
+            SaveUserSpecific(settings);
         }
     }
 }

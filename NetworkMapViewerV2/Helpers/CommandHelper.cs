@@ -27,6 +27,11 @@ namespace NetworkMapViewerV2.Helpers
         {
             if (command == null || string.IsNullOrWhiteSpace(command.Path) || string.IsNullOrWhiteSpace(address))
                 return;
+            if (!AddressValidator.IsSafe(address))
+            {
+                MessageBox.Show($"'{address}' is not a valid IP address or hostname.", "Invalid Address", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
 
             try
             {

@@ -8,18 +8,7 @@ using System.Windows;
 namespace NetworkMapViewerV2.Data
 {
     public partial class MapRepository
-    {
-        public void UpdateDevice(NetworkDevice device, string mapName)
-        {
-            using var connection = GetOpenConnection();
-            using var transaction = connection.BeginTransaction();
-            try
-            {
-                UpdateDeviceInternal(device, connection, transaction, mapName);
-                transaction.Commit();
-            }
-            catch { transaction.Rollback(); throw; }
-        }
+    {     
 
         private void UpdateDeviceInternal(NetworkDevice device, SqlConnection connection, SqlTransaction transaction, string mapName)
         {
@@ -150,33 +139,7 @@ namespace NetworkMapViewerV2.Data
                     mapName: mapName, oldValue: oldValueJson, newValue: newValueJson, connection: connection, transaction: transaction);
             }
         }
-
-        public bool DeleteDevice(int deviceId, string mapName)
-        {
-            try
-            {
-                if (deviceId <= 0) return true;
-                using var connection = GetOpenConnection();
-                using var cmd = new SqlCommand("DELETE FROM Devices WHERE DeviceId = @DeviceId", connection);
-                cmd.Parameters.AddWithValue("@DeviceId", deviceId);
-                cmd.ExecuteNonQuery();
-
-                InsertAuditLogInternal(actionType: "DELETE", target: "Devices", details: $"Device removed from {mapName}", targetId: deviceId, mapName: mapName, oldValue: null, newValue: null, connection: connection, transaction: null);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                if (ex.Message.Contains("permission was denied"))
-                {
-                    MessageBox.Show("Failed to delete device:\nYou don't have permission to modify the database.", "Database Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-                else
-                {
-                    MessageBox.Show($"Failed to delete device:\n{ex.Message}", "Database Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-                return false;
-            }
-        }
+               
 
         public List<GlobalSearchResult> SearchDevices(string query, bool deepSearch, bool equalitySearch)
         {

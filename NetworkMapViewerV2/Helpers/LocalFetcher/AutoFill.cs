@@ -20,11 +20,12 @@ namespace NetworkMapViewerV2.Helpers.LocalFetcher
         // REMOVED MapCanvasView mapCanvas from parameters
         public static async Task RunAutoFillScript(MainViewModel vm, NetworkDevice device, string scriptName)
         {
-            if (string.IsNullOrWhiteSpace(device.Address) || device.Address == "0.0.0.0")
+            if (!AddressValidator.IsSafe(device.Address) || device.Address == "0.0.0.0")
             {
                 MessageBox.Show("Please set a valid IP Address for this device first!", "Missing IP", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
+
 
             string scriptPath = Path.Combine(ScriptsPath, scriptName);
             if (!File.Exists(scriptPath))
@@ -68,14 +69,26 @@ namespace NetworkMapViewerV2.Helpers.LocalFetcher
                 System.Diagnostics.Process? process = null;
                 string output = "";
                 string err = "";
-
                 try
                 {
                     process = System.Diagnostics.Process.Start(psi);
                     if (process == null) return;
 
-                    output = await process.StandardOutput.ReadToEndAsync();
-                    err = await process.StandardError.ReadToEndAsync();
+                    var outputTask = process.StandardOutput.ReadToEndAsync();
+                    var errorTask = process.StandardError.ReadToEndAsync();
+
+                    using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+                    try
+                    {
+                        await process.WaitForExitAsync(timeout.Token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        try { process.Kill(entireProcessTree: true); } catch { }
+                    }
+
+                    output = await outputTask;
+                    err = await errorTask;
 
                     await process.WaitForExitAsync();
                 }
@@ -168,7 +181,11 @@ namespace NetworkMapViewerV2.Helpers.LocalFetcher
         // REMOVED MapCanvasView mapCanvas from parameters
         public static async Task RunPrinterAutoFill(MainViewModel? GlobalViewModel, NetworkDevice device)
         {
-            if (string.IsNullOrWhiteSpace(device.Address) || device.Address == "0.0.0.0") return;
+            if (!AddressValidator.IsSafe(device.Address) || device.Address == "0.0.0.0")
+            {
+                MessageBox.Show("Please set a valid IP Address for this device first!", "Missing IP", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
             var oldHintText = device.Hints.ToList();
 
             device.Hints.Clear();
@@ -214,7 +231,11 @@ namespace NetworkMapViewerV2.Helpers.LocalFetcher
         // REMOVED MapCanvasView mapCanvas from parameters
         public static async Task RunGrandstreamAutoFill(MainViewModel? GlobalViewModel, NetworkDevice device)
         {
-            if (string.IsNullOrWhiteSpace(device.Address) || device.Address == "0.0.0.0") return;
+            if (!AddressValidator.IsSafe(device.Address) || device.Address == "0.0.0.0")
+            {
+                MessageBox.Show("Please set a valid IP Address for this device first!", "Missing IP", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
             var oldHintText = device.Hints.ToList();
 
             device.Hints.Clear();

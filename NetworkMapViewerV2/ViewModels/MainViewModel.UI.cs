@@ -46,7 +46,7 @@ namespace NetworkMapViewerV2.ViewModels
         [RelayCommand]
         private void ExitApplication()
         {
-            Environment.Exit(0);
+            Application.Current.MainWindow?.Close();
         }
 
         [RelayCommand]

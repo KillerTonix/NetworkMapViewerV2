@@ -42,8 +42,8 @@ namespace NetworkMapViewerV2.Data
         {
             try
             {
-                using var connection = GetOpenConnection();
-                string sql = "INSERT INTO Maps (MapName, MapType) VALUES (@MapName, @MapType); SELECT SCOPE_IDENTITY();";
+                using var connection = GetOpenConnection();                
+                string sql = "INSERT INTO Maps (MapName, MapType, Version) VALUES (@MapName, @MapType, 1); SELECT SCOPE_IDENTITY();";
                 using var cmd = new SqlCommand(sql, connection);
 
                 cmd.Parameters.AddWithValue("@MapName", mapName);
@@ -184,39 +184,84 @@ namespace NetworkMapViewerV2.Data
 
         public async Task<int> GetMapVersionAsync(int mapId)
         {
-            using var connection = GetOpenConnection();
+            await using var connection = new SqlConnection(DatabaseService.ConnectionString);
+            await connection.OpenAsync();
             using var cmd = new SqlCommand("SELECT Version FROM Maps WHERE MapId = @MapId", connection);
             cmd.Parameters.AddWithValue("@MapId", mapId);
-            object result = await cmd.ExecuteScalarAsync();
+            object? result = await cmd.ExecuteScalarAsync();
             return result != null && result != DBNull.Value ? Convert.ToInt32(result) : 0;
         }
 
-        public async Task IncrementAndSaveMapVersionAsync(MapTabState map)
+
+        /// <summary>
+        /// Saves all pending changes of a map in ONE transaction: deletes, inserts/updates, version bump.
+        /// If anything fails, nothing is saved. Throws MapConflictException if someone else saved the map first.
+        /// </summary>
+        public void SaveMapChanges(MapTabState tab)
         {
+            using var connection = GetOpenConnection();
+            using var transaction = connection.BeginTransaction();
+
+            // Items that will get a new ID from the database. If the save fails, reset them to 0 so the next save inserts them again.
+            var newDevices = tab.Devices.Where(d => d.DeviceId == 0).ToList();
+            var newLabels = tab.Labels.Where(l => l.LabelId == 0).ToList();
+
             try
             {
-                using var connection = GetOpenConnection();
-
-                string sql = @"
-                UPDATE [Maps]
-                SET [Version] = [Version] + 1
-                WHERE [MapId] = @MapId;
-
-                SELECT [Version] FROM [NMViewer].[dbo].[Maps] WHERE [MapId] = @MapId;";
-
-                using var cmd = new SqlCommand(sql, connection);
-                cmd.Parameters.AddWithValue("@MapId", map.MapId);
-
-                object result = await cmd.ExecuteScalarAsync();
-                if (result != null && result != DBNull.Value)
+                // 1. Lock this map's row and check that nobody saved since we loaded it
+                using (var cmd = new SqlCommand("SELECT Version FROM Maps WITH (UPDLOCK, HOLDLOCK) WHERE MapId = @MapId", connection, transaction))
                 {
-                    map.Version = Convert.ToInt32(result);
+                    cmd.Parameters.AddWithValue("@MapId", tab.MapId);
+                    object? result = cmd.ExecuteScalar();
+                    int dbVersion = result is null or DBNull ? 1 : Convert.ToInt32(result);
+                    if (dbVersion != tab.Version)
+                        throw new MapConflictException($"Map \"{tab.MapName}\" was saved by someone else after you opened it.");
                 }
+
+                // 2. Deletes
+                foreach (int deviceId in tab.PendingDeletedDeviceIds.Where(id => id > 0))
+                {
+                    using var cmd = new SqlCommand("DELETE FROM Devices WHERE DeviceId = @Id", connection, transaction);
+                    cmd.Parameters.AddWithValue("@Id", deviceId);
+                    cmd.ExecuteNonQuery();
+                    InsertAuditLogInternal("DELETE", "Devices", $"Device removed from {tab.MapName}", deviceId, tab.MapName, null, null, connection, transaction);
+                }
+                foreach (int labelId in tab.PendingDeletedLabelIds.Where(id => id > 0))
+                {
+                    using var cmd = new SqlCommand("DELETE FROM Labels WHERE LabelId = @Id", connection, transaction);
+                    cmd.Parameters.AddWithValue("@Id", labelId);
+                    cmd.ExecuteNonQuery();
+                    InsertAuditLogInternal("DELETE", "Labels", $"Label removed from {tab.MapName}", labelId, tab.MapName, null, null, connection, transaction);
+                }
+
+                // 3. Inserts / updates (the existing Internal methods already use the transaction you pass them)
+                foreach (var device in tab.Devices) UpdateDeviceInternal(device, connection, transaction, tab.MapName);
+                foreach (var label in tab.Labels) UpdateLabelInternal(label, connection, transaction, tab.MapName);
+
+                // 4. Bump the version
+                int newVersion;
+                using (var cmd = new SqlCommand("UPDATE Maps SET Version = ISNULL(Version, 1) + 1 OUTPUT inserted.Version WHERE MapId = @MapId", connection, transaction))
+                {
+                    cmd.Parameters.AddWithValue("@MapId", tab.MapId);
+                    newVersion = Convert.ToInt32(cmd.ExecuteScalar());
+                }
+
+                transaction.Commit();
+
+                // Only after a successful commit
+                tab.Version = newVersion;
+                tab.PendingDeletedDeviceIds.Clear();
+                tab.PendingDeletedLabelIds.Clear();
             }
-            catch (Exception ex)
+            catch
             {
-                MessageBox.Show($"Failed to increment map version:\n{ex.Message}", "Database Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                try { transaction.Rollback(); } catch { }   // the connection may already be dead
+                foreach (var d in newDevices) d.DeviceId = 0;
+                foreach (var l in newLabels) l.LabelId = 0;
+                throw;
             }
         }
     }
+
+    public class MapConflictException(string message) : Exception(message);
 }

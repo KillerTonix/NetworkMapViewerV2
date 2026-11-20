@@ -17,6 +17,8 @@ namespace NetworkMapViewerV2.Helpers.LocalFetcher
 
         public static async Task<string> RunPsExecFallbackAsync(string ipAddress)
         {
+            if (!AddressValidator.IsSafe(ipAddress)) return "ERROR=Invalid device address.";
+
             string localScriptPath = Path.Combine(ScriptsPath, "SystemInfo PSExec.ps1");
             string psExecPath = Path.Combine(ScriptsPath, "psexec.exe");
 

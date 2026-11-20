@@ -1,15 +1,13 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Data.SqlClient;
 using Microsoft.Win32;
 using NetworkMapViewerV2.Helpers;
 using NetworkMapViewerV2.Models;
 using NetworkMapViewerV2.Services;
 using NetworkMapViewerV2.Views;
 using System.Collections.ObjectModel;
-using System.IO;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Media;
 
 namespace NetworkMapViewerV2.ViewModels
 {
@@ -104,7 +102,7 @@ namespace NetworkMapViewerV2.ViewModels
                     if (_appSettings != null)
                     {
                         _appSettings.LastOpenedMapId = newMapId;
-                        SettingsService.Save(_appSettings);
+                        SettingsService.SaveUserSpecific(_appSettings);
                     }
 
                     // 5. Update the ComboBoxes in the sidebar so the new map is visible!
@@ -174,6 +172,9 @@ namespace NetworkMapViewerV2.ViewModels
             {
                 var repo = new Data.MapRepository();
                 var freshData = repo.LoadMap(state.MapId);
+                state.Version = freshData.Version;
+                state.PendingDeletedDeviceIds.Clear();
+                state.PendingDeletedLabelIds.Clear();
                 state.Devices.Clear();
                 foreach (var device in freshData.Devices)
                 {
@@ -203,40 +204,34 @@ namespace NetworkMapViewerV2.ViewModels
         [RelayCommand]
         private async Task SaveMap()
         {
-            if (SelectedTab == null || SelectedTab.MapId <= 0) return;
+            var tab = SelectedTab;
+            if (tab == null || tab.MapId <= 0) return;
 
             try
             {
-                var repo = new Data.MapRepository();
+                _repo.SaveMapChanges(tab);
+                tab.HasUnsavedChanges = false;
+            }
+            catch (Data.MapConflictException ex)
+            {
+                var answer = MessageBox.Show(
+                    $"{ex.Message}\n\nYour changes were NOT saved.\n\n" +
+                    "Yes – reload the map now (your changes will be lost)\n" +
+                    "No – keep your changes on screen (saving will keep failing until you reload)",
+                    "Map changed by someone else", MessageBoxButton.YesNo, MessageBoxImage.Warning);
 
-                // Delete any devices or labels that were marked for deletion
-                foreach (int deviceId in SelectedTab.PendingDeletedDeviceIds) { repo.DeleteDevice(deviceId, SelectedTab.MapName); }
-                SelectedTab.PendingDeletedDeviceIds.Clear(); // Empty the queue
-                foreach (int labelId in SelectedTab.PendingDeletedLabelIds) { repo.DeleteLabel(labelId, SelectedTab.MapName); }
-                SelectedTab.PendingDeletedLabelIds.Clear(); // Empty the queue
-
-                // Save all devices and labels in memory to the database
-                foreach (var device in SelectedTab.Devices) repo.UpdateDevice(device, SelectedTab.MapName);
-                foreach (var label in SelectedTab.Labels) repo.UpdateLabel(label, SelectedTab.MapName);
-
-                await repo.IncrementAndSaveMapVersionAsync(SelectedTab);
-
-                SelectedTab.HasUnsavedChanges = false;
+                if (answer == MessageBoxResult.Yes) await ReloadMap();
+            }
+            catch (SqlException ex) when (ex.Number is 229 or 230)   // SQL Server "permission denied"
+            {
+                MessageBox.Show("Failed to save:\nYou don't have permission to modify the database.", "Save Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             catch (Exception ex)
             {
-                if (ex.Message.Contains("permission was denied"))
-                {
-                    MessageBox.Show($"Failed to save to database:\nYou don't have permission to modify the database.", "Save Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-                else
-                {
-                    MessageBox.Show($"Failed to save to database:\n{ex.Message}", "Save Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-                SelectedTab.HasUnsavedChanges = true;
+                MessageBox.Show($"Failed to save. Nothing was changed in the database.\n\n{ex.Message}", "Save Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
-               
+
 
         public void OpenMapFromDatabase(int mapId)
         {

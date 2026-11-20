@@ -1,23 +1,11 @@
 ﻿using Microsoft.Data.SqlClient;
 using NetworkMapViewerV2.Models;
 using System.Text.Json;
-using System.Windows;
 
 namespace NetworkMapViewerV2.Data
 {
     public partial class MapRepository
-    {
-        public void UpdateLabel(NetworkLabel label, string mapName)
-        {
-            using var connection = GetOpenConnection();
-            using var transaction = connection.BeginTransaction();
-            try
-            {
-                UpdateLabelInternal(label, connection, transaction, mapName);
-                transaction.Commit();
-            }
-            catch { transaction.Rollback(); throw; }
-        }
+    {      
 
         private void UpdateLabelInternal(NetworkLabel label, SqlConnection connection, SqlTransaction transaction, string mapName)
         {
@@ -117,112 +105,74 @@ namespace NetworkMapViewerV2.Data
                 Foreground = @Foreground, TextJson = @TextJson
             WHERE LabelId = @LabelId";
 
-                try
-                {
-                    using var cmd = new SqlCommand(sql, connection, transaction);
-                    cmd.Parameters.AddWithValue("@LabelId", label.LabelId);
-                    AddLabelParameters(cmd, label, textJson);
-                    cmd.ExecuteNonQuery();
 
-                    var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
-
-                    // Construct Old Snapshot
-                    var oldSnapshot = new
-                    {
-                        TextLines = JsonSerializer.Deserialize<List<string>>(dbTextJson) ?? new(),
-                        Position = new { Left = Math.Round(dbLeft, 1), Top = Math.Round(dbTop, 1) },
-                        Size = new { Width = Math.Round(dbWidth, 1), Height = Math.Round(dbHeight, 1) },
-                        Style = new
-                        {
-                            Background = dbBackground,
-                            Foreground = dbForeground,
-                            BorderBrush = dbBorderBrush,
-                            BorderThickness = dbBorderThickness,
-                            FontFamily = dbFontFamily,
-                            FontSize = dbFontSize,
-                            FontStyle = dbFontStyle,
-                            FontWeight = dbFontWeight,
-                            HorizontalAlignment = dbHorizontalAlignment,
-                            VerticalAlignment = dbVerticalAlignment
-                        }
-                    };
-
-                    // Construct New Snapshot
-                    var newSnapshot = new
-                    {
-                        TextLines = label.TextLines?.ToList() ?? new(),
-                        Position = new { Left = Math.Round(label.Left, 1), Top = Math.Round(label.Top, 1) },
-                        Size = new { Width = Math.Round(label.Width, 1), Height = Math.Round(label.Height, 1) },
-                        Style = new
-                        {
-                            Background = label.Background ?? "Transparent",
-                            Foreground = label.Foreground ?? "#000000",
-                            BorderBrush = label.BorderBrush ?? "Transparent",
-                            BorderThickness = label.BorderThickness,
-                            FontFamily = label.FontFamily ?? "Segoe UI",
-                            FontSize = label.FontSize,
-                            FontStyle = label.FontStyle ?? "Normal",
-                            FontWeight = label.FontWeight ?? "Normal",
-                            HorizontalAlignment = label.HorizontalAlignment ?? "Center",
-                            VerticalAlignment = label.VerticalAlignment ?? "Center"
-                        }
-                    };
-
-                    string oldValueJson = JsonSerializer.Serialize(oldSnapshot, jsonOptions);
-                    string newValueJson = JsonSerializer.Serialize(newSnapshot, jsonOptions);
-                    string details = $"Label: \"{labelSnippet}\" | Changed: {string.Join(", ", changedFields)}";
-
-                    InsertAuditLogInternal(
-                        actionType: "UPDATE",
-                        target: "Label",
-                        details: details,
-                        targetId: label.LabelId,
-                        mapName: mapName,
-                        oldValue: oldValueJson,
-                        newValue: newValueJson,
-                        connection: connection,
-                        transaction: transaction);
-                }
-                catch (Exception ex)
-                {
-                    if (ex.Message.Contains("permission was denied"))
-                    {
-                        MessageBox.Show($"Failed to update label:\nYou don't have permission to modify the database.", "Database Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
-                    else
-                    {
-                        MessageBox.Show($"Failed to update label:\n{ex.Message}", "Database Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
-                }
-            }
-        }
-
-        public bool DeleteLabel(int labelId, string mapName)
-        {
-            try
-            {
-                if (labelId <= 0) return true;
-                using var connection = GetOpenConnection();
-                using var cmd = new SqlCommand("DELETE FROM Labels WHERE LabelId = @LabelId", connection);
-                cmd.Parameters.AddWithValue("@LabelId", labelId);
+                using var cmd = new SqlCommand(sql, connection, transaction);
+                cmd.Parameters.AddWithValue("@LabelId", label.LabelId);
+                AddLabelParameters(cmd, label, textJson);
                 cmd.ExecuteNonQuery();
 
-                InsertAuditLogInternal(actionType: "DELETE", target: "Labels", details: $"Label removed from {mapName}", targetId: labelId, mapName: mapName, oldValue: null, newValue: null, connection: connection, transaction: null);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                if (ex.Message.Contains("permission was denied"))
+                var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
+
+                // Construct Old Snapshot
+                var oldSnapshot = new
                 {
-                    MessageBox.Show("Failed to delete Label:\nYou don't have permission to modify the database.", "Database Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-                else
+                    TextLines = JsonSerializer.Deserialize<List<string>>(dbTextJson) ?? new(),
+                    Position = new { Left = Math.Round(dbLeft, 1), Top = Math.Round(dbTop, 1) },
+                    Size = new { Width = Math.Round(dbWidth, 1), Height = Math.Round(dbHeight, 1) },
+                    Style = new
+                    {
+                        Background = dbBackground,
+                        Foreground = dbForeground,
+                        BorderBrush = dbBorderBrush,
+                        BorderThickness = dbBorderThickness,
+                        FontFamily = dbFontFamily,
+                        FontSize = dbFontSize,
+                        FontStyle = dbFontStyle,
+                        FontWeight = dbFontWeight,
+                        HorizontalAlignment = dbHorizontalAlignment,
+                        VerticalAlignment = dbVerticalAlignment
+                    }
+                };
+
+                // Construct New Snapshot
+                var newSnapshot = new
                 {
-                    MessageBox.Show($"Failed to delete Label:\n{ex.Message}", "Database Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-                return false;
+                    TextLines = label.TextLines?.ToList() ?? new(),
+                    Position = new { Left = Math.Round(label.Left, 1), Top = Math.Round(label.Top, 1) },
+                    Size = new { Width = Math.Round(label.Width, 1), Height = Math.Round(label.Height, 1) },
+                    Style = new
+                    {
+                        Background = label.Background ?? "Transparent",
+                        Foreground = label.Foreground ?? "#000000",
+                        BorderBrush = label.BorderBrush ?? "Transparent",
+                        BorderThickness = label.BorderThickness,
+                        FontFamily = label.FontFamily ?? "Segoe UI",
+                        FontSize = label.FontSize,
+                        FontStyle = label.FontStyle ?? "Normal",
+                        FontWeight = label.FontWeight ?? "Normal",
+                        HorizontalAlignment = label.HorizontalAlignment ?? "Center",
+                        VerticalAlignment = label.VerticalAlignment ?? "Center"
+                    }
+                };
+
+                string oldValueJson = JsonSerializer.Serialize(oldSnapshot, jsonOptions);
+                string newValueJson = JsonSerializer.Serialize(newSnapshot, jsonOptions);
+                string details = $"Label: \"{labelSnippet}\" | Changed: {string.Join(", ", changedFields)}";
+
+                InsertAuditLogInternal(
+                    actionType: "UPDATE",
+                    target: "Label",
+                    details: details,
+                    targetId: label.LabelId,
+                    mapName: mapName,
+                    oldValue: oldValueJson,
+                    newValue: newValueJson,
+                    connection: connection,
+                    transaction: transaction);
+
             }
         }
+              
 
         private static void AddLabelParameters(SqlCommand cmd, NetworkLabel label, string textJson)
         {
