@@ -13,6 +13,7 @@ namespace NetworkMapViewerV2.Views
     public partial class MainWindow : Window
     {
         public MainViewModel ViewModel { get; }
+        private bool _closeConfirmed;
 
         // --- WIN32 API IMPORTS ---
         [DllImport("user32.dll")]
@@ -44,14 +45,23 @@ namespace NetworkMapViewerV2.Views
                 }
             };
 
-            this.Closed += (sender, args) =>
+            this.Closing += async (sender, args) =>
             {
-                try { ViewModel?.StopMapSyncTimer(); } catch { }
-                try { ViewModel?.PingService.StopPinging(); } catch { }
-                try { BackgroundPingService.Instance.Stop(); } catch { }
+                if (_closeConfirmed) return;
 
-                // Hard exit: skips library cleanup that can wait on broken DB connections
-                System.Diagnostics.Process.GetCurrentProcess().Kill();
+                var dirtyTabs = ViewModel.OpenTabs.Where(t => t.HasUnsavedChanges).ToList();
+                if (dirtyTabs.Count == 0) return;
+
+                args.Cancel = true;   // must be set before the first await
+
+                foreach (var tab in dirtyTabs)
+                {
+                    if (!await ViewModel.ConfirmCloseTabAsync(tab))
+                        return;       // Cancel or a failed save: keep the app open
+                }
+
+                _closeConfirmed = true;
+                Close();              // ask again; this time nothing stops it
             };
 
             var settings = SettingsService.Load();

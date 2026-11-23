@@ -12,15 +12,34 @@ namespace NetworkMapViewerV2.ViewModels
         [ObservableProperty]
         private ObservableCollection<MapTabState> _openTabs = [];
         [ObservableProperty]
-        public MapTabState _selectedTab = new();   
+        public MapTabState _selectedTab = new();
+
+        /// <summary>
+        /// Asks what to do with unsaved changes. Returns true if the tab may be closed.
+        /// </summary>
+        public async Task<bool> ConfirmCloseTabAsync(MapTabState tab)
+        {
+            if (!tab.HasUnsavedChanges) return true;
+
+            var answer = MessageBox.Show(
+                $"Map \"{tab.MapName}\" has unsaved changes.\n\nSave them before closing?",
+                "Unsaved Changes", MessageBoxButton.YesNoCancel, MessageBoxImage.Warning);
+
+            if (answer == MessageBoxResult.Cancel) return false;
+            if (answer == MessageBoxResult.No) return true;
+
+            // Yes: SaveMap saves the selected tab, so select this one first
+            SelectedTab = tab;
+            await SaveMap();
+            return !tab.HasUnsavedChanges;   // save failed -> keep the tab open
+        }
 
         [RelayCommand]
-        public void CloseTab(MapTabState tabToClose)
+        public async Task CloseTab(MapTabState tabToClose)
         {
-            if (tabToClose != null && OpenTabs.Contains(tabToClose))
-            {
-                OpenTabs.Remove(tabToClose);
-            }
+            if (tabToClose == null || !OpenTabs.Contains(tabToClose)) return;
+            if (!await ConfirmCloseTabAsync(tabToClose)) return;
+            CloseMapTab(tabToClose);
         }
 
         /// <summary>Closes a map tab without asking (used when the map no longer exists in the database).</summary>
@@ -28,6 +47,7 @@ namespace NetworkMapViewerV2.ViewModels
         {
             OpenTabs.Remove(tab);
             if (SelectedTab == tab) SelectedTab = OpenTabs.FirstOrDefault()!;
+            SyncOpenTabDevices();   // stop background-pinging the closed map's devices
         }
 
         partial void OnSelectedTabChanged(MapTabState value)
@@ -54,24 +74,9 @@ namespace NetworkMapViewerV2.ViewModels
 
 
         [RelayCommand]
-        public void CloseCurrentTab()
+        public async Task CloseCurrentTab()
         {
-            // Closes whatever tab is currently selected when the user hits Ctrl+W
-            if (SelectedTab != null)
-            {
-                if (IsEditingEnabled)
-                {
-                    var result = MessageBox.Show("You have unsaved changes. Are you sure you want to close this tab?", "Unsaved Changes", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-                    if (result == MessageBoxResult.Yes)
-                    {
-                        CloseTab(SelectedTab);
-                    }
-                }
-                else
-                {
-                    CloseTab(SelectedTab);
-                }
-            }
-        }       
+            if (SelectedTab != null) await CloseTab(SelectedTab);
+        }
     }
 }

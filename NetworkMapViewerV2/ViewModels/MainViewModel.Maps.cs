@@ -86,12 +86,14 @@ namespace NetworkMapViewerV2.ViewModels
                     // 1. Create the map in the database instantly
                     var repo = new Data.MapRepository();
                     int newMapId = repo.CreateNewMap(mapName, mapType);
+                    if (newMapId <= 0) return;   // CreateNewMap already showed the error
 
                     // 2. Create the blank Tab State tied to the real Database ID
                     var newTab = new MapTabState
                     {
                         MapId = newMapId,
                         MapName = mapName,
+                        MapType = mapType,
                         Devices = [], // Start with empty lists
                         Labels = []
                     };
@@ -183,7 +185,7 @@ namespace NetworkMapViewerV2.ViewModels
                         MessageBox.Show($"Failed to rename map:\n{ex.Message}", "Rename Error", MessageBoxButton.OK, MessageBoxImage.Error);
                     }
 
-                    OpenMap(); // reopen the list so the new name is visible
+                    await OpenMap();
                 }
 
             }
@@ -371,46 +373,35 @@ namespace NetworkMapViewerV2.ViewModels
             var tab = OpenTabs.FirstOrDefault(t => t.MapId == mapId);
             if (tab == null) return;
 
-            await Application.Current.Dispatcher.InvokeAsync(async () =>
+            try
             {
-                try
-                {
-                    // 1. Fetch fresh devices & labels from database
-                    var freshData = _repo.LoadMap(mapId);
+                // Load on a background thread so the window stays responsive while the DB answers
+                var freshData = await Task.Run(() => _repo.LoadMap(mapId));
 
-                    // 2. Clear & repopulate devices
-                    tab.Devices.Clear();
-                    foreach (var device in freshData.Devices)
-                    {
-                        tab.Devices.Add(device);
-                    }
+                // While we were loading, the user may have closed the tab or started editing it
+                if (!OpenTabs.Contains(tab) || tab.HasUnsavedChanges || tab.IsEditingEnabled) return;
 
-                    // 3. Clear & repopulate labels
-                    tab.Labels.Clear();
-                    foreach (var label in freshData.Labels)
-                    {
-                        tab.Labels.Add(label);
-                    }
+                tab.Version = freshData.Version;   // the version of the data we actually loaded
+                tab.PendingDeletedDeviceIds.Clear();
+                tab.PendingDeletedLabelIds.Clear();
 
-                    tab.HasUnsavedChanges = false;
+                tab.Devices.Clear();
+                foreach (var device in freshData.Devices) tab.Devices.Add(device);
 
-                    // 4. Trigger UI redraw if canvas delegate is assigned
-                    tab.TriggerRedraw?.Invoke();
+                tab.Labels.Clear();
+                foreach (var label in freshData.Labels) tab.Labels.Add(label);
 
-                    // 5. Update background ping service with newly loaded addresses
-                    SyncOpenTabDevices();
+                tab.HasUnsavedChanges = false;
+                tab.TriggerRedraw?.Invoke();
+                SyncOpenTabDevices();
 
-                    // 6. Recalculate pings for active view
-                    if (SelectedTab == tab)
-                    {
-                        await RecalculatePingsAsync(tab.Devices);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Failed to auto-refresh map {mapId}: {ex.Message}");
-                }
-            });
+                if (SelectedTab == tab)
+                    await RecalculatePingsAsync(tab.Devices);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to auto-refresh map {mapId}: {ex.Message}");
+            }
         }
 
 

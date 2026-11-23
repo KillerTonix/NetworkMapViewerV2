@@ -189,7 +189,9 @@ namespace NetworkMapViewerV2.Data
 
             var devices = new List<NetworkDevice>();
             using var connection = GetOpenConnection();
-            using var cmd = new SqlCommand("SELECT DeviceId, Address, GroupId, TitleJson FROM Devices", connection);
+            using var cmd = new SqlCommand(
+                "SELECT DeviceId, Address, GroupId, TitleJson FROM Devices " +
+                "WHERE Address IS NOT NULL AND LTRIM(RTRIM(Address)) <> ''", connection);
             using var reader = cmd.ExecuteReader();
 
             while (reader.Read())
@@ -199,10 +201,9 @@ namespace NetworkMapViewerV2.Data
                     DeviceId = reader.GetInt32(0),
                     Address = reader.GetString(1),
                     GroupId = reader.GetInt32(2),
-                    Titles = reader.GetString(3) != null ? JsonSerializer.Deserialize<ObservableCollection<string>>(reader.GetString(3)) ?? [] : []
+                    Titles = new ObservableCollection<string>(ParseJsonList(reader.IsDBNull(3) ? null : reader.GetString(3)))
                 });
             }
-
             return devices;
         }
 

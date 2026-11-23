@@ -17,6 +17,21 @@ namespace NetworkMapViewerV2.Helpers.LocalFetcher
         private static readonly string decryptedPasswordManagers = SecureSettingsHelper.UnprotectPassword(settings.ManagersPCPassword) ?? "";
         private static readonly string decryptedPasswordQMS = SecureSettingsHelper.UnprotectPassword(settings.QMSPassword) ?? "";
 
+        /// <summary>
+        /// Wraps text in PowerShell single quotes, where $ and ` have no special meaning.
+        /// A quote inside is doubled. PowerShell also treats the "smart" quotes ‘ ’ ‚ ‛ as single quotes.
+        /// </summary>
+        private static string PsQuote(string value)
+        {
+            var sb = new System.Text.StringBuilder("'");
+            foreach (char c in value)
+            {
+                if (c is '\'' or '\u2018' or '\u2019' or '\u201A' or '\u201B') sb.Append(c);
+                sb.Append(c);
+            }
+            return sb.Append('\'').ToString();
+        }
+
         // REMOVED MapCanvasView mapCanvas from parameters
         public static async Task RunAutoFillScript(MainViewModel vm, NetworkDevice device, string scriptName)
         {
@@ -46,13 +61,13 @@ namespace NetworkMapViewerV2.Helpers.LocalFetcher
                 string additionalArgs = "";
 
                 if (scriptName.Contains("Linux"))
-                    additionalArgs = $"-Password \"{decryptedPasswordSSH}\"";
+                    additionalArgs = $"-Password {PsQuote(decryptedPasswordSSH)}";
                 else if (scriptName.Contains("Non Domain"))
-                    additionalArgs = $"-Password1 \"{decryptedPasswordSSH}\" -Password2 \"{decryptedPasswordManagers}\"";
+                    additionalArgs = $"-Password1 {PsQuote(decryptedPasswordSSH)} -Password2 {PsQuote(decryptedPasswordManagers)}";
                 else if (scriptName.Contains("Default"))
-                    additionalArgs = $"-Password1 \"{decryptedPasswordSSH}\" -Password2 \"{decryptedPasswordQMS}\"";
+                    additionalArgs = $"-Password1 {PsQuote(decryptedPasswordSSH)} -Password2 {PsQuote(decryptedPasswordQMS)}";
 
-                string rawCommand = $"& \"{scriptPath}\" -IP \"{device.Address}\" {additionalArgs}";
+                string rawCommand = $"& {PsQuote(scriptPath)} -IP {PsQuote(device.Address)} {additionalArgs}";
                 byte[] commandBytes = System.Text.Encoding.Unicode.GetBytes(rawCommand);
                 string encodedCommand = Convert.ToBase64String(commandBytes);
 

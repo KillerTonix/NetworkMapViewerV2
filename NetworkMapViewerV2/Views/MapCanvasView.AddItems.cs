@@ -206,7 +206,7 @@ namespace NetworkMapViewerV2.Views
             newDevice.Titles.Add("New Device"); // Adds text safely to the JSON list!
 
             _currentState.Devices.Add(newDevice);
-            GlobalViewModel?.HasUnsavedChanges = true;
+            _currentState.HasUnsavedChanges = true;
             DrawMap(_currentState);
         }
     }

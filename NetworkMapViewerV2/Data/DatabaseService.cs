@@ -47,7 +47,9 @@ namespace NetworkMapViewerV2.Data
                     (
                         MapId INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
                         MapName NVARCHAR(MAX) NOT NULL,
-                        MapType TEXT NOT NULL
+                        MapType TEXT NOT NULL,
+                        Version INT NOT NULL
+                            CONSTRAINT DF_Maps_Version DEFAULT (1)
                     );
                 END;
                 
@@ -70,13 +72,17 @@ namespace NetworkMapViewerV2.Data
                 BEGIN
                     CREATE TABLE dbo.AuditLogs
                     (
-                        LogId INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-                        [Timestamp] DATETIME2 NOT NULL,
-                        Username NVARCHAR(255) NOT NULL,
-                        ActionType NVARCHAR(100) NOT NULL,
-                        TableName NVARCHAR(255) NOT NULL,
-                        RecordId INT NOT NULL,
-                        Details NVARCHAR(MAX) NULL
+                        id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                        [TimeStamp] DATETIME NOT NULL,
+                        MapName NVARCHAR(255) NULL,
+                        UserName NVARCHAR(100) NULL,
+                        ActionType NVARCHAR(50) NULL,
+                        Target NVARCHAR(100) NULL,
+                        Details NVARCHAR(MAX) NULL,
+                        MachineName NVARCHAR(100) NULL,
+                        OldValue NVARCHAR(MAX) NULL,
+                        NewValue NVARCHAR(MAX) NULL,
+                        TargetID INT NULL
                     );
                 END;
                 

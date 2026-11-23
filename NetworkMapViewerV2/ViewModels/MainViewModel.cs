@@ -60,7 +60,6 @@ namespace NetworkMapViewerV2.ViewModels
                 int serverVersion = await Task.Run(() => _repo.GetMapVersionAsync(tab.MapId));
                 if (serverVersion > tab.Version)
                 {
-                    tab.Version = serverVersion;
                     await RefreshCurrentMapAsync(tab.MapId);
                 }
             }
